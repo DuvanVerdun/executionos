@@ -5,13 +5,12 @@
     <link rel="preconnect" href="https://gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <script src="app.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ExecutionOS</title>
 </head>
 <body>
-    <div class="app-container">
+    <div class="plan-screen screen">
         <section class="header-section">
             <h1>ExecutionOS</h1>
             <p>ExecutionOS helps ambitious builders who already know what they should be doing but struggle to execute consistently on meaningful goals and projects.</p>
@@ -28,5 +27,16 @@
             <button id="start-work-btn">START WORK</button>
         </section>
     </div>
+    <div class="focus-screen screen">
+        <p id="mission-display"></p>
+        <section class="timer-section">
+            <p id="timer">00:00:00</p>
+        </section>
+        <section class="action-section">
+            <button id="pause-btn">Pause</button>
+            <button id="stop-btn">Stop</button>
+        </section>
+    </div>
 </body>
+<script src="app.js"></script>
 </html>
