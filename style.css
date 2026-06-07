@@ -84,6 +84,11 @@ body {
     font-weight: bold;
 }
 
+#target-time-display {
+    font-size: 1rem;
+    margin-top: 0;
+}
+
 .focus-screen .timer-section p {
     font-size: 7rem;
     font-weight: bold;
