@@ -2,30 +2,52 @@ const AppState = {
     currentMission: '',
     targetTimeSeconds: 0,
     actualTimeSeconds: 0,
-    isTimerRunning: false
+    completionStatus: 'uncompleted',
+    percentageCompleted: 0,
+    isTimerRunning: false,
+    fromPlanScreen: true
 }
 
 let timerInterval = null;
 
+const targetTimeInput = document.getElementById('time-input');
+const missionInput = document.getElementById('mission-input');
 const startWorkBtn = document.getElementById('start-work-btn');
 const pauseBtn = document.getElementById('pause-btn');
 const stopBtn = document.getElementById('stop-btn');
+const continueBtn = document.getElementById('continue-btn');
+const finishBtn = document.getElementById('finish-btn');
 
 startWorkBtn.addEventListener('click', () => {
-    parsedTime = parseTimeFromHHMMSS(document.getElementById('time-input').value);
-    AppState.currentMission = document.getElementById('mission-input').value;
+    if (!missionInput.value) {
+        alert('Please enter a mission');
+        return;
+    }
+    if (!targetTimeInput.value || !/^\d{2}:\d{2}$/.test(targetTimeInput.value)) {
+        alert('Please enter a target time in HH:MM format');
+        return;
+    }
+    const parsedTime = parseTimeFromHHMMSS(targetTimeInput.value);
+    AppState.currentMission = missionInput.value;
     AppState.targetTimeSeconds = parsedTime;
     changeToFocusScreen(AppState);
     startTimer(AppState);
 })
 
 function changeToFocusScreen(appState) {
-    const planScreen = document.querySelector('.plan-screen');
     const focusScreen = document.querySelector('.focus-screen');
-    planScreen.style.display = 'none';
-    focusScreen.style.display = 'flex';
-    document.getElementById('mission-display').textContent = `Mission: ${appState.currentMission}`;
-    document.getElementById('target-time-display').textContent = `Target Time: ${document.getElementById('time-input').value}`;
+    if (AppState.fromPlanScreen) {
+        const planScreen = document.querySelector('.plan-screen');
+        planScreen.style.display = 'none';
+        focusScreen.style.display = 'flex';
+        document.getElementById('mission-display').textContent = `Mission: ${appState.currentMission}`;
+        document.getElementById('target-time-display').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
+    }
+    else {
+        const reviewScreen = document.querySelector('.review-screen');
+        reviewScreen.style.display = 'none';
+        focusScreen.style.display = 'flex';
+    }
 }
 
 function parseTimeFromHHMMSS(timeStr) {
@@ -33,6 +55,14 @@ function parseTimeFromHHMMSS(timeStr) {
     const hours = parseInt(parts[0]);
     const minutes = parseInt(parts[1]);
     return hours * 3600 + minutes * 60;
+}
+
+function formatTime(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
 }
 
 function startTimer(appState) {
@@ -66,4 +96,27 @@ pauseBtn.addEventListener('click', () => {
 stopBtn.addEventListener('click', () => {
     clearInterval(timerInterval);
     AppState.isTimerRunning = false;
+    AppState.fromPlanScreen = false;
+    AppState.percentageCompleted = Math.floor(AppState.actualTimeSeconds / AppState.targetTimeSeconds * 100);
+    if (AppState.actualTimeSeconds >= AppState.targetTimeSeconds) {
+        AppState.completionStatus = 'completed';
+    }
+    changeToReviewScreen(AppState);
+})
+
+function changeToReviewScreen(appState) {
+    const focusScreen = document.querySelector('.focus-screen');
+    const reviewScreen = document.querySelector('.review-screen');
+    focusScreen.style.display = 'none';
+    reviewScreen.style.display = 'flex';
+    document.getElementById('target-time-review').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
+    document.getElementById('actual-time-review').textContent = `Actual Time: ${formatTime(appState.actualTimeSeconds)}`;
+    document.getElementById('completion-percentage-review').textContent = `${appState.percentageCompleted}%`;
+    document.getElementById('completion-status-review').textContent = appState.completionStatus;
+}
+
+continueBtn.addEventListener('click', () => {
+    changeToFocusScreen(AppState);
+    startTimer(AppState);
+    pauseBtn.textContent = 'Pause';
 })

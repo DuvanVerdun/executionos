@@ -21,7 +21,7 @@
         </section>
         <section class="time-section">
             <h3>How long will you focus?</h3>
-            <input type="text" placeholder="hh:mm" class="input" id="time-input">
+            <input type="text" placeholder="HH:MM" class="input" id="time-input">
         </section>
         <section class="action-section">
             <button id="start-work-btn">START WORK</button>
@@ -37,6 +37,21 @@
             <button id="pause-btn">Pause</button>
             <button id="stop-btn">Stop</button>
         </section>
+    </div>
+    <div class="review-screen screen">
+        <h1>Review</h1>
+        <div class="target-vs-actual-container">
+            <h2 id="target-time-review"></h2>
+            <h2 id="actual-time-review"></h2>
+        </div>
+        <div class="percentage-status-container">
+            <p id="completion-percentage-review"></p>
+            <p id="completion-status-review"></p>
+        </div>
+        <div class="action-section">
+            <button id="continue-btn">Continue</button>
+            <button id="finish-btn">Finish</button>
+        </div>
     </div>
 </body>
 <script src="app.js"></script>
