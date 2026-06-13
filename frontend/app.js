@@ -1,4 +1,4 @@
-const BACKEND_URL = 'executionos-production.up.railway.app';
+const BACKEND_URL = 'https://executionos-production.up.railway.app';
 
 const AppState = {
     currentMission: '',
