@@ -1,3 +1,5 @@
+const BACKEND_URL = 'http://YOUR_REPLIT_URL.repl.co'; // Replace with your actual Replit URL
+
 const AppState = {
     currentMission: '',
     targetTimeSeconds: 0,
@@ -120,3 +122,55 @@ continueBtn.addEventListener('click', () => {
     startTimer(AppState);
     pauseBtn.textContent = 'Pause';
 })
+
+finishBtn.addEventListener('click', async () => {
+    const sessionData = {
+        mission: AppState.currentMission,
+        target_time: formatTime(AppsState.targetTimeSeconds),
+        actual_time: formatTime(AppState.actualTimeSeconds),
+        completion_percent: AppState.percentageCompleted,
+        completion_status: AppState.completionStatus,
+        timestamp: new Date().toISOString()
+    };
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/save-session`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(sessionData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert("✅ Session saved successfully!\nReady for next session.");
+            resetApp();
+        } else {
+            alert("❌ Error saving session: " + result.error);
+        }
+    } catch (error) {
+        console.error("Backend error:", error);
+        alert("❌ Could not reach backend. Check your connection and BACKEND_URL.");
+    }
+});
+
+function resetApp() {
+    AppState.currentMission = '';
+    AppState.targetTimeSeconds = 0;
+    AppState.actualTimeSeconds = 0;
+    AppState.completionStatus = 'uncompleted';
+    AppState.percentageCompleted = 0;
+    AppState.isTimerRunning = false;
+    AppState.fromPlanScreen = true;
+
+    missionInput.value = '';
+    targetTimeInput.value = '';
+    document.getElementById('timer').textContent = '00:00:00';
+
+    const planScreen = document.querySelector('.plan-screen');
+    const reviewScreen = document.querySelector('.review-screen')
+    reviewScreen.style.display = 'none';
+    planScreen.style.display = 'flex';
+}
