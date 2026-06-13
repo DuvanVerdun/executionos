@@ -126,7 +126,7 @@ continueBtn.addEventListener('click', () => {
 finishBtn.addEventListener('click', async () => {
     const sessionData = {
         mission: AppState.currentMission,
-        target_time: formatTime(AppsState.targetTimeSeconds),
+        target_time: formatTime(AppState.targetTimeSeconds),
         actual_time: formatTime(AppState.actualTimeSeconds),
         completion_percent: AppState.percentageCompleted,
         completion_status: AppState.completionStatus,
