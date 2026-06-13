@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://YOUR_REPLIT_URL.repl.co'; // Replace with your actual Replit URL
+const BACKEND_URL = 'executionos-production.up.railway.app';
 
 const AppState = {
     currentMission: '',
