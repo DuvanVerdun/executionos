@@ -1,4 +1,38 @@
+// ========== 1. CONSTANTS ==========
+
 const BACKEND_URL = 'https://executionos-production.up.railway.app';
+
+
+// ========== 2. STATE & MANAGERS ==========
+
+const QueueManager = {
+    queue: [],
+    cap: 15,
+    storageKey: 'executionOS_sessionQueue',
+
+    loadQueue: function() {
+        const stored = localStorage.getItem(this.storageKey);
+        this.queue = stored ? JSON.parse(stored) : [];
+    },
+
+    saveQueue: function() {
+        localStorage.setItem(this.storageKey, JSON.stringify(this.queue));
+    },
+
+    addToQueue: function(item) {
+        if (this.queue.length >= this.cap) {
+            return false;
+        }
+        this.queue.push(item);
+        this.saveQueue();
+        return true;
+    },
+
+    removeFirst: function() {
+        this.queue.shift();
+        this.saveQueue();
+    }
+};
 
 const AppState = {
     currentMission: '',
@@ -12,6 +46,9 @@ const AppState = {
 
 let timerInterval = null;
 
+
+// ========== 3. DOM ELEMENT REFERENCES ==========
+
 const targetTimeInput = document.getElementById('time-input');
 const missionInput = document.getElementById('mission-input');
 const startWorkBtn = document.getElementById('start-work-btn');
@@ -20,21 +57,89 @@ const stopBtn = document.getElementById('stop-btn');
 const continueBtn = document.getElementById('continue-btn');
 const finishBtn = document.getElementById('finish-btn');
 
-startWorkBtn.addEventListener('click', () => {
-    if (!missionInput.value) {
-        alert('Please enter a mission');
-        return;
+
+// ========== 4. UTILITY FUNCTIONS ==========
+
+function parseTimeFromHHMMSS(timeStr) {
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0]);
+    const minutes = parseInt(parts[1]);
+    return hours * 3600 + minutes * 60;
+}
+
+function formatTime(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function startTimer(appState) {
+    appState.isTimerRunning = true;
+    timerInterval = setInterval(updateTimer.bind(null, appState), 1000);
+}
+
+function updateTimer(appState) {
+    if (!appState.isTimerRunning) return;
+    appState.actualTimeSeconds += 1;
+    const hours = Math.floor(appState.actualTimeSeconds / 3600);
+    const minutes = Math.floor((appState.actualTimeSeconds % 3600) / 60);
+    const seconds = appState.actualTimeSeconds % 60;
+    const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+    document.getElementById('timer').textContent = formattedTime;
+}
+
+function resetApp() {
+    AppState.currentMission = '';
+    AppState.targetTimeSeconds = 0;
+    AppState.actualTimeSeconds = 0;
+    AppState.completionStatus = 'uncompleted';
+    AppState.percentageCompleted = 0;
+    AppState.isTimerRunning = false;
+    AppState.fromPlanScreen = true;
+
+    missionInput.value = '';
+    targetTimeInput.value = '';
+    document.getElementById('timer').textContent = '00:00:00';
+
+    const planScreen = document.querySelector('.plan-screen');
+    const reviewScreen = document.querySelector('.review-screen')
+    reviewScreen.style.display = 'none';
+    planScreen.style.display = 'flex';
+}
+
+async function postSession(sessionData) {
+    const response = await fetch(`${BACKEND_URL}/api/save-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sessionData)
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+        throw new Error(result.error || "Save failed");
     }
-    if (!targetTimeInput.value || !/^\d{2}:\d{2}$/.test(targetTimeInput.value)) {
-        alert('Please enter a target time in HH:MM format');
-        return;
+    return result;
+}
+
+async function retryQueue() {
+    while (QueueManager.queue.length > 0) {
+        try {
+            const sessionData = QueueManager.queue[0];
+            await postSession(sessionData);
+            QueueManager.removeFirst();
+        } catch (error) {
+            console.error("Retry failed:", error);
+            break;
+        }
     }
-    const parsedTime = parseTimeFromHHMMSS(targetTimeInput.value);
-    AppState.currentMission = missionInput.value;
-    AppState.targetTimeSeconds = parsedTime;
-    changeToFocusScreen(AppState);
-    startTimer(AppState);
-})
+}
+
+
+
+
+// ========== 5. SCREEN CHANGE FUNCTIONS ==========
 
 function changeToFocusScreen(appState) {
     const focusScreen = document.querySelector('.focus-screen');
@@ -52,35 +157,35 @@ function changeToFocusScreen(appState) {
     }
 }
 
-function parseTimeFromHHMMSS(timeStr) {
-    const parts = timeStr.split(':');
-    const hours = parseInt(parts[0]);
-    const minutes = parseInt(parts[1]);
-    return hours * 3600 + minutes * 60;
+function changeToReviewScreen(appState) {
+    const focusScreen = document.querySelector('.focus-screen');
+    const reviewScreen = document.querySelector('.review-screen');
+    focusScreen.style.display = 'none';
+    reviewScreen.style.display = 'flex';
+    document.getElementById('target-time-review').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
+    document.getElementById('actual-time-review').textContent = `Actual Time: ${formatTime(appState.actualTimeSeconds)}`;
+    document.getElementById('completion-percentage-review').textContent = `${appState.percentageCompleted}%`;
+    document.getElementById('completion-status-review').textContent = appState.completionStatus;
 }
 
-function formatTime(totalSeconds) {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-}
+// ========== 6. EVENT LISTENERS ==========
 
-function startTimer(appState) {
-    appState.isTimerRunning = true;
-    timerInterval = setInterval(updateTimer.bind(null, appState), 1000);
-}
-
-function updateTimer(appState) {
-    if (!appState.isTimerRunning) return;
-    appState.actualTimeSeconds += 1;
-    const hours = Math.floor(appState.actualTimeSeconds / 3600);
-    const minutes = Math.floor((appState.actualTimeSeconds % 3600) / 60);
-    const seconds = appState.actualTimeSeconds % 60;
-    const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-    document.getElementById('timer').textContent = formattedTime;
-}
+startWorkBtn.addEventListener('click', () => {
+    if (!missionInput.value) {
+        alert('Please enter a mission');
+        return;
+    }
+    if (!targetTimeInput.value || !/^\d{2}:\d{2}$/.test(targetTimeInput.value)) {
+        alert('Please enter a target time in HH:MM format');
+        return;
+    }
+    const parsedTime = parseTimeFromHHMMSS(targetTimeInput.value);
+    AppState.currentMission = missionInput.value;
+    AppState.targetTimeSeconds = parsedTime;
+    changeToFocusScreen(AppState);
+    startTimer(AppState);
+})
 
 pauseBtn.addEventListener('click', () => {
     if (AppState.isTimerRunning) {
@@ -106,17 +211,6 @@ stopBtn.addEventListener('click', () => {
     changeToReviewScreen(AppState);
 })
 
-function changeToReviewScreen(appState) {
-    const focusScreen = document.querySelector('.focus-screen');
-    const reviewScreen = document.querySelector('.review-screen');
-    focusScreen.style.display = 'none';
-    reviewScreen.style.display = 'flex';
-    document.getElementById('target-time-review').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
-    document.getElementById('actual-time-review').textContent = `Actual Time: ${formatTime(appState.actualTimeSeconds)}`;
-    document.getElementById('completion-percentage-review').textContent = `${appState.percentageCompleted}%`;
-    document.getElementById('completion-status-review').textContent = appState.completionStatus;
-}
-
 continueBtn.addEventListener('click', () => {
     changeToFocusScreen(AppState);
     startTimer(AppState);
@@ -134,43 +228,29 @@ finishBtn.addEventListener('click', async () => {
     };
 
     try {
-        const response = await fetch(`${BACKEND_URL}/api/save-session`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(sessionData)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            alert("✅ Session saved successfully!\nReady for next session.");
-            resetApp();
-        } else {
-            alert("❌ Error saving session: " + result.error);
-        }
+        await postSession(sessionData);
+        alert("✅ Session saved successfully!\nReady for next session.");
     } catch (error) {
-        console.error("Backend error:", error);
-        alert("❌ Could not reach backend. Check your connection and BACKEND_URL.");
+        console.error("Save error:", error);
+        const addedToQueue = QueueManager.addToQueue(sessionData);
+        if (!addedToQueue) {
+            alert("Queue full: connection issues persist. Cannot save more sessions.");
+        }
+        else {
+            alert("Added to offline queue, will sync when online.");
+        }
     }
+    
+    resetApp();
 });
 
-function resetApp() {
-    AppState.currentMission = '';
-    AppState.targetTimeSeconds = 0;
-    AppState.actualTimeSeconds = 0;
-    AppState.completionStatus = 'uncompleted';
-    AppState.percentageCompleted = 0;
-    AppState.isTimerRunning = false;
-    AppState.fromPlanScreen = true;
 
-    missionInput.value = '';
-    targetTimeInput.value = '';
-    document.getElementById('timer').textContent = '00:00:00';
+// ========== 7. APP INITIALIZATION ==========
 
-    const planScreen = document.querySelector('.plan-screen');
-    const reviewScreen = document.querySelector('.review-screen')
-    reviewScreen.style.display = 'none';
-    planScreen.style.display = 'flex';
-}
+document.addEventListener('DOMContentLoaded', async () => {
+    QueueManager.loadQueue()
+    if (QueueManager.queue.length > 0) {
+        alert("Syncing offline work...");
+        await retryQueue();
+    }
+});
