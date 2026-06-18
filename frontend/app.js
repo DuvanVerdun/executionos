@@ -41,7 +41,8 @@ const AppState = {
     completionStatus: 'uncompleted',
     percentageCompleted: 0,
     isTimerRunning: false,
-    fromPlanScreen: true
+    fromPlanScreen: true,
+    startTimestamp: ''
 }
 
 let timerInterval = null;
@@ -82,11 +83,9 @@ function startTimer(appState) {
 function updateTimer(appState) {
     if (!appState.isTimerRunning) return;
     appState.actualTimeSeconds += 1;
-    const hours = Math.floor(appState.actualTimeSeconds / 3600);
-    const minutes = Math.floor((appState.actualTimeSeconds % 3600) / 60);
-    const seconds = appState.actualTimeSeconds % 60;
-    const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+    const formattedTime = formatTime(appState.actualTimeSeconds);
     document.getElementById('timer').textContent = formattedTime;
+    saveActiveSession(appState)
 }
 
 function resetApp() {
@@ -97,10 +96,13 @@ function resetApp() {
     AppState.percentageCompleted = 0;
     AppState.isTimerRunning = false;
     AppState.fromPlanScreen = true;
+    AppState.startTimestamp = '';
 
     missionInput.value = '';
     targetTimeInput.value = '';
     document.getElementById('timer').textContent = '00:00:00';
+
+    clearActiveSession();
 
     const planScreen = document.querySelector('.plan-screen');
     const reviewScreen = document.querySelector('.review-screen')
@@ -136,7 +138,32 @@ async function retryQueue() {
     }
 }
 
+function saveActiveSession(appState) {
+    const activeSession = {
+        mission: appState.currentMission,
+        targetTimeSeconds: appState.targetTimeSeconds,
+        actualTimeSeconds: appState.actualTimeSeconds,
+        startTimestamp: appState.startTimestamp
+    }
+    localStorage.setItem('executionOS_activeSession', JSON.stringify(activeSession));
+}
 
+function loadActiveSession(appState) {
+    const stored = localStorage.getItem('executionOS_activeSession');
+    if (stored) {
+        const activeSession = JSON.parse(stored)
+        appState.currentMission = activeSession.mission;
+        appState.targetTimeSeconds = activeSession.targetTimeSeconds;
+        appState.actualTimeSeconds = activeSession.actualTimeSeconds;
+        appState.startTimestamp = activeSession.startTimestamp;
+        return true;
+    }
+    return false;
+}
+
+function clearActiveSession() {
+    localStorage.removeItem('executionOS_activeSession');
+}
 
 
 // ========== 5. SCREEN CHANGE FUNCTIONS ==========
@@ -149,6 +176,7 @@ function changeToFocusScreen(appState) {
         focusScreen.style.display = 'flex';
         document.getElementById('mission-display').textContent = `Mission: ${appState.currentMission}`;
         document.getElementById('target-time-display').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
+        document.getElementById('timer').textContent = formatTime(appState.actualTimeSeconds);
     }
     else {
         const reviewScreen = document.querySelector('.review-screen');
@@ -183,6 +211,7 @@ startWorkBtn.addEventListener('click', () => {
     const parsedTime = parseTimeFromHHMMSS(targetTimeInput.value);
     AppState.currentMission = missionInput.value;
     AppState.targetTimeSeconds = parsedTime;
+    AppState.startTimestamp = new Date().toISOString()
     changeToFocusScreen(AppState);
     startTimer(AppState);
 })
@@ -252,5 +281,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (QueueManager.queue.length > 0) {
         alert("Syncing offline work...");
         await retryQueue();
+    }
+    const loadedActiveSession = loadActiveSession(AppState)
+    if (loadedActiveSession) {
+        alert("Returning to uncompleted session...");
+        changeToFocusScreen(AppState)
+        pauseBtn.textContent = 'Resume';
     }
 });
