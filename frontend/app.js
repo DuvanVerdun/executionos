@@ -2,6 +2,30 @@
 
 const BACKEND_URL = 'https://executionos-production.up.railway.app';
 
+const DATE_TO_MONTHS = {
+    '01': 'Jan',
+    '02': 'Feb',
+    '03': 'Mar',
+    '04': 'Apr',
+    '05': 'May',
+    '06': 'Jun',
+    '07': 'Jul',
+    '08': 'Aug',
+    '09': 'Sep',
+    '10': 'Oct',
+    '11': 'Nov',
+    '12': 'Dec'
+}
+
+const NUMBER_TO_WEEKDAY = {
+    '0': 'Sun',
+    '1': 'Mon',
+    '2': 'Tue',
+    '3': 'Wed',
+    '4': 'Thu',
+    '5': 'Fri',
+    '6': 'Sat'
+}
 
 // ========== 2. STATE & MANAGERS ==========
 
@@ -52,11 +76,46 @@ let timerInterval = null;
 
 const targetTimeInput = document.getElementById('time-input');
 const missionInput = document.getElementById('mission-input');
+const dashboardBtn = document.getElementById('dashboard-btn')
 const startWorkBtn = document.getElementById('start-work-btn');
 const pauseBtn = document.getElementById('pause-btn');
 const stopBtn = document.getElementById('stop-btn');
 const continueBtn = document.getElementById('continue-btn');
 const finishBtn = document.getElementById('finish-btn');
+const newMissionBtn = document.getElementById('new-mission-btn');
+
+
+// MOCK DATA - Replace with real API call later
+
+const MOCK_SESSIONS = [
+    {
+        date: "2026-06-232T06:24:02-03:00",
+        mission: "Offline queue system",
+        targetTimeSeconds: 10800,  // 3h in seconds
+        actualTimeSeconds: 11520,  // 3h 12m in seconds
+        completionPercentage: 104,
+        status: "completed"
+    },
+    {
+        date: "2026-06-221T06:24:02-03:00",
+        mission: "Build dashboard UI",
+        targetTimeSeconds: 7200,  // 2h
+        actualTimeSeconds: 6300,  // 1h 45m
+        completionPercentage: 87,
+        completed: false
+    },
+    {
+        date: "2026-06-210T06:24:02-03:00",
+        mission: "Active session persistence",
+        targetTimeSeconds: 5400,  // 1h 30m
+        actualTimeSeconds: 5400,
+        completionPercentage: 100,
+        completed: true
+    }
+    // Add more as needed for design
+]
+
+
 
 
 // ========== 4. UTILITY FUNCTIONS ==========
@@ -73,6 +132,12 @@ function formatTime(totalSeconds) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatTimeTohm(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
 }
 
 function startTimer(appState) {
@@ -104,10 +169,7 @@ function resetApp() {
 
     clearActiveSession();
 
-    const planScreen = document.querySelector('.plan-screen');
-    const reviewScreen = document.querySelector('.review-screen')
-    reviewScreen.style.display = 'none';
-    planScreen.style.display = 'flex';
+    changeToDashboardScreen(MOCK_SESSIONS, fromPlan=false)
 }
 
 async function postSession(sessionData) {
@@ -166,6 +228,106 @@ function clearActiveSession() {
 }
 
 
+function getLastSevenDaysSessions(sessions, today, sevenDaysAgo) {
+    const lastSevenDaysSessions = [];
+    const weekDayIndex = 10;
+    for (const session of sessions) {
+        const sessionWithoutWeekDay = session.date.slice(0, weekDayIndex) + session.date.slice(weekDayIndex + 1);
+        let sessionDate = new Date(sessionWithoutWeekDay);
+        if (sessionDate >= sevenDaysAgo && sessionDate <= today) {
+            lastSevenDaysSessions.push(session);
+        }
+    }
+    return lastSevenDaysSessions;
+}
+
+function getLastSevenDaysStats(sessions) {
+    let lastSevenDaysStats = [];
+    let totalCombinedPercentages = 0;
+    let totalTime = 0;
+    for (session of sessions) {
+        totalCombinedPercentages += session.completionPercentage;
+        totalTime += session.actualTimeSeconds;
+    }
+    lastSevenDaysStats.push(sessions.length);
+    lastSevenDaysStats.push(Math.round(totalCombinedPercentages / sessions.length));
+    lastSevenDaysStats.push(totalTime);
+    return lastSevenDaysStats;
+}
+
+function getDashboardData(sessions) {
+    const today = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    const lastSevenDaysSessions = getLastSevenDaysSessions(sessions, today, sevenDaysAgo);
+    const lastSevenDaysStats = getLastSevenDaysStats(sessions);
+    return [lastSevenDaysSessions, lastSevenDaysStats];
+}
+
+function displaySessionsOnContainer(sessionsList, sessionsListContainer) {
+    lastDate = ''
+    for (session of sessionsList) {
+        const dashboardSessionCard = document.createElement("div");
+        const sessionCardDate = document.createElement("p");
+        const sessionCardMissionContainer = document.createElement("div");
+        const sessionCardMissionIcon = document.createElement("span");
+        const sessionCardMission = document.createElement("p");
+        const timeAndPercentageContainer = document.createElement("div");
+        const sessionCardTimeIcon = document.createElement("span");
+        const sessionCardTargetTime = document.createElement("p");
+        const sessionCardArrowIcon = document.createElement("span");
+        const sessionCardActualTime = document.createElement("p");
+        const sessionCardPercentage = document.createElement("p");
+        const sessionCardCheckIcon = document.createElement("span");
+
+        dashboardSessionCard.className = "dashboard-session-card";
+        sessionCardDate.className = "dashboard-session-date";
+        sessionCardMissionContainer.className = "dashboard-session-mission-container"
+        sessionCardMissionIcon.className = "material-symbols-outlined dashboard-session-mission-icon";
+        sessionCardMission.className = "dashboard-session-mission";
+        timeAndPercentageContainer.className = "time-and-percentage-container";
+        sessionCardTimeIcon.className = "material-symbols-outlined dashboard-session-time-icon";
+        sessionCardTargetTime.className = "dashboard-session-target-time";
+        sessionCardArrowIcon.className = "material-symbols-outlined dashboard-session-arrow-icon";
+        sessionCardActualTime.className = "dashboard-session-actual-time";
+        sessionCardPercentage.className = "dashboard-session-percentage";
+        sessionCardCheckIcon.className = "material-symbols-outlined dashboard-session-check-icon";
+
+        const month = DATE_TO_MONTHS[session.date.substring(5, 7)];
+        const weekDay = NUMBER_TO_WEEKDAY[session.date[10]]
+        const DayNumberOfMonth = session.date.substring(8, 10);
+        const uiDate = `${weekDay}, ${month} ${DayNumberOfMonth}`;
+
+        sessionCardDate.textContent = uiDate;
+        sessionCardMissionIcon.textContent = "assignment";
+        sessionCardMission.textContent = session.mission;
+        sessionCardTimeIcon.textContent = "timer";
+        sessionCardTargetTime.textContent = formatTimeTohm(session.targetTimeSeconds);
+        sessionCardArrowIcon.textContent = "arrow_right_alt";
+        sessionCardActualTime.textContent = formatTimeTohm(session.actualTimeSeconds);
+        sessionCardPercentage.textContent = `${session.completionPercentage}%`;
+        sessionCardCheckIcon.textContent = "check";
+
+        sessionsListContainer.appendChild(dashboardSessionCard);
+        
+        dashboardSessionCard.appendChild(sessionCardDate);
+        dashboardSessionCard.appendChild(sessionCardMissionContainer);
+        sessionCardMissionContainer.appendChild(sessionCardMissionIcon);
+        sessionCardMissionContainer.appendChild(sessionCardMission);
+        dashboardSessionCard.appendChild(timeAndPercentageContainer);
+        timeAndPercentageContainer.appendChild(sessionCardTimeIcon);
+        timeAndPercentageContainer.appendChild(sessionCardTargetTime);
+        timeAndPercentageContainer.appendChild(sessionCardArrowIcon);
+        timeAndPercentageContainer.appendChild(sessionCardActualTime);
+        timeAndPercentageContainer.appendChild(sessionCardPercentage);
+        timeAndPercentageContainer.appendChild(sessionCardCheckIcon);
+
+    }
+}
+
+
+
 // ========== 5. SCREEN CHANGE FUNCTIONS ==========
 
 function changeToFocusScreen(appState) {
@@ -196,8 +358,38 @@ function changeToReviewScreen(appState) {
     document.getElementById('completion-status-review').textContent = appState.completionStatus;
 }
 
+function changeToDashboardScreen(sessions, fromPlan) {
+    const [sessionsList, weeklyStats] = getDashboardData(sessions)
+
+    const currentAmountOfSessions = document.getElementById('amount-of-sessions').textContent.slice(0, -9);
+    const isSessionsListUpdated = Number(currentAmountOfSessions) === Number(weeklyStats[0]);
+    const sessionsListContainer = document.querySelector(".sessions-list-container");
+    if (sessionsList && (!isSessionsListUpdated)) {
+        displaySessionsOnContainer(sessionsList, sessionsListContainer);
+    }
+
+    document.getElementById('amount-of-sessions').textContent = `${weeklyStats[0]} sessions`
+    document.getElementById('average-percentage').textContent = `${weeklyStats[1]}%`
+    document.getElementById('total-time').textContent = `${formatTimeTohm(weeklyStats[2])}`
+
+    const lastScreen = fromPlan ? document.querySelector('.plan-screen') : document.querySelector('.review-screen');
+    const dashboardScreen = document.querySelector('.dashboard-screen');
+    lastScreen.style.display = 'none';
+    dashboardScreen.style.display = 'flex';
+}
+
+function changeToPlanScreen() {
+    const planScreen = document.querySelector('.plan-screen');
+    const dashboardScreen = document.querySelector('.dashboard-screen');
+    dashboardScreen.style.display = 'none';
+    planScreen.style.display = 'flex';
+}
 
 // ========== 6. EVENT LISTENERS ==========
+
+dashboardBtn.addEventListener('click', () => {
+    changeToDashboardScreen(MOCK_SESSIONS, fromPlan=true);
+})
 
 startWorkBtn.addEventListener('click', () => {
     if (!missionInput.value) {
@@ -247,13 +439,19 @@ continueBtn.addEventListener('click', () => {
 })
 
 finishBtn.addEventListener('click', async () => {
+    
+    const date = new Date();
+    const weekday = date.getUTCDay();
+    const isoString = date.toISOString();
+    const dateWithWeekDay = isoString.replace('T', weekday + 'T');
+    
     const sessionData = {
         mission: AppState.currentMission,
         target_time: formatTime(AppState.targetTimeSeconds),
         actual_time: formatTime(AppState.actualTimeSeconds),
         completion_percent: AppState.percentageCompleted,
         completion_status: AppState.completionStatus,
-        timestamp: new Date().toISOString()
+        timestamp: dateWithWeekDay
     };
 
     try {
@@ -272,6 +470,10 @@ finishBtn.addEventListener('click', async () => {
     
     resetApp();
 });
+
+newMissionBtn.addEventListener('click', () => {
+    changeToPlanScreen()
+})
 
 
 // ========== 7. APP INITIALIZATION ==========

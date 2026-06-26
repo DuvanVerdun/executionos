@@ -4,6 +4,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=assignment timer arrow_right_alt check" />
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,6 +26,7 @@
             <input type="text" placeholder="HH:MM" class="input" id="time-input">
         </section>
         <section class="action-section">
+            <button id="dashboard-btn">DASHBOARD</button>
             <button id="start-work-btn">START WORK</button>
         </section>
     </div>
@@ -52,6 +55,26 @@
             <button id="continue-btn">Continue</button>
             <button id="finish-btn">Finish</button>
         </div>
+    </div>
+    <div class="dashboard-screen screen">
+        <header>
+            <h1>Dashboard</h1>
+            <div class="new-mission-btn-container">
+                <button id="new-mission-btn">Start New Mission</button>
+            </div>
+        </header>
+        <section class="weekly-stats">
+            <h2>This Week's Stats</h2>
+            <div class="stats-card">
+                <p id="amount-of-sessions"></p>
+                <p id="average-percentage"></p>
+                <p id="total-time"></p>
+            </div>
+        </section>
+        <section class="sessions-list-container">
+            <h2>Finished Sessions</h2>
+            
+        </section>
     </div>
 </body>
 <script src="app.js"></script>

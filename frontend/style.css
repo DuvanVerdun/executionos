@@ -10,7 +10,6 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100vh;
     width: 50%;
     margin: 0 auto;
     background-color: #000;
@@ -18,10 +17,16 @@ body {
 
 .plan-screen {
     display: flex;
+    height: 100vh;
+}
+
+
+.focus-screen, .review-screen, .dashboard-screen {
+    display: none;
 }
 
 .focus-screen, .review-screen {
-    display: none;
+    height: 100vh;
 }
 
 h1 {
@@ -72,9 +77,12 @@ button {
 
 .plan-screen .action-section {
     margin-top: 50px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
 }
 
-#start-work-btn {
+#start-work-btn, #dashboard-btn {
     padding: 20px;
     font-size: 1.25rem;
 }
@@ -140,4 +148,92 @@ button {
 .review-screen .action-section button {
     padding: 20px 30px;
     font-size: 2rem;
+}
+
+
+
+
+/* Dashboard Screen Styles */
+
+.dashboard-screen header {
+    width: 100%;
+    height: 90px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid #fff;
+    position: sticky;
+    top: 0;
+    background-color: #000;
+    z-index: 100;
+}
+
+.dashboard-screen header h1 {
+    font-size: 30px;
+    display: flex;
+    align-items: center;
+}
+
+.new-mission-btn-container {
+    margin: auto 0;
+}
+
+#new-mission-btn {
+    padding: 10px 15px;
+    font-size: 1.5rem;
+}
+
+
+.weekly-stats {
+    width: 100%;
+}
+
+.weekly-stats .stats-card {
+    display: flex;
+}
+
+.stats-card p {
+    margin: 0;
+    padding: 20px 8%;
+    border: 1px solid #fff;
+}
+
+.sessions-list-container {
+    width: 100%;
+    margin-top: 30px;
+}
+
+.dashboard-session-card {
+    margin: 50px 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #fff;
+    padding: 2.5rem 10% 1.5rem 8%;
+}
+
+.dashboard-session-date {
+    font-size: 25px;
+    position: absolute;
+    transform: translate(0px, -90px);
+    background-color: #000;
+    padding: 10px 20px;
+    border: 1px solid #fff;
+    z-index: 1;
+}
+
+.dashboard-session-mission-container {
+    display: flex;
+    gap: 10%;
+    margin: 0;
+}
+
+.dashboard-session-mission-container span,
+.time-and-percentage-container span {
+    display: flex;
+    align-items: center;
+}
+
+.time-and-percentage-container {
+    display: flex;
+    gap: 10%;
 }
