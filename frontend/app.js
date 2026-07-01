@@ -89,7 +89,7 @@ const newMissionBtn = document.getElementById('new-mission-btn');
 
 const MOCK_SESSIONS = [
     {
-        date: "2026-06-232T06:24:02-03:00",
+        date: "2026-06-302T06:24:02-03:00",
         mission: "Offline queue system",
         targetTimeSeconds: 10800,  // 3h in seconds
         actualTimeSeconds: 11520,  // 3h 12m in seconds
@@ -97,7 +97,15 @@ const MOCK_SESSIONS = [
         status: "completed"
     },
     {
-        date: "2026-06-221T06:24:02-03:00",
+        date: "2026-06-291T12:24:02-03:00",
+        mission: "Finish dashboard UI",
+        targetTimeSeconds: 7200,  // 2h
+        actualTimeSeconds: 6300,  // 1h 45m
+        completionPercentage: 87,
+        completed: false
+    },
+    {
+        date: "2026-06-291T06:24:02-03:00",
         mission: "Build dashboard UI",
         targetTimeSeconds: 7200,  // 2h
         actualTimeSeconds: 6300,  // 1h 45m
@@ -105,7 +113,7 @@ const MOCK_SESSIONS = [
         completed: false
     },
     {
-        date: "2026-06-210T06:24:02-03:00",
+        date: "2026-06-280T06:24:02-03:00",
         mission: "Active session persistence",
         targetTimeSeconds: 5400,  // 1h 30m
         actualTimeSeconds: 5400,
@@ -227,102 +235,180 @@ function clearActiveSession() {
     localStorage.removeItem('executionOS_activeSession');
 }
 
+function getDashboardDataDateRange() {
+    const today = new Date();
+    const todayWeekday = today.getUTCDay();
+    
+    const firstDayOfTheWeek = new Date();
+    
+    if (todayWeekday === 0) {
+        firstDayOfTheWeek.setDate(today.getDate() - 6);
+    }
+    else {
+        firstDayOfTheWeek.setDate(today.getDate() - todayWeekday);
+    }
+    return [today, firstDayOfTheWeek];
+}
 
-function getLastSevenDaysSessions(sessions, today, sevenDaysAgo) {
-    const lastSevenDaysSessions = [];
+function getThisWeekSessions(sessions, today, firstDayOfTheWeek) {
+    const thisWeekSessions = [];
     const weekDayIndex = 10;
     for (const session of sessions) {
         const sessionWithoutWeekDay = session.date.slice(0, weekDayIndex) + session.date.slice(weekDayIndex + 1);
         let sessionDate = new Date(sessionWithoutWeekDay);
-        if (sessionDate >= sevenDaysAgo && sessionDate <= today) {
-            lastSevenDaysSessions.push(session);
+        if (sessionDate >= firstDayOfTheWeek && sessionDate <= today) {
+            thisWeekSessions.push(session);
         }
     }
-    return lastSevenDaysSessions;
+    return thisWeekSessions;
 }
 
-function getLastSevenDaysStats(sessions) {
-    let lastSevenDaysStats = [];
+function getThisWeekStats(sessions) {
+    let thisWeekStats = [];
     let totalCombinedPercentages = 0;
     let totalTime = 0;
-    for (session of sessions) {
+    for (const session of sessions) {
         totalCombinedPercentages += session.completionPercentage;
         totalTime += session.actualTimeSeconds;
     }
-    lastSevenDaysStats.push(sessions.length);
-    lastSevenDaysStats.push(Math.round(totalCombinedPercentages / sessions.length));
-    lastSevenDaysStats.push(totalTime);
-    return lastSevenDaysStats;
+    thisWeekStats.push(sessions.length);
+    thisWeekStats.push(Math.round(totalCombinedPercentages / sessions.length));
+    thisWeekStats.push(totalTime);
+    return thisWeekStats;
 }
 
 function getDashboardData(sessions) {
-    const today = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    const [today, firstDayOfTheWeek] = getDashboardDataDateRange(); 
     
-    const lastSevenDaysSessions = getLastSevenDaysSessions(sessions, today, sevenDaysAgo);
-    const lastSevenDaysStats = getLastSevenDaysStats(sessions);
-    return [lastSevenDaysSessions, lastSevenDaysStats];
+    const thisWeekSessions = getThisWeekSessions(sessions, today, firstDayOfTheWeek);
+    const thisWeekStats = getThisWeekStats(thisWeekSessions);
+    return [thisWeekSessions, thisWeekStats];
+}
+
+function displayOnNewCard(session, sessionsListContainer, uiDate) {
+        
+    const dashboardSessionCard = document.createElement("div");
+    const sessionCardDate = document.createElement("p");
+    const sessionCardMissionContainer = document.createElement("div");
+    const sessionCardMissionIcon = document.createElement("span");
+    const sessionCardMission = document.createElement("p");
+    const timeAndPercentageContainer = document.createElement("div");
+    const sessionCardTimeIcon = document.createElement("span");
+    const sessionCardTargetTime = document.createElement("p");
+    const sessionCardArrowIcon = document.createElement("span");
+    const sessionCardActualTime = document.createElement("p");
+    const sessionCardPercentage = document.createElement("p");
+    const sessionCardCheckIcon = document.createElement("span");
+
+    dashboardSessionCard.className = "dashboard-session-card";
+    dashboardSessionCard.id = `session-card-${session.date[10]}-${session.date.substring(5, 7)}-${session.date.substring(8, 10)}`;
+    sessionCardDate.className = "dashboard-session-date";
+    sessionCardMissionContainer.className = "dashboard-session-mission-container";
+    sessionCardMissionIcon.className = "material-symbols-outlined dashboard-session-mission-icon";
+    sessionCardMission.className = "dashboard-session-mission";
+    timeAndPercentageContainer.className = "time-and-percentage-container";
+    sessionCardTimeIcon.className = "material-symbols-outlined dashboard-session-time-icon";
+    sessionCardTargetTime.className = "dashboard-session-target-time";
+    sessionCardArrowIcon.className = "material-symbols-outlined dashboard-session-arrow-icon";
+    sessionCardActualTime.className = "dashboard-session-actual-time";
+    sessionCardPercentage.className = "dashboard-session-percentage";
+    sessionCardCheckIcon.className = "material-symbols-outlined dashboard-session-check-icon";
+
+    sessionCardDate.textContent = uiDate;
+    sessionCardMissionIcon.textContent = "assignment";
+    sessionCardMission.textContent = session.mission;
+    sessionCardTimeIcon.textContent = "timer";
+    sessionCardTargetTime.textContent = formatTimeTohm(session.targetTimeSeconds);
+    sessionCardArrowIcon.textContent = "arrow_right_alt";
+    sessionCardActualTime.textContent = formatTimeTohm(session.actualTimeSeconds);
+    sessionCardPercentage.textContent = `${session.completionPercentage}%`;
+    sessionCardCheckIcon.textContent = "check";
+
+    sessionsListContainer.appendChild(dashboardSessionCard);
+        
+    dashboardSessionCard.appendChild(sessionCardDate);
+    dashboardSessionCard.appendChild(sessionCardMissionContainer);
+    sessionCardMissionContainer.appendChild(sessionCardMissionIcon);
+    sessionCardMissionContainer.appendChild(sessionCardMission);
+    dashboardSessionCard.appendChild(timeAndPercentageContainer);
+    timeAndPercentageContainer.appendChild(sessionCardTimeIcon);
+    timeAndPercentageContainer.appendChild(sessionCardTargetTime);
+    timeAndPercentageContainer.appendChild(sessionCardArrowIcon);
+    timeAndPercentageContainer.appendChild(sessionCardActualTime);
+    timeAndPercentageContainer.appendChild(sessionCardPercentage);
+    timeAndPercentageContainer.appendChild(sessionCardCheckIcon);
+
+
+}
+
+function displayOnExistingCard(session, dashboardSessionCardId) {
+
+    const dashboardSessionCard = document.getElementById(dashboardSessionCardId);
+
+    const sessionCardDivisionLine = document.createElement("span");
+    const sessionCardMissionContainer = document.createElement("div");
+    const sessionCardMissionIcon = document.createElement("span");
+    const sessionCardMission = document.createElement("p");
+    const timeAndPercentageContainer = document.createElement("div");
+    const sessionCardTimeIcon = document.createElement("span");
+    const sessionCardTargetTime = document.createElement("p");
+    const sessionCardArrowIcon = document.createElement("span");
+    const sessionCardActualTime = document.createElement("p");
+    const sessionCardPercentage = document.createElement("p");
+    const sessionCardCheckIcon = document.createElement("span");
+
+    sessionCardDivisionLine.className = "dashboard-session-division-line";
+    sessionCardMissionContainer.className = "dashboard-session-mission-container";
+    sessionCardMissionIcon.className = "material-symbols-outlined dashboard-session-mission-icon";
+    sessionCardMission.className = "dashboard-session-mission";
+    timeAndPercentageContainer.className = "time-and-percentage-container";
+    sessionCardTimeIcon.className = "material-symbols-outlined dashboard-session-time-icon";
+    sessionCardTargetTime.className = "dashboard-session-target-time";
+    sessionCardArrowIcon.className = "material-symbols-outlined dashboard-session-arrow-icon";
+    sessionCardActualTime.className = "dashboard-session-actual-time";
+    sessionCardPercentage.className = "dashboard-session-percentage";
+    sessionCardCheckIcon.className = "material-symbols-outlined dashboard-session-check-icon";
+
+    sessionCardMissionIcon.textContent = "assignment";
+    sessionCardMission.textContent = session.mission;
+    sessionCardTimeIcon.textContent = "timer";
+    sessionCardTargetTime.textContent = formatTimeTohm(session.targetTimeSeconds);
+    sessionCardArrowIcon.textContent = "arrow_right_alt";
+    sessionCardActualTime.textContent = formatTimeTohm(session.actualTimeSeconds);
+    sessionCardPercentage.textContent = `${session.completionPercentage}%`;
+    sessionCardCheckIcon.textContent = "check";
+
+    dashboardSessionCard.appendChild(sessionCardDivisionLine);
+    dashboardSessionCard.appendChild(sessionCardMissionContainer);
+    sessionCardMissionContainer.appendChild(sessionCardMissionIcon);
+    sessionCardMissionContainer.appendChild(sessionCardMission);
+    dashboardSessionCard.appendChild(timeAndPercentageContainer);
+    timeAndPercentageContainer.appendChild(sessionCardTimeIcon);
+    timeAndPercentageContainer.appendChild(sessionCardTargetTime);
+    timeAndPercentageContainer.appendChild(sessionCardArrowIcon);
+    timeAndPercentageContainer.appendChild(sessionCardActualTime);
+    timeAndPercentageContainer.appendChild(sessionCardPercentage);
+    timeAndPercentageContainer.appendChild(sessionCardCheckIcon);
 }
 
 function displaySessionsOnContainer(sessionsList, sessionsListContainer) {
     lastDate = ''
-    for (session of sessionsList) {
-        const dashboardSessionCard = document.createElement("div");
-        const sessionCardDate = document.createElement("p");
-        const sessionCardMissionContainer = document.createElement("div");
-        const sessionCardMissionIcon = document.createElement("span");
-        const sessionCardMission = document.createElement("p");
-        const timeAndPercentageContainer = document.createElement("div");
-        const sessionCardTimeIcon = document.createElement("span");
-        const sessionCardTargetTime = document.createElement("p");
-        const sessionCardArrowIcon = document.createElement("span");
-        const sessionCardActualTime = document.createElement("p");
-        const sessionCardPercentage = document.createElement("p");
-        const sessionCardCheckIcon = document.createElement("span");
-
-        dashboardSessionCard.className = "dashboard-session-card";
-        sessionCardDate.className = "dashboard-session-date";
-        sessionCardMissionContainer.className = "dashboard-session-mission-container"
-        sessionCardMissionIcon.className = "material-symbols-outlined dashboard-session-mission-icon";
-        sessionCardMission.className = "dashboard-session-mission";
-        timeAndPercentageContainer.className = "time-and-percentage-container";
-        sessionCardTimeIcon.className = "material-symbols-outlined dashboard-session-time-icon";
-        sessionCardTargetTime.className = "dashboard-session-target-time";
-        sessionCardArrowIcon.className = "material-symbols-outlined dashboard-session-arrow-icon";
-        sessionCardActualTime.className = "dashboard-session-actual-time";
-        sessionCardPercentage.className = "dashboard-session-percentage";
-        sessionCardCheckIcon.className = "material-symbols-outlined dashboard-session-check-icon";
-
+    for (const session of sessionsList) {
+        
+        const weekDay = NUMBER_TO_WEEKDAY[session.date[10]];
         const month = DATE_TO_MONTHS[session.date.substring(5, 7)];
-        const weekDay = NUMBER_TO_WEEKDAY[session.date[10]]
         const DayNumberOfMonth = session.date.substring(8, 10);
         const uiDate = `${weekDay}, ${month} ${DayNumberOfMonth}`;
 
-        sessionCardDate.textContent = uiDate;
-        sessionCardMissionIcon.textContent = "assignment";
-        sessionCardMission.textContent = session.mission;
-        sessionCardTimeIcon.textContent = "timer";
-        sessionCardTargetTime.textContent = formatTimeTohm(session.targetTimeSeconds);
-        sessionCardArrowIcon.textContent = "arrow_right_alt";
-        sessionCardActualTime.textContent = formatTimeTohm(session.actualTimeSeconds);
-        sessionCardPercentage.textContent = `${session.completionPercentage}%`;
-        sessionCardCheckIcon.textContent = "check";
-
-        sessionsListContainer.appendChild(dashboardSessionCard);
+        if (lastDate !== uiDate) {
+            displayOnNewCard(session, sessionsListContainer, uiDate);
+        }
+        else {
+            dashboardSessionCardId = `session-card-${session.date[10]}-${session.date.substring(5, 7)}-${session.date.substring(8, 10)}`;
+            displayOnExistingCard(session, dashboardSessionCardId);
+        }
         
-        dashboardSessionCard.appendChild(sessionCardDate);
-        dashboardSessionCard.appendChild(sessionCardMissionContainer);
-        sessionCardMissionContainer.appendChild(sessionCardMissionIcon);
-        sessionCardMissionContainer.appendChild(sessionCardMission);
-        dashboardSessionCard.appendChild(timeAndPercentageContainer);
-        timeAndPercentageContainer.appendChild(sessionCardTimeIcon);
-        timeAndPercentageContainer.appendChild(sessionCardTargetTime);
-        timeAndPercentageContainer.appendChild(sessionCardArrowIcon);
-        timeAndPercentageContainer.appendChild(sessionCardActualTime);
-        timeAndPercentageContainer.appendChild(sessionCardPercentage);
-        timeAndPercentageContainer.appendChild(sessionCardCheckIcon);
-
+        lastDate = uiDate;
     }
 }
 
