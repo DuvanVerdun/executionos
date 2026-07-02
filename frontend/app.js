@@ -66,7 +66,9 @@ const AppState = {
     percentageCompleted: 0,
     isTimerRunning: false,
     fromPlanScreen: true,
-    startTimestamp: ''
+    startTimestamp: '',
+    pauseStartTimestamp: '',
+    pausedTimeSeconds: 0
 }
 
 let timerInterval = null;
@@ -83,47 +85,6 @@ const stopBtn = document.getElementById('stop-btn');
 const continueBtn = document.getElementById('continue-btn');
 const finishBtn = document.getElementById('finish-btn');
 const newMissionBtn = document.getElementById('new-mission-btn');
-
-
-// MOCK DATA - Replace with real API call later
-
-const MOCK_SESSIONS = [
-    {
-        date: "2026-06-302T06:24:02-03:00",
-        mission: "Offline queue system",
-        targetTimeSeconds: 10800,  // 3h in seconds
-        actualTimeSeconds: 11520,  // 3h 12m in seconds
-        completionPercentage: 104,
-        status: "completed"
-    },
-    {
-        date: "2026-06-291T12:24:02-03:00",
-        mission: "Finish dashboard UI",
-        targetTimeSeconds: 7200,  // 2h
-        actualTimeSeconds: 6300,  // 1h 45m
-        completionPercentage: 87,
-        completed: false
-    },
-    {
-        date: "2026-06-291T06:24:02-03:00",
-        mission: "Build dashboard UI",
-        targetTimeSeconds: 7200,  // 2h
-        actualTimeSeconds: 6300,  // 1h 45m
-        completionPercentage: 87,
-        completed: false
-    },
-    {
-        date: "2026-06-280T06:24:02-03:00",
-        mission: "Active session persistence",
-        targetTimeSeconds: 5400,  // 1h 30m
-        actualTimeSeconds: 5400,
-        completionPercentage: 100,
-        completed: true
-    }
-    // Add more as needed for design
-]
-
-
 
 
 // ========== 4. UTILITY FUNCTIONS ==========
@@ -155,13 +116,14 @@ function startTimer(appState) {
 
 function updateTimer(appState) {
     if (!appState.isTimerRunning) return;
-    appState.actualTimeSeconds += 1;
+    const elapsed = Math.floor(((Date.now() - new Date(appState.startTimestamp).getTime()) / 1000) - appState.pausedTimeSeconds);
+    appState.actualTimeSeconds = elapsed;
     const formattedTime = formatTime(appState.actualTimeSeconds);
     document.getElementById('timer').textContent = formattedTime;
     saveActiveSession(appState)
 }
 
-function resetApp() {
+async function resetApp() {
     AppState.currentMission = '';
     AppState.targetTimeSeconds = 0;
     AppState.actualTimeSeconds = 0;
@@ -170,6 +132,8 @@ function resetApp() {
     AppState.isTimerRunning = false;
     AppState.fromPlanScreen = true;
     AppState.startTimestamp = '';
+    AppState.pauseStartTimestamp = '';
+    AppState.pausedTimeSeconds = 0
 
     missionInput.value = '';
     targetTimeInput.value = '';
@@ -177,7 +141,8 @@ function resetApp() {
 
     clearActiveSession();
 
-    changeToDashboardScreen(MOCK_SESSIONS, fromPlan=false)
+    const sessions = await getSessions();
+    await changeToDashboardScreen(sessions, fromPlan=false)
 }
 
 async function postSession(sessionData) {
@@ -193,6 +158,21 @@ async function postSession(sessionData) {
         throw new Error(result.error || "Save failed");
     }
     return result;
+}
+
+async function getSessions() {
+    const response = await fetch(`${BACKEND_URL}/api/get-sessions`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+    });
+
+    const result = await response.json(); 
+
+    if (!result.success) {
+        throw new Error(result.error || "Fetch failed");
+    }
+    console.log("Fetched sessions:", result.sessions);
+    return result.sessions;
 }
 
 async function retryQueue() {
@@ -213,7 +193,9 @@ function saveActiveSession(appState) {
         mission: appState.currentMission,
         targetTimeSeconds: appState.targetTimeSeconds,
         actualTimeSeconds: appState.actualTimeSeconds,
-        startTimestamp: appState.startTimestamp
+        startTimestamp: appState.startTimestamp,
+        pauseStartTimestamp: appState.pauseStartTimestamp,
+        pausedTimeSeconds: appState.pausedTimeSeconds
     }
     localStorage.setItem('executionOS_activeSession', JSON.stringify(activeSession));
 }
@@ -221,11 +203,13 @@ function saveActiveSession(appState) {
 function loadActiveSession(appState) {
     const stored = localStorage.getItem('executionOS_activeSession');
     if (stored) {
-        const activeSession = JSON.parse(stored)
+        const activeSession = JSON.parse(stored);
         appState.currentMission = activeSession.mission;
         appState.targetTimeSeconds = activeSession.targetTimeSeconds;
         appState.actualTimeSeconds = activeSession.actualTimeSeconds;
         appState.startTimestamp = activeSession.startTimestamp;
+        appState.pauseStartTimestamp = activeSession.pauseStartTimestamp;
+        appState.pausedTimeSeconds = activeSession.pausedTimeSeconds;
         return true;
     }
     return false;
@@ -264,11 +248,15 @@ function getThisWeekSessions(sessions, today, firstDayOfTheWeek) {
 }
 
 function getThisWeekStats(sessions) {
+    if (sessions.length === 0) {
+        return [0, 0, 0];
+    }
+    
     let thisWeekStats = [];
     let totalCombinedPercentages = 0;
     let totalTime = 0;
     for (const session of sessions) {
-        totalCombinedPercentages += session.completionPercentage;
+        totalCombinedPercentages += session.percentageCompleted;
         totalTime += session.actualTimeSeconds;
     }
     thisWeekStats.push(sessions.length);
@@ -321,7 +309,7 @@ function displayOnNewCard(session, sessionsListContainer, uiDate) {
     sessionCardTargetTime.textContent = formatTimeTohm(session.targetTimeSeconds);
     sessionCardArrowIcon.textContent = "arrow_right_alt";
     sessionCardActualTime.textContent = formatTimeTohm(session.actualTimeSeconds);
-    sessionCardPercentage.textContent = `${session.completionPercentage}%`;
+    sessionCardPercentage.textContent = `${session.percentageCompleted}%`;
     sessionCardCheckIcon.textContent = "check";
 
     sessionsListContainer.appendChild(dashboardSessionCard);
@@ -375,7 +363,7 @@ function displayOnExistingCard(session, dashboardSessionCardId) {
     sessionCardTargetTime.textContent = formatTimeTohm(session.targetTimeSeconds);
     sessionCardArrowIcon.textContent = "arrow_right_alt";
     sessionCardActualTime.textContent = formatTimeTohm(session.actualTimeSeconds);
-    sessionCardPercentage.textContent = `${session.completionPercentage}%`;
+    sessionCardPercentage.textContent = `${session.percentageCompleted}%`;
     sessionCardCheckIcon.textContent = "check";
 
     dashboardSessionCard.appendChild(sessionCardDivisionLine);
@@ -471,10 +459,13 @@ function changeToPlanScreen() {
     planScreen.style.display = 'flex';
 }
 
+
+
 // ========== 6. EVENT LISTENERS ==========
 
-dashboardBtn.addEventListener('click', () => {
-    changeToDashboardScreen(MOCK_SESSIONS, fromPlan=true);
+dashboardBtn.addEventListener('click', async () => {
+    const sessions = await getSessions();
+    await changeToDashboardScreen(sessions, fromPlan=true);
 })
 
 startWorkBtn.addEventListener('click', () => {
@@ -499,11 +490,13 @@ pauseBtn.addEventListener('click', () => {
         clearInterval(timerInterval);
         AppState.isTimerRunning = false;
         pauseBtn.textContent = 'Resume';
+        AppState.pauseStartTimestamp = new Date();
     }
     else {
-        startTimer(AppState);
-        AppState.isTimerRunning = true;
         pauseBtn.textContent = 'Pause';
+        const elapsed = (Date.now() - new Date(AppState.pauseStartTimestamp).getTime()) / 1000;
+        AppState.pausedTimeSeconds += elapsed;
+        startTimer(AppState);
     }
 })
 
@@ -515,13 +508,18 @@ stopBtn.addEventListener('click', () => {
     if (AppState.actualTimeSeconds >= AppState.targetTimeSeconds) {
         AppState.completionStatus = 'completed';
     }
+    if (!AppState.pauseStartTimestamp) {
+        AppState.pauseStartTimestamp = new Date();
+    }
     changeToReviewScreen(AppState);
 })
 
 continueBtn.addEventListener('click', () => {
     changeToFocusScreen(AppState);
-    startTimer(AppState);
     pauseBtn.textContent = 'Pause';
+    const elapsed = (Date.now() - new Date(AppState.pauseStartTimestamp).getTime()) / 1000;
+    AppState.pausedTimeSeconds += elapsed;
+    startTimer(AppState);
 })
 
 finishBtn.addEventListener('click', async () => {
@@ -532,12 +530,12 @@ finishBtn.addEventListener('click', async () => {
     const dateWithWeekDay = isoString.replace('T', weekday + 'T');
     
     const sessionData = {
+        date: dateWithWeekDay,
         mission: AppState.currentMission,
-        target_time: formatTime(AppState.targetTimeSeconds),
-        actual_time: formatTime(AppState.actualTimeSeconds),
-        completion_percent: AppState.percentageCompleted,
-        completion_status: AppState.completionStatus,
-        timestamp: dateWithWeekDay
+        targetTimeSeconds: AppState.targetTimeSeconds,
+        actualTimeSeconds: AppState.actualTimeSeconds,
+        completionStatus: AppState.completionStatus,
+        percentageCompleted: AppState.percentageCompleted
     };
 
     try {
