@@ -1,6 +1,6 @@
 // ========== 1. CONSTANTS ==========
 
-const BACKEND_URL = 'https://executionos-production.up.railway.app';
+const BACKEND_URL = '';  // TODO: set after Render deploy
 
 const DATE_TO_MONTHS = {
     '01': 'Jan',
@@ -28,6 +28,11 @@ const NUMBER_TO_WEEKDAY = {
 }
 
 // ========== 2. STATE & MANAGERS ==========
+
+
+let accessToken = null;
+
+let isUserMenuOpened = false;
 
 const QueueManager = {
     queue: [],
@@ -65,7 +70,6 @@ const AppState = {
     completionStatus: 'uncompleted',
     percentageCompleted: 0,
     isTimerRunning: false,
-    fromPlanScreen: true,
     startTimestamp: '',
     pauseStartTimestamp: '',
     pausedTimeSeconds: 0
@@ -76,18 +80,94 @@ let timerInterval = null;
 
 // ========== 3. DOM ELEMENT REFERENCES ==========
 
+const loadingScreen = document.querySelector('.loading-screen');
+const registerScreen = document.querySelector('.register-screen');
+const loginScreen = document.querySelector('.login-screen');
+const planScreen = document.querySelector('.plan-screen');
+const focusScreen = document.querySelector('.focus-screen');
+const reviewScreen = document.querySelector('.review-screen');
+const dashboardScreen = document.querySelector('.dashboard-screen');
+
+const loadingIcon = document.getElementById('loading-icon');
+const loadingErrorMessage = document.getElementById('loading-error-message');
+const retryBtn = document.getElementById('retry-btn');
+
+const registerForm = document.getElementById('register-form');
+const registerUsernameInput = document.getElementById('register-username-input');
+const registerEmailInput = document.getElementById('register-email-input');
+const registerPasswordInput = document.getElementById('register-password-input');
+const registerPasswordErrorMessage = document.getElementById('register-password-error-message');
+const registerSubmitBtn = document.getElementById('register-submit-btn');
+const registerErrorMessage = document.getElementById('register-error-message');
+const registerSwitchToLoginBtn = document.getElementById('switch-to-login-screen');
+
+const loginForm = document.getElementById('login-form');
+const loginUsernameOrEmailInput = document.getElementById('login-username-or-email-input');
+const loginPasswordInput = document.getElementById('login-password-input');
+const loginSubmitBtn = document.getElementById('login-submit-btn');
+const loginErrorMessage = document.getElementById('login-error-message');
+const loginSwitchToRegisterBtn = document.getElementById('switch-to-register-screen');
+
+const planUserMenuUsername = document.getElementById('plan-user-menu-username');
+const planUserIcon = document.getElementById('plan-user-icon');
+const planUserMenuLogoutBtn = document.getElementById('plan-user-menu-logout-btn');
+
 const targetTimeInput = document.getElementById('time-input');
 const missionInput = document.getElementById('mission-input');
 const dashboardBtn = document.getElementById('dashboard-btn')
 const startWorkBtn = document.getElementById('start-work-btn');
+
 const pauseBtn = document.getElementById('pause-btn');
 const stopBtn = document.getElementById('stop-btn');
+
 const continueBtn = document.getElementById('continue-btn');
 const finishBtn = document.getElementById('finish-btn');
+
 const newMissionBtn = document.getElementById('new-mission-btn');
+const dashboardUserMenuUsername = document.getElementById('dashboard-user-menu-username');
+const dashboardUserIcon = document.getElementById('dashboard-user-icon');
+const dashboardUserMenuLogoutBtn = document.getElementById('dashboard-user-menu-logout-btn');
+
 
 
 // ========== 4. UTILITY FUNCTIONS ==========
+
+async function initiateApp() {
+    try {
+        const result = await refreshAccessToken();
+        accessToken = result.access_token;
+        planUserMenuUsername.textContent = result.username;
+        dashboardUserMenuUsername.textContent = result.username;
+    } catch (error) {
+        showLoadingScreenError();
+        return;
+    }
+    await routeToInitialScreen();
+}
+
+async function routeToInitialScreen() {
+    if (!accessToken) {
+        changeToRegisterScreen("loading");
+        return;
+    }
+    syncOfflineWork();
+    const loadedActiveSession = loadActiveSession(AppState);
+    if (!loadedActiveSession) {
+        changeToPlanScreen("loading");
+        return;
+    }
+    alert("Returning to uncompleted session...");
+    changeToFocusScreen(AppState, "loading");
+}
+
+async function syncOfflineWork() {
+    QueueManager.loadQueue();
+    if (QueueManager.queue.length > 0) {
+        alert("Syncing offline work...");
+        await retryQueue;
+    }
+}
+
 
 function parseTimeFromHHMMSS(timeStr) {
     const parts = timeStr.split(':');
@@ -130,7 +210,6 @@ async function resetApp() {
     AppState.completionStatus = 'uncompleted';
     AppState.percentageCompleted = 0;
     AppState.isTimerRunning = false;
-    AppState.fromPlanScreen = true;
     AppState.startTimestamp = '';
     AppState.pauseStartTimestamp = '';
     AppState.pausedTimeSeconds = 0
@@ -140,40 +219,129 @@ async function resetApp() {
     document.getElementById('timer').textContent = '00:00:00';
 
     clearActiveSession();
-
-    const sessions = await getSessions();
-    await changeToDashboardScreen(sessions, fromPlan=false)
 }
 
-async function postSession(sessionData) {
-    const response = await fetch(`${BACKEND_URL}/api/save-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sessionData)
+async function unauthFetch(options) {
+    if (!options.path || !options.method) {
+        throw new Error("Missing required options: path and method");
+    }
+    const response = await fetch(`${BACKEND_URL}/api/${options.path}`, {
+        method: options.method,
+        headers: { "Content-Type": "application/json"},
+        body: JSON.stringify(options.body)
     });
-
+    const statusCode = response.status;
     const result = await response.json();
+    result.status = statusCode;
+    return result;
+}
 
+async function register(username, email, password) {
+    const result = await unauthFetch({
+        path: "register",
+        method: "POST",
+        body: { username, email, password }
+    });
+    return result;
+}
+
+async function login(usernameOrEmail, password) {
+    const result = await unauthFetch({
+        path: "login",
+        method: "POST",
+        body: { usernameOrEmail, password }
+    });
+    return result;
+}
+
+async function refreshAccessToken() {
+    const response = await fetch(`${BACKEND_URL}/api/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json"},
+        credentials: "include"
+    });
+    if (response.status === 401) {
+        return "";
+    }
+    const result = await response.json();
     if (!result.success) {
-        throw new Error(result.error || "Save failed");
+        throw new Error(result.error || "Token refresh failed");
     }
     return result;
 }
 
-async function getSessions() {
-    const response = await fetch(`${BACKEND_URL}/api/get-sessions`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-    });
-
-    const result = await response.json(); 
-
-    if (!result.success) {
-        throw new Error(result.error || "Fetch failed");
+async function apiFetch(options) {
+    if (!options.path || !options.method) {
+        throw new Error("Missing required options: path and method");
     }
-    console.log("Fetched sessions:", result.sessions);
+    const response = await fetch(`${BACKEND_URL}/api/${options.path}`, {
+        method: options.method,
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(options.body)
+    });
+    if (response.status === 401) {
+        const result = await refreshAccessToken();
+        const retry = await fetch(`${BACKEND_URL}/api/${options.path}`, {
+            method: options.method,
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${result.access_token}`
+            },
+            body: JSON.stringify(options.body)
+        });
+        if (retry.status === 401) {
+            changeToLoginScreen(options.currentScreen);
+            throw new Error("Unauthorized: Please log in.");
+        }
+        const retryResult = await retry.json();
+        accessToken = result.access_token;
+        planUserMenuUsername.textContent = result.username;
+        dashboardUserMenuUsername.textContent = result.username;
+        return retryResult;
+    }
+    const result = await response.json();
+    return result;
+}
+
+async function logout() {
+    const result = await apiFetch({
+        path: "logout",
+        method: "POST"
+    });
+    return result;
+}
+
+async function postSession(sessionData) {
+    const result = await apiFetch({
+        path: "save-session",
+        method: "POST",
+        body: sessionData,
+        currentScreen: "review"
+    });
+    return result;
+}
+
+async function getSessions(currentScreen) {
+    const result = await apiFetch({
+        path: "get-sessions",
+        method: "GET",
+        currentScreen: currentScreen
+    });
     return result.sessions;
 }
+
+async function deleteSession(sessionID) {
+    const result = await apiFetch({
+        path: `delete-session/${sessionID}`,
+        method: "DELETE",
+        currentScreen: "dashboard"
+    });
+    return result;
+}
+
 
 async function retryQueue() {
     while (QueueManager.queue.length > 0) {
@@ -400,30 +568,145 @@ function displaySessionsOnContainer(sessionsList, sessionsListContainer) {
     }
 }
 
+function getPasswordError(password) {
+    if (password.length < 12) {
+        return 'At least 12 characters.';
+    }
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#\$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]).+$/;
+    if (!regex.test(password)) {
+        return 'Must contain uppercase, lowercase, symbol, and number.';
+    }
+    return '';
+}
+
+function toggleUserMenu(screen) {  // relies on only one screen's menu ever being open at a time
+    if (screen === "plan") {
+        if (isUserMenuOpened) {
+            planUserMenuUsername.style.display = 'none';
+            planUserMenuLogoutBtn.style.display = 'none';
+            isUserMenuOpened = false;
+            return;
+        }
+    planUserMenuUsername.style.display = 'block';
+    planUserMenuLogoutBtn.style.display = 'block';    
+    isUserMenuOpened = true;
+    }
+    if (screen === "dashboard") {
+        if (isUserMenuOpened) {
+            dashboardUserMenuUsername.style.display = 'none';
+            dashboardUserMenuLogoutBtn.style.display = 'none';
+            isUserMenuOpened = false;
+            return;
+        }
+    dashboardUserMenuUsername.style.display = 'block';
+    dashboardUserMenuLogoutBtn.style.display = 'block';    
+    isUserMenuOpened = true;
+    }
+}
+
 
 
 // ========== 5. SCREEN CHANGE FUNCTIONS ==========
 
-function changeToFocusScreen(appState) {
-    const focusScreen = document.querySelector('.focus-screen');
-    if (AppState.fromPlanScreen) {
-        const planScreen = document.querySelector('.plan-screen');
-        planScreen.style.display = 'none';
-        focusScreen.style.display = 'flex';
-        document.getElementById('mission-display').textContent = `Mission: ${appState.currentMission}`;
-        document.getElementById('target-time-display').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
-        document.getElementById('timer').textContent = formatTime(appState.actualTimeSeconds);
+function showLoadingScreenError() {
+    loadingIcon.style.display = 'none';
+    loadingErrorMessage.style.display = 'flex';
+    retryBtn.style.display = 'flex';
+}
+
+function showLoadingIcon() {
+    loadingIcon.style.display = 'flex';
+    loadingErrorMessage.style.display = 'none';
+    retryBtn.style.display = 'none';
+}
+
+function changeToRegisterScreen(currentScreen) {
+    if (currentScreen === "loading") {
+        loadingIcon.style.display = 'none';
+        loadingScreen.style.display = 'none';
+        registerScreen.style.display = 'flex';
     }
-    else {
-        const reviewScreen = document.querySelector('.review-screen');
+    else if (currentScreen === "login") {
+        loginScreen.style.display = 'none';
+        registerScreen.style.display = 'flex';
+    }
+}
+
+function changeToLoginScreen(currentScreen) {
+    if (currentScreen === "register") {
+        registerScreen.style.display = 'none';
+        loginScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "plan") {
+        if (isUserMenuOpened) {
+            toggleUserMenu("plan");
+        }
+        planScreen.style.display = 'none';
+        loginScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "focus") {
+        focusScreen.style.display = 'none';
+        loginScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "review") {
         reviewScreen.style.display = 'none';
+        loginScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "dashboard") {
+        if (isUserMenuOpened) {
+            toggleUserMenu("dashboard");
+        }
+        dashboardScreen.style.display = 'none';
+        loginScreen.style.display = 'flex';
+    }
+}
+
+function changeToPlanScreen(currentScreen) {
+    if (currentScreen === "loading") {
+        loadingScreen.style.display = 'none';
+        planScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "register") {
+        registerScreen.style.display = 'none';
+        planScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "login") {
+        loginScreen.style.display = 'none';
+        planScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "dashboard") {
+        if (isUserMenuOpened) {
+            toggleUserMenu("dashboard");
+        }
+        dashboardScreen.style.display = 'none';
+        planScreen.style.display = 'flex';
+    }
+}
+
+function changeToFocusScreen(appState, currentScreen) {
+    if (currentScreen === "review") {
+        reviewScreen.style.display = 'none';
+        focusScreen.style.display = 'flex';
+        return;
+    }
+    document.getElementById('mission-display').textContent = `Mission: ${appState.currentMission}`;
+    document.getElementById('target-time-display').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
+    document.getElementById('timer').textContent = formatTime(appState.actualTimeSeconds);
+    if (currentScreen === "loading") {
+        loadingScreen.style.display = 'none';
+        pauseBtn.textContent = 'Resume';
+        focusScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "plan") {
+        if (isUserMenuOpened) {
+            toggleUserMenu("plan");
+        }
+        planScreen.style.display = 'none';
         focusScreen.style.display = 'flex';
     }
 }
 
 function changeToReviewScreen(appState) {
-    const focusScreen = document.querySelector('.focus-screen');
-    const reviewScreen = document.querySelector('.review-screen');
     focusScreen.style.display = 'none';
     reviewScreen.style.display = 'flex';
     document.getElementById('target-time-review').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
@@ -432,9 +715,8 @@ function changeToReviewScreen(appState) {
     document.getElementById('completion-status-review').textContent = appState.completionStatus;
 }
 
-function changeToDashboardScreen(sessions, fromPlan) {
+function changeToDashboardScreen(sessions, currentScreen) {
     const [sessionsList, weeklyStats] = getDashboardData(sessions)
-
     const currentAmountOfSessions = document.getElementById('amount-of-sessions').textContent.slice(0, -9);
     const isSessionsListUpdated = Number(currentAmountOfSessions) === Number(weeklyStats[0]);
     const sessionsListContainer = document.querySelector(".sessions-list-container");
@@ -446,27 +728,125 @@ function changeToDashboardScreen(sessions, fromPlan) {
     document.getElementById('average-percentage').textContent = `${weeklyStats[1]}%`
     document.getElementById('total-time').textContent = `${formatTimeTohm(weeklyStats[2])}`
 
-    const lastScreen = fromPlan ? document.querySelector('.plan-screen') : document.querySelector('.review-screen');
-    const dashboardScreen = document.querySelector('.dashboard-screen');
-    lastScreen.style.display = 'none';
-    dashboardScreen.style.display = 'flex';
-}
-
-function changeToPlanScreen() {
-    const planScreen = document.querySelector('.plan-screen');
-    const dashboardScreen = document.querySelector('.dashboard-screen');
-    dashboardScreen.style.display = 'none';
-    planScreen.style.display = 'flex';
+    if (currentScreen === "plan") {
+        if (isUserMenuOpened) {
+            toggleUserMenu("plan");
+        }
+        planScreen.style.display = 'none';
+        dashboardScreen.style.display = 'flex';
+    }
+    else if (currentScreen === "review") {
+        reviewScreen.style.display = 'none';
+        dashboardScreen.style.display = 'flex';
+    }
 }
 
 
 
 // ========== 6. EVENT LISTENERS ==========
 
+retryBtn.addEventListener('click', async () => {
+    showLoadingIcon();
+    await initiateApp();
+});
+
+registerSwitchToLoginBtn.addEventListener('click', () => {
+    changeToLoginScreen("register");
+});
+
+registerForm.addEventListener('submit', async () => {
+    event.preventDefault();
+    registerErrorMessage.textContent = '';
+    registerPasswordErrorMessage.textContent = '';
+    if (!registerEmailInput.value || !registerUsernameInput.value) {
+        registerErrorMessage.textContent = 'Email and Username are needed to register';
+        return;
+    }
+    if (!registerEmailInput.value.includes("@")) {
+        registerErrorMessage.textContent = 'Email must contain @';
+        return;
+    }
+    const passwordError = getPasswordError(registerPasswordInput.value);
+    if (passwordError) {
+        registerPasswordErrorMessage.textContent = passwordError;
+        return;
+    }
+    let result;
+    try {
+        result = await register(registerUsernameInput.value, registerEmailInput.value, registerPasswordInput.value);
+    } catch (error) {
+        registerErrorMessage.textContent = 'Network/Server connection failed. Please try again';
+        return;
+    }
+    if (result.status === 409) {
+        registerErrorMessage.textContent = 'Username or Email already taken.';
+        return;
+    }
+    else if (result.status === 400) {
+        registerErrorMessage.textContent = 'Something went wrong. Please try again';
+        return;
+    }
+    else if (result.success === true) {
+        accessToken = result.access_token;
+        changeToPlanScreen("register");
+    }
+});
+
+loginSwitchToRegisterBtn.addEventListener('click', () => {
+    changeToRegisterScreen("login");
+});
+
+loginForm.addEventListener('submit', async () => {
+    event.preventDefault();
+    loginErrorMessage.textContent = '';
+    if (!loginUsernameOrEmailInput.value) {
+        loginErrorMessage.textContent = 'Email or Username is needed to log in';
+        return;
+    }
+    let result;
+    try {
+        result = await login(loginUsernameOrEmailInput.value, loginPasswordInput.value);
+    } catch (error) {
+        loginErrorMessage.textContent = 'Network/Server connection failed. Please try again';
+        return;
+    }
+    if (result.status === 401) {
+        loginErrorMessage.textContent = 'Email, username or password is incorrect';
+        return;
+    }
+    else if (result.status === 400) {
+        loginErrorMessage.textContent = 'Something went wrong. Please try again'
+        return;
+    }
+    else if (result.success === true) {
+        accessToken = result.access_token;
+        changeToPlanScreen("login");
+    }
+});
+
+planUserIcon.addEventListener('click', () => {
+    toggleUserMenu("plan");
+});
+
+planUserMenuLogoutBtn.addEventListener('click', async () => {
+    if (!confirm("Are you sure you want to log out?")) {
+        return;
+    }
+    try {
+        await logout();
+        accessToken = null;
+        planUserMenuUsername.textContent = '';
+        dashboardUserMenuUsername.textContent = '';
+        changeToLoginScreen("plan");
+    } catch (error) {
+        alert("An unexpected network/server connection error occurred");
+    }
+});
+
 dashboardBtn.addEventListener('click', async () => {
     const sessions = await getSessions();
-    await changeToDashboardScreen(sessions, fromPlan=true);
-})
+    changeToDashboardScreen(sessions, "plan");
+});
 
 startWorkBtn.addEventListener('click', () => {
     if (!missionInput.value) {
@@ -481,7 +861,7 @@ startWorkBtn.addEventListener('click', () => {
     AppState.currentMission = missionInput.value;
     AppState.targetTimeSeconds = parsedTime;
     AppState.startTimestamp = new Date().toISOString()
-    changeToFocusScreen(AppState);
+    changeToFocusScreen(AppState, "plan");
     startTimer(AppState);
 })
 
@@ -503,7 +883,6 @@ pauseBtn.addEventListener('click', () => {
 stopBtn.addEventListener('click', () => {
     clearInterval(timerInterval);
     AppState.isTimerRunning = false;
-    AppState.fromPlanScreen = false;
     AppState.percentageCompleted = Math.floor(AppState.actualTimeSeconds / AppState.targetTimeSeconds * 100);
     if (AppState.actualTimeSeconds >= AppState.targetTimeSeconds) {
         AppState.completionStatus = 'completed';
@@ -515,7 +894,7 @@ stopBtn.addEventListener('click', () => {
 })
 
 continueBtn.addEventListener('click', () => {
-    changeToFocusScreen(AppState);
+    changeToFocusScreen(AppState, "review");
     pauseBtn.textContent = 'Pause';
     const elapsed = (Date.now() - new Date(AppState.pauseStartTimestamp).getTime()) / 1000;
     AppState.pausedTimeSeconds += elapsed;
@@ -523,24 +902,16 @@ continueBtn.addEventListener('click', () => {
 })
 
 finishBtn.addEventListener('click', async () => {
-    
-    const date = new Date();
-    const weekday = date.getUTCDay();
-    const isoString = date.toISOString();
-    const dateWithWeekDay = isoString.replace('T', weekday + 'T');
-    
     const sessionData = {
-        date: dateWithWeekDay,
+        date: new Date().toISOString(),
         mission: AppState.currentMission,
         targetTimeSeconds: AppState.targetTimeSeconds,
         actualTimeSeconds: AppState.actualTimeSeconds,
-        completionStatus: AppState.completionStatus,
-        percentageCompleted: AppState.percentageCompleted
     };
 
     try {
         await postSession(sessionData);
-        alert("✅ Session saved successfully!\nReady for next session.");
+        alert("Session saved successfully!\nReady for next session.");
     } catch (error) {
         console.error("Save error:", error);
         const addedToQueue = QueueManager.addToQueue(sessionData);
@@ -553,25 +924,37 @@ finishBtn.addEventListener('click', async () => {
     }
     
     resetApp();
+
+    const sessions = await getSessions();
+    changeToDashboardScreen(sessions, "review");
 });
 
 newMissionBtn.addEventListener('click', () => {
-    changeToPlanScreen()
-})
+    changeToPlanScreen("dashboard");
+});
+
+dashboardUserIcon.addEventListener('click', () => {
+    toggleUserMenu("dashboard");
+});
+
+dashboardUserMenuLogoutBtn.addEventListener('click', async () => {
+    if (!confirm("Are you sure you want to log out?")) {
+        return;
+    }
+    try {
+        await logout();
+        accessToken = null;
+        planUserMenuUsername.textContent = '';
+        dashboardUserMenuUsername.textContent = '';
+        changeToLoginScreen("dashboard");
+    } catch (error) {
+        alert("An unexpected network/server connection error occurred");
+    }
+});
 
 
 // ========== 7. APP INITIALIZATION ==========
 
 document.addEventListener('DOMContentLoaded', async () => {
-    QueueManager.loadQueue()
-    if (QueueManager.queue.length > 0) {
-        alert("Syncing offline work...");
-        await retryQueue();
-    }
-    const loadedActiveSession = loadActiveSession(AppState)
-    if (loadedActiveSession) {
-        alert("Returning to uncompleted session...");
-        changeToFocusScreen(AppState)
-        pauseBtn.textContent = 'Resume';
-    }
+    await initiateApp();
 });
