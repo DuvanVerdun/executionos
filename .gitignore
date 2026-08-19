@@ -4,3 +4,4 @@ instance/
 venv/
 *.db
 __pycache__/
+cookies.txt

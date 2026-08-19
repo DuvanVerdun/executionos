@@ -12,7 +12,6 @@ from flask_jwt_extended import create_access_token, create_refresh_token  # type
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt  # type: ignore[reportUnknownVariableType]
 
 from extensions import db, jwt
-from pathlib import Path
 
 import os
 from dotenv import load_dotenv
@@ -24,11 +23,12 @@ load_dotenv()
 def create_app() -> Flask:
     app = Flask(__name__)
 
-    BACKEND_ROOT = Path(__file__).resolve().parent
-    DATABASE_DIR = BACKEND_ROOT / "instance"
-    os.makedirs(DATABASE_DIR, exist_ok=True)
-    db_uri = f"sqlite:///{DATABASE_DIR / 'executionos.db'}"
+    turso_url = os.environ["TURSO_DATABASE_URL"]
+    db_uri = f"sqlite+{turso_url}?secure=true"
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]}
+    }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
