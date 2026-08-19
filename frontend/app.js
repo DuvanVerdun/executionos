@@ -1,6 +1,6 @@
 // ========== 1. CONSTANTS ==========
 
-const BACKEND_URL = '';  // TODO: set after Render deploy
+const BACKEND_URL = 'https://executionos.onrender.com';
 
 const DATE_TO_MONTHS = {
     '01': 'Jan',
