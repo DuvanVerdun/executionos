@@ -271,7 +271,7 @@ async function refreshAccessToken() {
         headers: { "Content-Type": "application/json"},
         credentials: "include"
     });
-    if (response.status === 401, response.status === 403) {
+    if (response.status === 401 || response.status === 403) {
         return "";
     }
     const result = await response.json();
