@@ -33,7 +33,7 @@ def create_app() -> Flask:
 
     db.init_app(app)
     Migrate(app, db)
-    CORS(app, supports_credentials=True, origins=["https://executionos-mvp.netlify.app"])
+    CORS(app, supports_credentials=True, origins=["https://executionos-mvp.netlify.app", "http://localhost:5500"])
 
     app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
@@ -351,4 +351,4 @@ def create_app() -> Flask:
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, ssl_context=("localhost+1.pem", "localhost+1-key.pem"))

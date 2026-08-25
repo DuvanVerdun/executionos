@@ -14,7 +14,7 @@
 <body>
     <div class="loading-screen screen">
         <span id="loading-icon"></span>
-        <p id="loading-error-message"></p>
+        <p id="loading-error-message">Couldn't reach the server. Try again in a moment.</p>
         <button id="retry-btn">Retry</button>
     </div>
     <div class="register-screen screen">
@@ -37,7 +37,7 @@
     <div class="login-screen screen">
         <div class="login-form-container">
             <h1>Login</h1>
-            <form id="login-form">¿
+            <form id="login-form">
                 <p>Username or Email</p>
                 <input type="text" class="input" id="login-username-or-email-input">
                 <p>Password</p>
@@ -45,21 +45,25 @@
                 <button type="submit" id="login-submit-btn">LOGIN</button>
             </form>
             <p id="login-error-message" class="form-error-message"></p>
-            <button id="switch-to-register-screen">Create account</button>
+            <button id="switch-to-register-screen">Create an account</button>
         </div>
     </div>
     <div class="plan-screen screen">
+
         <section class="header-section">
-            <h1>ExecutionOS</h1>
-            <p>ExecutionOS helps ambitious builders who already know what they should be doing but struggle to execute consistently on meaningful goals and projects.</p>
-        </section>
-        <section class="plan-user-menu-section">
+            <div class="header-info">
+                <h1>ExecutionOS</h1>
+                <p>ExecutionOS helps ambitious builders who already know what they should be doing but struggle to execute consistently on meaningful goals and projects.</p>
+            </div>
             <div class="plan-user-menu">
-                <p id="plan-user-menu-username"></p>
-                <span id="plan-user-icon"></span>
+                <div class="plan-user-menu-username-and-icon-container">
+                    <p id="plan-user-menu-username"></p>
+                    <span id="plan-user-icon"></span>
+                </div>
                 <button id="plan-user-menu-logout-btn">Logout</button>
             </div>
         </section>
+        
         <section class="mission-section">
             <h3>What Matters Today?</h3>
             <input type="text" placeholder="Today's Mission" class="input" id="mission-input">
@@ -105,8 +109,10 @@
                 <button id="new-mission-btn">Start New Mission</button>
             </div>
             <div class="dashboard-user-menu">
-                <p id="dashboard-user-menu-username"></p>
-                <span id="dashboard-user-icon"></span>
+                <div class="dashboard-user-menu-username-and-icon-container">
+                    <p id="dashboard-user-menu-username"></p>
+                    <span id="dashboard-user-icon"></span>
+                </div>
                 <button id="dashboard-user-menu-logout-btn">Logout</button>
             </div>
         </header>
