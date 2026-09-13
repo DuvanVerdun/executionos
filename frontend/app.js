@@ -163,6 +163,9 @@ const dashboardTotalTimeDisplay = document.getElementById('dashboard-total-time-
 const dashboardSessionsListContainer = document.getElementById("dashboard-sessions-list-container");
 
 
+// general
+const passwordVisibilityButtons = document.querySelectorAll('.password-visibility-btn');
+
 
 // ========== 4. UTILITY FUNCTIONS ==========
 
@@ -203,7 +206,7 @@ async function syncOfflineWork() {
 }
 
 
-function parseTimeFromHHMMSS(timeStr) {
+function parseTimeFromHHMM(timeStr) {
     const parts = timeStr.split(':');
     const hours = parseInt(parts[0]);
     const minutes = parseInt(parts[1]);
@@ -264,9 +267,10 @@ async function resetApp() {
     AppState.pausedTimeSeconds = 0
 
     planMissionInput.value = '';
-    planTargetTimeInput.value = '';
+    planTargetTimeInput.value = '00:00';
     focusCurrentTimeDisplay.textContent = '00:00:00';
     focusTimerRingContainer.style.setProperty('--pct', '0%');
+    reviewContinueBtn.classList.replace('normal-button', 'cta-button');
 
     clearActiveSession();
 }
@@ -469,20 +473,28 @@ function getDashboardData(sessions) {
 
 function getDashboardDataDateRange() {
     const today = new Date();
-    const firstDayOfTheWeek = new Date();
-    const daysSinceMonday = today.getUTCDay();
-    firstDayOfTheWeek.setDate(today.getDate() - daysSinceMonday)
+    const firstDayOfTheWeek = new Date(today);
+    const daysSinceMonday = (today.getDay() + 6) % 7;
+    firstDayOfTheWeek.setDate(today.getDate() - daysSinceMonday);
+    firstDayOfTheWeek.setHours(0, 0, 0, 0);
     return [today, firstDayOfTheWeek];
 }
 
 function getThisWeekSessions(sessions, today, firstDayOfTheWeek) {
     const thisWeekSessions = [];
     for (const session of sessions) {
+        console.log(session);
         const sessionDate = new Date(session.date + 'Z');
         if (sessionDate >= firstDayOfTheWeek && sessionDate <= today) {
             thisWeekSessions.push(session);
         }
     }
+    thisWeekSessions.sort((a, b) => {
+        const dateA = new Date(a.date + 'Z');
+        const dateB = new Date(b.date + 'Z');
+        return dateB - dateA;
+    })
+
     return thisWeekSessions;
 }
 
@@ -520,16 +532,16 @@ function displaySessionsOnContainer(sessionsList) {
     for (const session of sessionsList) {
 
         const dateObj = new Date(session.date + 'Z');
-        const weekDay = NUMBER_TO_WEEKDAY[dateObj.getUTCDay()];
-        const month = DATE_TO_MONTHS[dateObj.getUTCMonth() + 1];
-        const date = dateObj.getUTCDate();
+        const weekDay = NUMBER_TO_WEEKDAY[dateObj.getDay()];
+        const month = DATE_TO_MONTHS[dateObj.getMonth() + 1];
+        const date = dateObj.getDate();
         const uiDate = `${weekDay}, ${month} ${date}`;
 
         if (lastDate !== uiDate) {
             displayOnNewCard(session, uiDate, dateObj);
         }
         else {
-            dashboardSessionCardId = `session-card-${dateObj.getUTCMonth() + 1}-${dateObj.getUTCDate()}`;
+            dashboardSessionCardId = `session-card-${dateObj.getMonth() + 1}-${dateObj.getDate()}`;
             displayOnExistingCard(session, dashboardSessionCardId);
         }
         lastDate = uiDate;
@@ -540,7 +552,7 @@ function displayOnNewCard(session, uiDate, dateObj) {
     const dashboardSessionCard = document.createElement("div");
     const sessionCardDate = document.createElement("p");
     dashboardSessionCard.className = "dashboard-session-card";
-    dashboardSessionCard.id = `session-card-${dateObj.getUTCMonth() + 1}-${dateObj.getUTCDate()}`;
+    dashboardSessionCard.id = `session-card-${dateObj.getMonth() + 1}-${dateObj.getDate()}`;
     sessionCardDate.className = "dashboard-session-date";
     sessionCardDate.textContent = uiDate;
     dashboardSessionCard.appendChild(sessionCardDate);
@@ -653,6 +665,25 @@ function toggleUserMenu(screen) {  // relies on only one screen's menu ever bein
     isUserMenuOpened = true;
     }
 }
+
+
+function togglePasswordVisibility(passwordInput, visibilityButton) {
+    const showIcon = visibilityButton.querySelector('.password-show-icon');
+    const hideIcon = visibilityButton.querySelector('.password-hide-icon');
+    
+    if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        showIcon.style.display = 'none';
+        hideIcon.style.display = 'block';
+        visibilityButton.ariaLabel = "Hide password"
+        return;
+    }
+    passwordInput.type = "password";
+    showIcon.style.display = 'block';
+    hideIcon.style.display = 'none';
+    visibilityButton.ariaLabel = "Show password";
+}
+
 
 
 // ========== 5. SCREEN CHANGE FUNCTIONS ==========
@@ -773,7 +804,7 @@ function changeToReviewScreen(appState) {
         reviewProgressRingContainer.style.setProperty('--pct', `${overtimePct}%`);
         reviewProgressRingContainer.style.background = `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--reward) var(--pct), var(--reward) 100%)`;
 
-        reviewContinueBtn.classList.replace('cta-button', 'normal-button')
+        reviewContinueBtn.classList.replace('cta-button', 'normal-button');
     }
 }
 
@@ -800,6 +831,14 @@ function changeToDashboardScreen(sessions, currentScreen) {
 loadingRetryBtn.addEventListener('click', async () => {
     showLoadingIcon();
     await initiateApp();
+});
+
+
+passwordVisibilityButtons.forEach((passwordVisibilityButton) => {
+    passwordVisibilityButton.addEventListener('click', () => {
+        const passwordInput = passwordVisibilityButton.parentElement.querySelector('.input');
+        togglePasswordVisibility(passwordInput, passwordVisibilityButton);
+    });
 });
 
 registerSwitchToLoginBtn.addEventListener('click', () => {
@@ -908,6 +947,42 @@ planDashboardBtn.addEventListener('click', async () => {
     changeToDashboardScreen(sessions, "plan");
 });
 
+
+
+let targetTimeDigits = '';
+
+planTargetTimeInput.addEventListener('keydown', (event) => {
+    if (/^\d$/.test(event.key)) {
+        event.preventDefault();
+        if (targetTimeDigits.length >= 4) {
+            return;
+        }
+        targetTimeDigits += event.key;
+    }
+    else if (event.key === 'Backspace') {
+        event.preventDefault();
+        targetTimeDigits = targetTimeDigits.slice(0, -1);
+    }
+    else {
+        event.preventDefault();
+        return;
+    }
+    if (!targetTimeDigits) {
+        planTargetTimeInput.value = '00:00';
+        return;
+    }
+    if (targetTimeDigits.length <= 2) {
+        const hours = targetTimeDigits.padStart(2, '0');
+        planTargetTimeInput.value = `${hours}:00`;
+        return;
+    }
+    const hours = targetTimeDigits.slice(0, -2).padStart(2, '0');
+    const minutes = targetTimeDigits.slice(-2);
+    planTargetTimeInput.value = `${hours}:${minutes}`;
+});
+
+
+
 planStartWorkBtn.addEventListener('click', () => {
     if (!planMissionInput.value) {
         alert('Please enter a mission');
@@ -921,7 +996,16 @@ planStartWorkBtn.addEventListener('click', () => {
         alert('Please enter a target time in HH:MM format');
         return;
     }
-    const parsedTime = parseTimeFromHHMMSS(planTargetTimeInput.value);
+    const [hours, minutes] = planTargetTimeInput.value.split(':').map(Number);
+    if (minutes > 59) {
+        alert('Minutes must be between 00 and 59');
+        return;
+    }
+    if (hours === 0 && minutes === 0) {
+        alert('Target time must be greater than 00:00');
+        return;
+    }
+    const parsedTime = parseTimeFromHHMM(planTargetTimeInput.value);
     AppState.currentMission = planMissionInput.value;
     AppState.targetTimeSeconds = parsedTime;
     AppState.startTimestamp = new Date().toISOString()

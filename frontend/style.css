@@ -120,6 +120,29 @@ p, h1, h2, h3 {
     background-color: var(--base);
 }
 
+.password-visibility-btn {
+    position: absolute;
+    right: clamp(16px, 1.04vw, 20px);
+    top: 50%;
+    transform: translateY(-50%);
+
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.password-hide-icon {
+    display: none;
+}
+
+.register-password-input-container .input,
+.login-password-input-container .input {
+    padding-right: clamp(48px, 3vw, 58px);
+}
+
+
 .form-error-message {
     width: clamp(350px, 20.83vw, 400px);
     color: var(--cta);
@@ -400,6 +423,7 @@ button {
 
 #plan-target-time-input {
     width: clamp(108px, 7.08vw, 136px);
+    padding: clamp(12px, 0.83vw, 16px) clamp(21px, 1.4vw, 23px)
 }
 
 #plan-target-time-input:focus ~ .input-placeholder,
@@ -471,6 +495,8 @@ button {
     align-items: center;
     height: 100%;
     width: clamp(300px, 19.8vw, 380px);
+
+    flex: 1;
 }
 
 #focus-mission-display {
@@ -492,7 +518,7 @@ button {
     font-weight: bold;
     text-align: center;
     align-items: center;
-    height: 100%;
+    flex: 1
 }
 
 .focus-button-container {
@@ -502,7 +528,10 @@ button {
     height: 100%;
     justify-content: space-between;
     align-items: start;
+
+    flex: 1;
 }
+
 
 
 /* Review Screen Styles */

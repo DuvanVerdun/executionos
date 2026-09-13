@@ -45,13 +45,32 @@
                 <div class="input-container register-password-input-container">
                     <input type="password" class="input" id="register-password-input" placeholder=" ">
                     <p class="input-placeholder">Password</p>
+                    <button type="button" class="password-visibility-btn" aria-label="Show password">
+
+                        <svg class="password-show-icon" viewBox="0 0 24 24" width="24" height="24"
+                            fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+
+                        <svg class="password-hide-icon" viewBox="0 0 24 24" width="24" height="24"
+                            fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3l18 18"/>
+                            <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/>
+                            <path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2 3"/>
+                            <path d="M6.6 6.6C3.6 8.5 2 12 2 12s3.5 8 10 8a9.8 9.8 0 0 0 4.4-1"/>
+                        </svg>
+
+                    </button>
                 </div>
                 <div class="register-error-and-button-container">
                     <p class="form-error-message" id="register-password-error-message"></p>
                     <button type="submit" class="cta-button" id="register-submit-btn">REGISTER</button>        
                     <p class="form-error-message" id="register-error-message"></p>
                     <div class="switch-btn-container">
-                        <button class="switch-btn" id="register-switch-to-login-btn">Already have an account?</button>
+                        <button type="button" class="switch-btn" id="register-switch-to-login-btn">Already have an account?</button>
                     </div>
                 </div>
             </form>
@@ -75,12 +94,31 @@
                 <div class="input-container login-password-input-container">
                     <input type="password" class="input" id="login-password-input" placeholder=" ">
                     <p class="input-placeholder">Password</p>
+                    <button type="button" class="password-visibility-btn" aria-label="Show password">
+
+                        <svg class="password-show-icon" viewBox="0 0 24 24" width="24" height="24"
+                            fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+
+                        <svg class="password-hide-icon" viewBox="0 0 24 24" width="24" height="24"
+                            fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3l18 18"/>
+                            <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/>
+                            <path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2 3"/>
+                            <path d="M6.6 6.6C3.6 8.5 2 12 2 12s3.5 8 10 8a9.8 9.8 0 0 0 4.4-1"/>
+                        </svg>
+
+                    </button>
                 </div>
                 <div class="login-error-and-button-container">
                     <button type="submit" class="cta-button" id="login-submit-btn">LOGIN</button>
                     <p class="form-error-message" id="login-error-message"></p>
                     <div class="switch-btn-container">
-                        <button class="switch-btn" id="login-switch-to-register-btn">Create an account</button>
+                        <button type="button" class="switch-btn" id="login-switch-to-register-btn">Create an account</button>
                     </div>
                 </div>
             </form>
@@ -121,7 +159,7 @@
                     <div class="plan-time-container">
                         <h3>How long will you focus?</h3>
                         <div class="input-container plan-time-input-container">
-                            <input type="text" class="input" id="plan-target-time-input" placeholder="HH:MM" maxlength="5">
+                            <input inputmode="numeric" class="input" id="plan-target-time-input" placeholder=" " maxlength="5" value="00:00">
                             <p class="input-placeholder">HH:MM</p>
                         </div>
                     </div>
