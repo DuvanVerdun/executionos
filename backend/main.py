@@ -27,7 +27,8 @@ def create_app() -> Flask:
     db_uri = f"sqlite+{turso_url}?secure=true"
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]}
+        "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]},
+        "pool_pre_ping": True
     }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
