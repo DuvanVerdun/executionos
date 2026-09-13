@@ -6,6 +6,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 
 from sqlalchemy import select
+from sqlalchemy.pool import NullPool
 from werkzeug.wrappers import Response
 from werkzeug.security import generate_password_hash, check_password_hash  # type: ignore[reportUnknownVariableType]
 from flask_jwt_extended import create_access_token, create_refresh_token  # type: ignore[reportUnknownVariableType]
@@ -27,7 +28,8 @@ def create_app() -> Flask:
     db_uri = f"sqlite+{turso_url}?secure=true"
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]}
+        "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]},
+        "poolclass": NullPool
     }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
