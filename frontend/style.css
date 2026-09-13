@@ -12,11 +12,11 @@
 
     /* font sizes */
     --body: 1rem;
-    --button: 1.3rem;
-    --header: 1.69rem;
-    --title: 2.2rem;
-    --prize: 2.85rem;
-    --timer: 6rem;
+    --button: clamp(1.3rem, 1.4vw, 1.65rem);
+    --header: clamp(1.69rem, 1.82vw, 2.15rem);
+    --title: clamp(2.2rem, 2.37vw, 2.79rem);
+    --prize: clamp(2.85rem, 3.08vw, 3.63rem);
+    --timer: clamp(6rem, 6.5vw, 7.8rem);
 }
 
 @property --pct {
@@ -72,7 +72,7 @@ p, h1, h2, h3 {
 }
 
 .card-header {
-    width: 350px;
+    width: clamp(350px, 20.83vw, 400px);
     text-align: center;
     font-size: var(--title);
     color: var(--white);
@@ -81,8 +81,8 @@ p, h1, h2, h3 {
 
 .input {
     box-sizing: border-box;
-    width: 350px;
-    padding: 12px 16px;
+    width: clamp(350px, 22vw, 425px);
+    padding: clamp(12px, 0.83vw, 16px) clamp(16px, 1.04vw, 20px);
     border-radius: 8px;
     border: 3px solid var(--border);
     font-family: 'Outfit', sans-serif;
@@ -105,8 +105,8 @@ p, h1, h2, h3 {
 .input-placeholder {
     position: absolute;
     font-size: var(--button);
-    left: 18px;
-    top: 14px;
+    left: clamp(18px, 1.15vw, 22px);
+    top: clamp(14px, 0.94vw, 18px);
     pointer-events: none;
 
     transition: .1s ease-in;
@@ -114,14 +114,14 @@ p, h1, h2, h3 {
 
 .input:focus ~ .input-placeholder,
 .input:not(:placeholder-shown) ~ .input-placeholder {
-    top: -13px;
-    left: 20px;
+    top: clamp(-17px, -0.89vw, -13px);
+    left: clamp(16px, 0.83vw, 20px); 
     padding: 0 4px;
     background-color: var(--base);
 }
 
 .form-error-message {
-    width: 350px;
+    width: clamp(350px, 20.83vw, 400px);
     color: var(--cta);
     font-size: var(--button);
     text-align: start;
@@ -130,7 +130,7 @@ p, h1, h2, h3 {
 button {
     border-radius: 8px;
     font-size: var(--button);
-    padding: 16px 32px;
+    padding: clamp(16px, 1.04vw, 20px) clamp(32px, 2.08vw, 40px);
 
     transition: .1s ease-in;
 }
@@ -168,7 +168,7 @@ button {
 .switch-btn-container {
     display: flex;
     justify-content: end;
-    width: 350px;
+    width: clamp(350px, 20.83vw, 400px);
 }
 
 .switch-btn {
@@ -192,7 +192,7 @@ button {
     align-items: center;
     width: 50%;
     
-    gap: 24px;
+    gap: clamp(24px, 1.67vw, 32px);
 }
 
 #loading-error-message, #loading-retry-btn {
@@ -212,8 +212,8 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 48px;
-    padding: 48px;
+    gap: clamp(48px, 3.33vw, 64px);
+    padding: clamp(48px, 3.33vw, 64px);
     border-radius: 8px;
     border: 3px solid var(--border);
 }
@@ -223,7 +223,7 @@ button {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 24px;
+    gap: clamp(24px, 1.67vw, 32px);
 }
 
 .register-error-and-button-container {
@@ -235,7 +235,7 @@ button {
 }
 
 #register-submit-btn {
-    width: 350px;
+    width: clamp(350px, 20.83vw, 400px);
 }
 
 
@@ -246,8 +246,8 @@ button {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 48px;
-    padding: 48px;
+    gap: clamp(48px, 3.33vw, 64px);
+    padding: clamp(48px, 3.33vw, 64px);
     border-radius: 8px;
     border: 3px solid var(--border);
 }
@@ -257,7 +257,7 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 24px;
+    gap: clamp(24px, 1.67vw, 32px);
 }
 
 .login-error-and-button-container {
@@ -269,7 +269,7 @@ button {
 }
 
 #login-submit-btn {
-    width: 350px;
+    width: clamp(350px, 20.83vw, 400px);
 }
 
 
@@ -289,7 +289,7 @@ button {
     flex-direction: row;
     width: 100%;
     box-sizing: border-box;
-    padding: 20px;
+    padding: clamp(20px, 1.3vw, 28px);
     justify-content: space-between;
     align-items: center;
     border-bottom: 3px solid var(--text);
@@ -310,8 +310,8 @@ button {
     background-color: var(--base);
     
     position: absolute;
-    top: 1.5px;
-    right: -6.5px;
+    top: clamp(1.5px, 0.31vw, 6px);
+    right: clamp(-6.5px, -0.1vw, -2px);
 }
 
 #plan-user-menu-information {
@@ -330,8 +330,8 @@ button {
 .user-icon {
     display: flex;
     box-sizing: border-box;
-    width: 44px;
-    height: 44px;
+    width: clamp(44px, 2.92vw, 56px);
+    height: clamp(44px, 2.92vw, 56px);
     border-radius: 50%;
     border: 3px solid var(--text);
 }
@@ -377,8 +377,8 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 64px 48px;
-    gap: 64px;
+    padding: clamp(64px, 4.17vw, 80px) 48px;
+    gap: clamp(64px, 4.17vw, 80px);
     border-radius: 8px;
     border: 3px solid var(--border);
 }
@@ -389,7 +389,7 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 24px;
+    gap: clamp(24px, 1.67vw, 32px);
 }
 
 .plan-mission-container h3,
@@ -399,12 +399,12 @@ button {
 }
 
 #plan-target-time-input {
-    width: 108px;
+    width: clamp(108px, 7.08vw, 136px);
 }
 
 #plan-target-time-input:focus ~ .input-placeholder,
 #plan-target-time-input:not(:placeholder-shown) ~ .input-placeholder {
-    left: 14px;
+    left: clamp(14px, 0.94vw, 18px);
 }
 
 
@@ -413,7 +413,7 @@ button {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    width: 450px;
+    width: clamp(450px, 28vw, 540px);
 }
 
 
@@ -437,8 +437,8 @@ button {
     justify-content: center;
     align-items: center;
     border-radius: 50%;
-    width: 600px;
-    height: 600px;
+    width: clamp(600px, 39.6vw, 760px);
+    height: clamp(600px, 39.6vw, 760px);
     --pct: 0%;
     background: conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--border) var(--pct), var(--border) 100%);
     transform: scaleX(-1);
@@ -451,8 +451,8 @@ button {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 540px;
-    height: 540px;
+    width: 90%;
+    height: 90%;
     border-radius: 50%;
     background-color: var(--base);
 }
@@ -470,7 +470,7 @@ button {
     justify-content: end;
     align-items: center;
     height: 100%;
-    width: 300px;
+    width: clamp(300px, 19.8vw, 380px);
 }
 
 #focus-mission-display {
@@ -498,15 +498,10 @@ button {
 .focus-button-container {
     display: flex;
     flex-direction: row;
-    width: 300px;
+    width: clamp(300px, 19.8vw, 380px);
     height: 100%;
     justify-content: space-between;
     align-items: start;
-}
-
-.focus-screen .action-section button {
-    padding: 15px 30px;
-    font-size: 2rem;
 }
 
 
@@ -517,8 +512,8 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 32px;
-    padding: 48px;
+    gap: clamp(32px, 2.08vw, 40px);
+    padding: clamp(48px, 3.33vw, 64px);
     border-radius: 8px;
     border: 3px solid var(--border);
 }
@@ -632,7 +627,7 @@ button {
     min-width: 600px;
     justify-content: space-between;
     align-items: center;
-    gap: 64px;
+    gap: clamp(64px, 4.17vw, 80px);
     min-height: 100vh;
 }
 
@@ -641,7 +636,7 @@ button {
     flex-direction: row;
     width: 100%;
     box-sizing: border-box;
-    padding: 20px;
+    padding: clamp(20px, 1.3vw, 28px);
     justify-content: space-between;
     align-items: center;
     border-bottom: 3px solid var(--text);
@@ -665,8 +660,8 @@ button {
     background-color: var(--base);
     
     position: absolute;
-    top: 10px;
-    right: -6.5px;
+    top: clamp(10px, 0.83vw, 16px);
+    right: clamp(-6.5px, -0.1vw, -2px);
 }
 
 #dashboard-user-menu-information {
@@ -711,7 +706,7 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 64px;
+    gap: clamp(64px, 4.17vw, 80px);
 }
 
 .dashboard-weekly-stats-container {
@@ -721,7 +716,7 @@ button {
 }
 
 .dashboard-content-title {
-    width: 450px;
+    width: clamp(450px, 27.8vw, 534px);
     height: fit-content;
     font-size: var(--header);
     color: var(--white);
@@ -732,10 +727,10 @@ button {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    padding: 48px;
+    padding: clamp(48px, 3.33vw, 64px);
     border-radius: 8px;
     border: 3px solid var(--reward);
-    width: 350px;
+    width: clamp(350px, 20.83vw, 400px);
 }
 
 .dashboard-weekly-stats-card p {
@@ -748,16 +743,16 @@ button {
 #dashboard-sessions-list-container {
     display: flex;
     flex-direction: column;
-    gap: 48px;
+    gap: clamp(48px, 3.33vw, 64px);
     color: var(--white);
 }
 
 .dashboard-session-card {
     display: flex;
     flex-direction: column;
-    width: 350px;
-    gap: 32px;
-    padding: 48px;
+    width: clamp(350px, 20.83vw, 400px);
+    gap: clamp(32px, 2.08vw, 40px);
+    padding: clamp(48px, 3.33vw, 64px);
     background-color: var(--base);
     border-radius: 8px;
     border: 3px solid var(--reward);
@@ -793,7 +788,7 @@ button {
     display: flex;
     flex-direction: row;
     width: 100%;
-    gap: 24px;
+    gap: clamp(24px, 1.67vw, 32px);
     position: relative;
 }
 
@@ -875,7 +870,7 @@ button {
     justify-content: space-between;
     gap: 12px;
     align-items: center;
-    padding: 20px;
+    padding: clamp(20px, 1.3vw, 28px);
     background-color: var(--base);
     border-top: 3px solid var(--text);
 }
