@@ -3,132 +3,242 @@
 <head>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=assignment timer arrow_right_alt check" />
+    
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ExecutionOS</title>
 </head>
 <body>
-    <div class="loading-screen screen">
-        <span id="loading-icon"></span>
-        <p id="loading-error-message">Couldn't reach the server. Try again in a moment.</p>
-        <button id="retry-btn">Retry</button>
-    </div>
-    <div class="register-screen screen">
-        <div class="register-form-container">
-            <h1>Register</h1>
-            <form id="register-form">
-                <p>Email</p>
-                <input type="email" class="input" id="register-email-input">
-                <p>Username</p>
-                <input type="text" class="input" id="register-username-input">
-                <p>Password</p>
-                <input type="password" class="input" id="register-password-input">
-                <p id="register-password-error-message" class="form-error-message"></p>
-                <button type="submit" id="register-submit-btn">REGISTER</button>
-                <p id="register-error-message" class="form-error-message"></p>
-            </form>
-            <button id="switch-to-login-screen">Already have an account?</button>
+    
+    <!-- Loading Screen Section -->
+    
+    <div class="screen loading-screen">
+        <div class="loading-retry-container">
+            <span id="loading-icon"></span>
+            <p id="loading-error-message">Couldn't reach the server. Try again in a moment.</p>
+            <button id="loading-retry-btn" class="normal-button">Retry</button>
         </div>
     </div>
-    <div class="login-screen screen">
-        <div class="login-form-container">
-            <h1>Login</h1>
-            <form id="login-form">
-                <p>Username or Email</p>
-                <input type="text" class="input" id="login-username-or-email-input">
-                <p>Password</p>
-                <input type="password" class="input" id="login-password-input">
-                <button type="submit" id="login-submit-btn">LOGIN</button>
-            </form>
-            <p id="login-error-message" class="form-error-message"></p>
-            <button id="switch-to-register-screen">Create an account</button>
-        </div>
-    </div>
-    <div class="plan-screen screen">
+    
 
-        <section class="header-section">
-            <div class="header-info">
-                <h1>ExecutionOS</h1>
-                <p>ExecutionOS helps ambitious builders who already know what they should be doing but struggle to execute consistently on meaningful goals and projects.</p>
-            </div>
-            <div class="plan-user-menu">
-                <div class="plan-user-menu-username-and-icon-container">
-                    <p id="plan-user-menu-username"></p>
-                    <span id="plan-user-icon"></span>
+    <!-- Register Screen Section -->
+    
+    <div class="screen wordmark-centered-layout register-screen">
+        <h1 class="wordmark">ExecutionOS</h1>
+        <div class="register-card">
+            <h2 class="card-header">Register</h2>
+
+            <form id="register-form">
+                <div class="input-container register-email-input-container">
+                    <input type="email" class="input" id="register-email-input" placeholder=" ">
+                    <p class="input-placeholder">Email</p>
                 </div>
-                <button id="plan-user-menu-logout-btn">Logout</button>
-            </div>
-        </section>
-        
-        <section class="mission-section">
-            <h3>What Matters Today?</h3>
-            <input type="text" placeholder="Today's Mission" class="input" id="mission-input">
-        </section>
-        <section class="time-section">
-            <h3>How long will you focus?</h3>
-            <input type="text" placeholder="HH:MM" class="input" id="time-input">
-        </section>
-        <section class="action-section">
-            <button id="dashboard-btn">DASHBOARD</button>
-            <button id="start-work-btn">START WORK</button>
-        </section>
-    </div>
-    <div class="focus-screen screen">
-        <p id="mission-display"></p>
-        <p id="target-time-display"></p>
-        <section class="timer-section">
-            <p id="timer">00:00:00</p>
-        </section>
-        <section class="action-section">
-            <button id="pause-btn">Pause</button>
-            <button id="stop-btn">Stop</button>
-        </section>
-    </div>
-    <div class="review-screen screen">
-        <h1>Review</h1>
-        <div class="target-vs-actual-container">
-            <h2 id="target-time-review"></h2>
-            <h2 id="actual-time-review"></h2>
-        </div>
-        <div class="percentage-status-container">
-            <p id="completion-percentage-review"></p>
-            <p id="completion-status-review"></p>
-        </div>
-        <div class="action-section">
-            <button id="continue-btn">Continue</button>
-            <button id="finish-btn">Finish</button>
-        </div>
-    </div>
-    <div class="dashboard-screen screen">
-        <header>
-            <div class="new-mission-btn-container">
-                <button id="new-mission-btn">Start New Mission</button>
-            </div>
-            <div class="dashboard-user-menu">
-                <div class="dashboard-user-menu-username-and-icon-container">
-                    <p id="dashboard-user-menu-username"></p>
-                    <span id="dashboard-user-icon"></span>
+                <div class="input-container register-username-input-container">
+                    <input type="text" class="input" id="register-username-input" placeholder=" ">
+                    <p class="input-placeholder">Username</p>
                 </div>
-                <button id="dashboard-user-menu-logout-btn">Logout</button>
-            </div>
-        </header>
-        <section class="weekly-stats">
-            <h2>This Week's Stats</h2>
-            <div class="stats-card">
-                <p id="amount-of-sessions"></p>
-                <p id="average-percentage"></p>
-                <p id="total-time"></p>
-            </div>
-        </section>
-        <section class="sessions-list-container">
-            <h2>Finished Sessions</h2>
+                <div class="input-container register-password-input-container">
+                    <input type="password" class="input" id="register-password-input" placeholder=" ">
+                    <p class="input-placeholder">Password</p>
+                </div>
+                <div class="register-error-and-button-container">
+                    <p class="form-error-message" id="register-password-error-message"></p>
+                    <button type="submit" class="cta-button" id="register-submit-btn">REGISTER</button>        
+                    <p class="form-error-message" id="register-error-message"></p>
+                    <div class="switch-btn-container">
+                        <button class="switch-btn" id="register-switch-to-login-btn">Already have an account?</button>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+
+    <!-- Login Screen Section -->
+
+    <div class="screen wordmark-centered-layout login-screen">
+        <h1 class="wordmark">ExecutionOS</h1>
+        <div class="login-card">
+            <h2 class="card-header">Login</h2>
+
+            <form id="login-form">
+                <div class="input-container login-username-or-email-input-container">
+                    <input type="text" class="input" id="login-username-or-email-input" placeholder=" ">
+                    <p class="input-placeholder">Username or Email</p>
+                </div>
+                <div class="input-container login-password-input-container">
+                    <input type="password" class="input" id="login-password-input" placeholder=" ">
+                    <p class="input-placeholder">Password</p>
+                </div>
+                <div class="login-error-and-button-container">
+                    <button type="submit" class="cta-button" id="login-submit-btn">LOGIN</button>
+                    <p class="form-error-message" id="login-error-message"></p>
+                    <div class="switch-btn-container">
+                        <button class="switch-btn" id="login-switch-to-register-btn">Create an account</button>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+
+    <!-- Plan Screen Section -->
+
+    <div class="screen plan-screen">
+
+        <div class="plan-container">
+
+            <header class="plan-header">
+                <h1 class="wordmark">ExecutionOS</h1>
+                <span id="plan-user-icon" class="user-icon"></span>
+                <div id="plan-user-menu">
+                    <div id="plan-user-menu-information">
+                        <p id="plan-user-menu-username"></p>
+                        <span id="plan-user-menu-icon" class="user-icon"></span>
+                    </div>
+                    <span class="plan-user-menu-divisor-line"></span>
+                    <button id="plan-user-menu-logout-btn">Logout</button>
+                </div>
+            </header>
             
-        </section>
+            <section class="plan-content">
+
+                <section class="plan-input-section">
+                    <div class="plan-mission-container">
+                        <h3>What Matters Today?</h3>
+                        <div class="input-container plan-mission-input-container">
+                            <input type="text" class="input" id="plan-mission-input" placeholder=" " maxlength="50">
+                            <p class="input-placeholder">Today's Mission</p>
+                        </div>
+                    </div>
+                    <div class="plan-time-container">
+                        <h3>How long will you focus?</h3>
+                        <div class="input-container plan-time-input-container">
+                            <input type="text" class="input" id="plan-target-time-input" placeholder="HH:MM" maxlength="5">
+                            <p class="input-placeholder">HH:MM</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="plan-button-section">
+                    <button id="plan-dashboard-btn" class="normal-button">DASHBOARD</button>
+                    <button id="plan-start-work-btn" class="cta-button">START WORK</button>
+                </section>
+
+            </section>
+
+        </div>
+
     </div>
+
+
+    <!-- Focus Screen Section -->
+
+    <div class="screen focus-screen">
+
+        <div id="focus-timer-ring-container">
+        
+            <div class="focus-timer-ring-mask"></div>
+            
+            <div class="focus-display-container">
+                <p id="focus-mission-display"></p>
+                <p id="focus-target-time-display"></p>
+            </div>
+            
+            <p id="focus-current-time-display">00:00:00</p>
+
+            <div class="focus-button-container">
+                <button id="focus-pause-btn" class="normal-button">Pause</button>
+                <button id="focus-stop-btn" class="normal-button">Stop</button>
+            </div>
+
+        </div>
+    
+    </div>
+
+
+    <!-- Review Screen Section -->
+
+    <div class="screen wordmark-centered-layout review-screen">
+
+        <h1 class="wordmark">ExecutionOS</h1>
+
+        <div class="review-container">
+            <div class="review-display-container">
+                <p id="review-mission-display"></p>
+                <p id="review-target-time-display"></p>
+            </div>
+            <div class="review-progress-container">
+                <div id="review-progress-ring-container">
+                    <div class="review-progress-ring-mask"></div>
+                    <p id="review-completion-percentage-display"></p>
+                </div>
+                <p id="review-completion-status-display"></p>
+            </div>
+            
+            <p id="review-actual-time-display"></p>
+
+            <div class="review-button-container">
+                <button id="review-continue-btn" class="cta-button">Continue</button>
+                <button id="review-finish-btn" class="reward-button">Finish</button>
+            </div>
+        </div>
+    
+    </div>
+
+
+    <!-- Dashboard Screen Section -->
+
+    <div class="screen dashboard-screen">
+
+        <div class="dashboard-container">
+            
+            <header class="dashboard-header">
+                <button id="dashboard-new-mission-btn" class="cta-button">Start New Mission</button>
+                <span id="dashboard-user-icon" class="user-icon"></span>
+                <div id="dashboard-user-menu">
+                    <div id="dashboard-user-menu-information">
+                        <p id="dashboard-user-menu-username"></p>
+                        <span id="dashboard-user-menu-icon" class="user-icon"></span>
+                    </div>
+                    <span class="dashboard-user-menu-divisor-line"></span>
+                    <button id="dashboard-user-menu-logout-btn">Logout</button>
+                </div>
+            </header>
+
+            <section class="dashboard-content">
+                <div class="dashboard-weekly-stats-container">
+                    <h2 class="dashboard-content-title">Weekly Stats</h2>
+                    <div class="dashboard-weekly-stats-card">
+                        <p id="dashboard-amount-of-sessions-display"></p>
+                        <p id="dashboard-average-percentage-display"></p>
+                        <p id="dashboard-total-time-display"></p>
+                    </div>
+                </div>
+                <div id="dashboard-sessions-list-container">
+                    <h2 class="dashboard-content-title">Sessions</h2>            
+                </div>
+            </section>
+
+            <footer class="dashboard-footer">
+                <h1 class="wordmark">ExecutionOS</h1>
+                <div class="dashboard-footer-feedback-container">
+                    <button id="dashboard-send-feedback-btn">Send Feedback</button>
+                    <p>The app is currently in an early stage, help us improve it sending your problems and ideas.</p>
+                </div>
+            </footer>
+
+        </div>
+    
+    </div>
+
 </body>
 <script src="app.js"></script>
 </html>

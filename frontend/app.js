@@ -73,7 +73,7 @@ const AppState = {
     currentMission: '',
     targetTimeSeconds: 0,
     actualTimeSeconds: 0,
-    completionStatus: 'uncompleted',
+    completionStatus: 'partial',
     percentageCompleted: 0,
     isTimerRunning: false,
     startTimestamp: '',
@@ -86,18 +86,15 @@ let timerInterval = null;
 
 // ========== 3. DOM ELEMENT REFERENCES ==========
 
-const loadingScreen = document.querySelector('.loading-screen');
-const registerScreen = document.querySelector('.register-screen');
-const loginScreen = document.querySelector('.login-screen');
-const planScreen = document.querySelector('.plan-screen');
-const focusScreen = document.querySelector('.focus-screen');
-const reviewScreen = document.querySelector('.review-screen');
-const dashboardScreen = document.querySelector('.dashboard-screen');
 
+// loading screen
+const loadingScreen = document.querySelector('.loading-screen');
 const loadingIcon = document.getElementById('loading-icon');
 const loadingErrorMessage = document.getElementById('loading-error-message');
-const retryBtn = document.getElementById('retry-btn');
+const loadingRetryBtn = document.getElementById('loading-retry-btn');
 
+// register screen
+const registerScreen = document.querySelector('.register-screen');
 const registerForm = document.getElementById('register-form');
 const registerUsernameInput = document.getElementById('register-username-input');
 const registerEmailInput = document.getElementById('register-email-input');
@@ -105,38 +102,65 @@ const registerPasswordInput = document.getElementById('register-password-input')
 const registerPasswordErrorMessage = document.getElementById('register-password-error-message');
 const registerSubmitBtn = document.getElementById('register-submit-btn');
 const registerErrorMessage = document.getElementById('register-error-message');
-const registerSwitchToLoginBtn = document.getElementById('switch-to-login-screen');
+const registerSwitchToLoginBtn = document.getElementById('register-switch-to-login-btn');
 
+// login screen
+const loginScreen = document.querySelector('.login-screen');
 const loginForm = document.getElementById('login-form');
 const loginUsernameOrEmailInput = document.getElementById('login-username-or-email-input');
 const loginPasswordInput = document.getElementById('login-password-input');
 const loginSubmitBtn = document.getElementById('login-submit-btn');
 const loginErrorMessage = document.getElementById('login-error-message');
-const loginSwitchToRegisterBtn = document.getElementById('switch-to-register-screen');
+const loginSwitchToRegisterBtn = document.getElementById('login-switch-to-register-btn');
 
-const planUserMenu = document.querySelector('.plan-user-menu')
-const planUserMenuUsername = document.getElementById('plan-user-menu-username');
+// plan screen
+const planScreen = document.querySelector('.plan-screen');
 const planUserIcon = document.getElementById('plan-user-icon');
+const planUserMenu = document.getElementById('plan-user-menu');
+const planUserMenuUsername = document.getElementById('plan-user-menu-username');
+const planUserMenuIcon = document.getElementById('plan-user-menu-icon');
 const planUserMenuLogoutBtn = document.getElementById('plan-user-menu-logout-btn');
 
-const targetTimeInput = document.getElementById('time-input');
-const missionInput = document.getElementById('mission-input');
-const dashboardBtn = document.getElementById('dashboard-btn')
-const startWorkBtn = document.getElementById('start-work-btn');
+const planMissionInput = document.getElementById('plan-mission-input');
+const planTargetTimeInput = document.getElementById('plan-target-time-input');
+const planDashboardBtn = document.getElementById('plan-dashboard-btn');
+const planStartWorkBtn = document.getElementById('plan-start-work-btn');
 
-const pauseBtn = document.getElementById('pause-btn');
-const stopBtn = document.getElementById('stop-btn');
+// focus screen
+const focusScreen = document.querySelector('.focus-screen');
+const focusTimerRingContainer = document.getElementById('focus-timer-ring-container');
+const focusMissionDisplay = document.getElementById('focus-mission-display');
+const focusTargetTimeDisplay = document.getElementById('focus-target-time-display');
+const focusCurrentTimeDisplay = document.getElementById('focus-current-time-display');
+const focusPauseBtn = document.getElementById('focus-pause-btn');
+const focusStopBtn = document.getElementById('focus-stop-btn');
 
-const continueBtn = document.getElementById('continue-btn');
-const finishBtn = document.getElementById('finish-btn');
+// review screen
+const reviewScreen = document.querySelector('.review-screen');
+const reviewMissionDisplay = document.getElementById('review-mission-display');
+const reviewTargetTimeDisplay = document.getElementById('review-target-time-display');
+const reviewProgressRingContainer = document.getElementById('review-progress-ring-container');
+const reviewCompletionPercentageDisplay = document.getElementById('review-completion-percentage-display');
+const reviewCompletionStatusDisplay = document.getElementById('review-completion-status-display');
+const reviewActualTimeDisplay = document.getElementById('review-actual-time-display');
+const reviewContinueBtn = document.getElementById('review-continue-btn');
+const reviewFinishBtn = document.getElementById('review-finish-btn');
 
-const newMissionBtn = document.getElementById('new-mission-btn');
-const sessionsListContainer = document.querySelector(".sessions-list-container");
+// dashboard screen
+const dashboardScreen = document.querySelector('.dashboard-screen');
 
-const dashboardUserMenu = document.querySelector('.dashboard-user-menu')
-const dashboardUserMenuUsername = document.getElementById('dashboard-user-menu-username');
+const dashboardNewMissionBtn = document.getElementById('dashboard-new-mission-btn');
+
 const dashboardUserIcon = document.getElementById('dashboard-user-icon');
+const dashboardUserMenu = document.getElementById('dashboard-user-menu');
+const dashboardUserMenuUsername = document.getElementById('dashboard-user-menu-username');
+const dashboardUserMenuIcon = document.getElementById('dashboard-user-menu-icon');
 const dashboardUserMenuLogoutBtn = document.getElementById('dashboard-user-menu-logout-btn');
+
+const dashboardAmountOfSessionsDisplay = document.getElementById('dashboard-amount-of-sessions-display');
+const dashboardAveragePercentageDisplay = document.getElementById('dashboard-average-percentage-display');
+const dashboardTotalTimeDisplay = document.getElementById('dashboard-total-time-display');
+const dashboardSessionsListContainer = document.getElementById("dashboard-sessions-list-container");
 
 
 
@@ -187,9 +211,9 @@ function parseTimeFromHHMMSS(timeStr) {
 }
 
 function formatTime(totalSeconds) {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    const hours = Math.floor(Number(totalSeconds) / 3600);
+    const minutes = Math.floor((Number(totalSeconds) % 3600) / 60);
+    const seconds = Number(totalSeconds) % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
@@ -209,7 +233,22 @@ function updateTimer(appState) {
     const elapsed = Math.floor(((Date.now() - new Date(appState.startTimestamp).getTime()) / 1000) - appState.pausedTimeSeconds);
     appState.actualTimeSeconds = elapsed;
     const formattedTime = formatTime(appState.actualTimeSeconds);
-    document.getElementById('timer').textContent = formattedTime;
+    focusCurrentTimeDisplay.textContent = formattedTime;
+
+    let pct = appState.actualTimeSeconds / appState.targetTimeSeconds * 100;
+    appState.percentageCompleted = Math.floor(pct);
+    
+    if (pct < 100) {
+        focusTimerRingContainer.style.setProperty('--pct', `${pct}%`);
+        focusTimerRingContainer.style.background =
+            `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--border) var(--pct), var(--border) 100%)`;
+    } else {
+        const overtimePct = pct - 100;
+        focusTimerRingContainer.style.setProperty('--pct', `${overtimePct}%`);
+        focusTimerRingContainer.style.background =
+            `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--reward) var(--pct), var(--reward) 100%)`;
+    }
+    
     saveActiveSession(appState)
 }
 
@@ -217,16 +256,17 @@ async function resetApp() {
     AppState.currentMission = '';
     AppState.targetTimeSeconds = 0;
     AppState.actualTimeSeconds = 0;
-    AppState.completionStatus = 'uncompleted';
+    AppState.completionStatus = 'partial';
     AppState.percentageCompleted = 0;
     AppState.isTimerRunning = false;
     AppState.startTimestamp = '';
     AppState.pauseStartTimestamp = '';
     AppState.pausedTimeSeconds = 0
 
-    missionInput.value = '';
-    targetTimeInput.value = '';
-    document.getElementById('timer').textContent = '00:00:00';
+    planMissionInput.value = '';
+    planTargetTimeInput.value = '';
+    focusCurrentTimeDisplay.textContent = '00:00:00';
+    focusTimerRingContainer.style.setProperty('--pct', '0%');
 
     clearActiveSession();
 }
@@ -389,6 +429,14 @@ function loadActiveSession(appState) {
         appState.startTimestamp = activeSession.startTimestamp;
         appState.pauseStartTimestamp = activeSession.pauseStartTimestamp;
         appState.pausedTimeSeconds = activeSession.pausedTimeSeconds;
+
+        if (!appState.pauseStartTimestamp) {
+            const startTime = new Date(appState.startTimestamp).getTime();
+            const lastActiveTime = startTime + (appState.actualTimeSeconds + appState.pausedTimeSeconds) * 1000;
+            appState.pauseStartTimestamp = new Date(lastActiveTime).toISOString();
+            saveActiveSession(appState)
+        }
+
         return true;
     }
     return false;
@@ -404,11 +452,12 @@ function clearActiveSession() {
 
 function renderDashboardData(sessions) {
     const [sessionsList, weeklyStats] = getDashboardData(sessions)
-    sessionsListContainer.innerHTML = '';
+    dashboardSessionsListContainer.innerHTML = '';
+    renderDashboardSessionsListTitle();
     displaySessionsOnContainer(sessionsList);
-    document.getElementById('amount-of-sessions').textContent = `${weeklyStats[0]} sessions`
-    document.getElementById('average-percentage').textContent = `${weeklyStats[1]}%`
-    document.getElementById('total-time').textContent = `${formatTimeTohm(weeklyStats[2])}`
+    dashboardAmountOfSessionsDisplay.textContent = `${weeklyStats[0]} sessions`
+    dashboardAveragePercentageDisplay.textContent = `${weeklyStats[1]}%`
+    dashboardTotalTimeDisplay.textContent = `${formatTimeTohm(weeklyStats[2])}`
 }
 
 function getDashboardData(sessions) {
@@ -454,6 +503,18 @@ function getThisWeekStats(sessions) {
     return thisWeekStats;
 }
 
+
+/* FIND BETTER SOLUTION LATER, THIS IS A TEMPORAL ONE */
+function renderDashboardSessionsListTitle() {
+    const dashboardSessionsListTitle = document.createElement("h2");
+    dashboardSessionsListTitle.className = "dashboard-content-title";
+    dashboardSessionsListTitle.textContent = "Sessions";
+    dashboardSessionsListContainer.appendChild(dashboardSessionsListTitle);
+}
+
+
+
+
 function displaySessionsOnContainer(sessionsList) {
     lastDate = ''
     for (const session of sessionsList) {
@@ -483,7 +544,7 @@ function displayOnNewCard(session, uiDate, dateObj) {
     sessionCardDate.className = "dashboard-session-date";
     sessionCardDate.textContent = uiDate;
     dashboardSessionCard.appendChild(sessionCardDate);
-    sessionsListContainer.appendChild(dashboardSessionCard);
+    dashboardSessionsListContainer.appendChild(dashboardSessionCard);
     buildSessionContentBlock(session, dashboardSessionCard);
 }
 
@@ -499,9 +560,10 @@ function buildSessionContentBlock(session, dashboardSessionCard) {
     const sessionCardMissionContainer = document.createElement("div");
     const sessionCardMissionIcon = document.createElement("span");
     const sessionCardMission = document.createElement("p");
-    const sessionMenuBtn = document.createElement("div");
-    const sessionMenuIcon = document.createElement("span");
-    const deleteSessionBtn = document.createElement("button");
+    const dashboardSessionOpenMenuIcon = document.createElement("span");
+    const dashboardSessionMenu = document.createElement("div");
+    const dashboardSessionCloseMenuIcon = document.createElement("span");
+    const dashboardDeleteSessionBtn = document.createElement("button");
     const timeAndPercentageContainer = document.createElement("div");
     const sessionCardTimeIcon = document.createElement("span");
     const sessionCardTargetTime = document.createElement("p");
@@ -513,10 +575,11 @@ function buildSessionContentBlock(session, dashboardSessionCard) {
     sessionCardMissionContainer.className = "dashboard-session-mission-container";
     sessionCardMissionIcon.className = "material-symbols-outlined dashboard-session-mission-icon";
     sessionCardMission.className = "dashboard-session-mission";
-    sessionMenuBtn.className = "session-menu-btn";
-    sessionMenuIcon.className = "material-symbols-outlined session-menu-icon";
-    deleteSessionBtn.className = "delete-session-btn";
-    timeAndPercentageContainer.className = "time-and-percentage-container";
+    dashboardSessionOpenMenuIcon.className = "material-symbols-outlined dashboard-session-open-menu-icon dashboard-session-toggle-menu-icon";
+    dashboardSessionMenu.className = "dashboard-session-menu";
+    dashboardSessionCloseMenuIcon.className = "material-symbols-outlined dashboard-session-close-menu-icon dashboard-session-toggle-menu-icon";
+    dashboardDeleteSessionBtn.className = "dashboard-delete-session-btn";
+    timeAndPercentageContainer.className = "dashboard-session-time-and-percentage-container";
     sessionCardTimeIcon.className = "material-symbols-outlined dashboard-session-time-icon";
     sessionCardTargetTime.className = "dashboard-session-target-time";
     sessionCardArrowIcon.className = "material-symbols-outlined dashboard-session-arrow-icon";
@@ -526,9 +589,10 @@ function buildSessionContentBlock(session, dashboardSessionCard) {
 
     sessionCardMissionIcon.textContent = "assignment";
     sessionCardMission.textContent = session.mission;
-    sessionMenuIcon.textContent = "more_vert";
-    deleteSessionBtn.textContent = "Delete Session";
-    deleteSessionBtn.dataset.sessionId = session.id;
+    dashboardSessionOpenMenuIcon.textContent = "more_vert";
+    dashboardSessionCloseMenuIcon.textContent = "more_vert";
+    dashboardDeleteSessionBtn.textContent = "Delete Session";
+    dashboardDeleteSessionBtn.dataset.sessionId = session.id;
     sessionCardTimeIcon.textContent = "timer";
     sessionCardTargetTime.textContent = formatTimeTohm(session.target_time_seconds);
     sessionCardArrowIcon.textContent = "arrow_right_alt";
@@ -539,9 +603,10 @@ function buildSessionContentBlock(session, dashboardSessionCard) {
     dashboardSessionCard.appendChild(sessionCardMissionContainer);
     sessionCardMissionContainer.appendChild(sessionCardMissionIcon);
     sessionCardMissionContainer.appendChild(sessionCardMission);
-    sessionCardMissionContainer.appendChild(sessionMenuBtn);
-    sessionMenuBtn.appendChild(sessionMenuIcon);
-    sessionMenuBtn.appendChild(deleteSessionBtn);
+    sessionCardMissionContainer.appendChild(dashboardSessionOpenMenuIcon);
+    sessionCardMissionContainer.appendChild(dashboardSessionMenu);
+    dashboardSessionMenu.appendChild(dashboardDeleteSessionBtn);
+    dashboardSessionMenu.appendChild(dashboardSessionCloseMenuIcon);
     dashboardSessionCard.appendChild(timeAndPercentageContainer);
     timeAndPercentageContainer.appendChild(sessionCardTimeIcon);
     timeAndPercentageContainer.appendChild(sessionCardTargetTime);
@@ -565,33 +630,26 @@ function getPasswordError(password) {
 function toggleUserMenu(screen) {  // relies on only one screen's menu ever being open at a time
     if (screen === "plan") {
         if (isUserMenuOpened) {
-            planUserMenuUsername.style.display = 'none';
-            planUserMenuLogoutBtn.style.display = 'none';
-            planUserMenu.style.backgroundColor = 'transparent';
-            planUserMenu.style.border = 'none';
+            planUserIcon.style.display = 'flex';
+            planUserMenu.style.display = 'none';
 
             isUserMenuOpened = false;
             return;
         }
-        planUserMenuUsername.style.display = 'block';
-        planUserMenuLogoutBtn.style.display = 'block';
-        planUserMenu.style.backgroundColor = '#000';
-        planUserMenu.style.border = '1px solid #fff';   
+        planUserIcon.style.display = 'none';
+        planUserMenu.style.display = 'flex';
         isUserMenuOpened = true;
     }
     if (screen === "dashboard") {
         if (isUserMenuOpened) {
-            dashboardUserMenuUsername.style.display = 'none';
-            dashboardUserMenuLogoutBtn.style.display = 'none';
-            dashboardUserMenu.style.backgroundColor = 'transparent';
-            dashboardUserMenu.style.border = 'none';
+            dashboardUserIcon.style.display = 'flex';
+            dashboardUserMenu.style.display = 'none';
+
             isUserMenuOpened = false;
             return;
         }
-    dashboardUserMenuUsername.style.display = 'block';
-    dashboardUserMenuLogoutBtn.style.display = 'block';
-    dashboardUserMenu.style.backgroundColor = '#000';
-    dashboardUserMenu.style.border = '1px solid #fff';
+        dashboardUserIcon.style.display = 'none';
+        dashboardUserMenu.style.display = 'flex';
     isUserMenuOpened = true;
     }
 }
@@ -602,53 +660,53 @@ function toggleUserMenu(screen) {  // relies on only one screen's menu ever bein
 function showLoadingScreenError() {
     loadingIcon.style.display = 'none';
     loadingErrorMessage.style.display = 'flex';
-    retryBtn.style.display = 'flex';
+    loadingRetryBtn.style.display = 'flex';
 }
 
 function showLoadingIcon() {
     loadingIcon.style.display = 'flex';
     loadingErrorMessage.style.display = 'none';
-    retryBtn.style.display = 'none';
+    loadingRetryBtn.style.display = 'none';
 }
 
 function changeToRegisterScreen(currentScreen) {
     if (currentScreen === "loading") {
         loadingIcon.style.display = 'none';
         loadingScreen.style.display = 'none';
-        registerScreen.style.display = 'flex';
+        registerScreen.style.display = 'grid';
     }
     else if (currentScreen === "login") {
         loginScreen.style.display = 'none';
-        registerScreen.style.display = 'flex';
+        registerScreen.style.display = 'grid';
     }
 }
 
 function changeToLoginScreen(currentScreen) {
     if (currentScreen === "register") {
         registerScreen.style.display = 'none';
-        loginScreen.style.display = 'flex';
+        loginScreen.style.display = 'grid';
     }
     else if (currentScreen === "plan") {
         if (isUserMenuOpened) {
             toggleUserMenu("plan");
         }
         planScreen.style.display = 'none';
-        loginScreen.style.display = 'flex';
+        loginScreen.style.display = 'grid';
     }
     else if (currentScreen === "focus") {
         focusScreen.style.display = 'none';
-        loginScreen.style.display = 'flex';
+        loginScreen.style.display = 'grid';
     }
     else if (currentScreen === "review") {
         reviewScreen.style.display = 'none';
-        loginScreen.style.display = 'flex';
+        loginScreen.style.display = 'grid';
     }
     else if (currentScreen === "dashboard") {
         if (isUserMenuOpened) {
             toggleUserMenu("dashboard");
         }
         dashboardScreen.style.display = 'none';
-        loginScreen.style.display = 'flex';
+        loginScreen.style.display = 'grid';
     }
 }
 
@@ -680,12 +738,12 @@ function changeToFocusScreen(appState, currentScreen) {
         focusScreen.style.display = 'flex';
         return;
     }
-    document.getElementById('mission-display').textContent = `Mission: ${appState.currentMission}`;
-    document.getElementById('target-time-display').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
-    document.getElementById('timer').textContent = formatTime(appState.actualTimeSeconds);
+    focusMissionDisplay.textContent = appState.currentMission;
+    focusTargetTimeDisplay.textContent = formatTime(appState.targetTimeSeconds);
+    focusCurrentTimeDisplay.textContent = formatTime(appState.actualTimeSeconds);
     if (currentScreen === "loading") {
         loadingScreen.style.display = 'none';
-        pauseBtn.textContent = 'Resume';
+        focusPauseBtn.textContent = 'Resume';
         focusScreen.style.display = 'flex';
     }
     else if (currentScreen === "plan") {
@@ -699,11 +757,24 @@ function changeToFocusScreen(appState, currentScreen) {
 
 function changeToReviewScreen(appState) {
     focusScreen.style.display = 'none';
-    reviewScreen.style.display = 'flex';
-    document.getElementById('target-time-review').textContent = `Target Time: ${formatTime(appState.targetTimeSeconds)}`;
-    document.getElementById('actual-time-review').textContent = `Actual Time: ${formatTime(appState.actualTimeSeconds)}`;
-    document.getElementById('completion-percentage-review').textContent = `${appState.percentageCompleted}%`;
-    document.getElementById('completion-status-review').textContent = appState.completionStatus;
+    reviewScreen.style.display = 'grid';
+    reviewMissionDisplay.textContent = appState.currentMission;
+    reviewTargetTimeDisplay.textContent = formatTime(appState.targetTimeSeconds);
+    reviewCompletionPercentageDisplay.textContent = `${appState.percentageCompleted}%`;
+    reviewCompletionStatusDisplay.textContent = appState.completionStatus.charAt(0).toUpperCase() + appState.completionStatus.slice(1);
+    reviewActualTimeDisplay.textContent = formatTime(appState.actualTimeSeconds);
+    
+    const pct = appState.percentageCompleted;
+    if (pct < 100) {
+        reviewProgressRingContainer.style.setProperty('--pct', `${pct}%`);
+        reviewProgressRingContainer.style.background = `conic-gradient(var(--cta) 0%, var(--cta) var(--pct), var(--border) var(--pct), var(--border) 100%)`;
+    } else {
+        const overtimePct = pct - 100;
+        reviewProgressRingContainer.style.setProperty('--pct', `${overtimePct}%`);
+        reviewProgressRingContainer.style.background = `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--reward) var(--pct), var(--reward) 100%)`;
+
+        reviewContinueBtn.classList.replace('cta-button', 'normal-button')
+    }
 }
 
 function changeToDashboardScreen(sessions, currentScreen) {
@@ -726,7 +797,7 @@ function changeToDashboardScreen(sessions, currentScreen) {
 
 // ========== 6. EVENT LISTENERS ==========
 
-retryBtn.addEventListener('click', async () => {
+loadingRetryBtn.addEventListener('click', async () => {
     showLoadingIcon();
     await initiateApp();
 });
@@ -813,6 +884,10 @@ planUserIcon.addEventListener('click', () => {
     toggleUserMenu("plan");
 });
 
+planUserMenuIcon.addEventListener('click', () => {
+    toggleUserMenu("plan");
+});
+
 planUserMenuLogoutBtn.addEventListener('click', async () => {
     if (!confirm("Are you sure you want to log out?")) {
         return;
@@ -828,48 +903,52 @@ planUserMenuLogoutBtn.addEventListener('click', async () => {
     }
 });
 
-dashboardBtn.addEventListener('click', async () => {
+planDashboardBtn.addEventListener('click', async () => {
     const sessions = await getSessions();
     changeToDashboardScreen(sessions, "plan");
 });
 
-startWorkBtn.addEventListener('click', () => {
-    if (!missionInput.value) {
+planStartWorkBtn.addEventListener('click', () => {
+    if (!planMissionInput.value) {
         alert('Please enter a mission');
         return;
     }
-    if (!targetTimeInput.value || !/^\d{2}:\d{2}$/.test(targetTimeInput.value)) {
+    if (planMissionInput.value.length > 50) {
+        alert('Mission must be 50 characters or less');
+        return;
+    }
+    if (!planTargetTimeInput.value || !/^\d{2}:\d{2}$/.test(planTargetTimeInput.value)) {
         alert('Please enter a target time in HH:MM format');
         return;
     }
-    const parsedTime = parseTimeFromHHMMSS(targetTimeInput.value);
-    AppState.currentMission = missionInput.value;
+    const parsedTime = parseTimeFromHHMMSS(planTargetTimeInput.value);
+    AppState.currentMission = planMissionInput.value;
     AppState.targetTimeSeconds = parsedTime;
     AppState.startTimestamp = new Date().toISOString()
     changeToFocusScreen(AppState, "plan");
     startTimer(AppState);
 })
 
-pauseBtn.addEventListener('click', () => {
+focusPauseBtn.addEventListener('click', () => {
     if (AppState.isTimerRunning) {
         clearInterval(timerInterval);
         AppState.isTimerRunning = false;
-        pauseBtn.textContent = 'Resume';
+        focusPauseBtn.textContent = 'Resume';
         AppState.pauseStartTimestamp = new Date();
+        saveActiveSession();
     }
     else {
-        pauseBtn.textContent = 'Pause';
+        focusPauseBtn.textContent = 'Pause';
         const elapsed = (Date.now() - new Date(AppState.pauseStartTimestamp).getTime()) / 1000;
         AppState.pausedTimeSeconds += elapsed;
         AppState.pauseStartTimestamp = '';
         startTimer(AppState);
     }
-})
+});
 
-stopBtn.addEventListener('click', () => {
+focusStopBtn.addEventListener('click', () => {
     clearInterval(timerInterval);
     AppState.isTimerRunning = false;
-    AppState.percentageCompleted = Math.floor(AppState.actualTimeSeconds / AppState.targetTimeSeconds * 100);
     if (AppState.actualTimeSeconds >= AppState.targetTimeSeconds) {
         AppState.completionStatus = 'completed';
     }
@@ -879,16 +958,16 @@ stopBtn.addEventListener('click', () => {
     changeToReviewScreen(AppState);
 })
 
-continueBtn.addEventListener('click', () => {
+reviewContinueBtn.addEventListener('click', () => {
     changeToFocusScreen(AppState, "review");
-    pauseBtn.textContent = 'Pause';
+    focusPauseBtn.textContent = 'Pause';
     const elapsed = (Date.now() - new Date(AppState.pauseStartTimestamp).getTime()) / 1000;
     AppState.pausedTimeSeconds += elapsed;
     AppState.pauseStartTimestamp = '';
     startTimer(AppState);
 })
 
-finishBtn.addEventListener('click', async () => {
+reviewFinishBtn.addEventListener('click', async () => {
     const sessionData = {
         date: new Date().toISOString(),
         mission: AppState.currentMission,
@@ -916,11 +995,15 @@ finishBtn.addEventListener('click', async () => {
     changeToDashboardScreen(sessions, "review");
 });
 
-newMissionBtn.addEventListener('click', () => {
+dashboardNewMissionBtn.addEventListener('click', () => {
     changeToPlanScreen("dashboard");
 });
 
 dashboardUserIcon.addEventListener('click', () => {
+    toggleUserMenu("dashboard");
+});
+
+dashboardUserMenuIcon.addEventListener('click', () => {
     toggleUserMenu("dashboard");
 });
 
@@ -939,27 +1022,29 @@ dashboardUserMenuLogoutBtn.addEventListener('click', async () => {
     }
 });
 
-sessionsListContainer.addEventListener('click', (event) => {
-    const sessionMenuBtn = event.target.closest('.session-menu-btn');
-    if (!sessionMenuBtn) return;
-    const deleteBtn = sessionMenuBtn.querySelector('.delete-session-btn');
+dashboardSessionsListContainer.addEventListener('click', (event) => {
+    const dashboardSessionOpenMenuIcon = event.target.closest('.dashboard-session-open-menu-icon');
+    if (!dashboardSessionOpenMenuIcon) return;
+    const dashboardSessionOpenMenuIconParent = dashboardSessionOpenMenuIcon.parentElement;
+    const dashboardSessionMenu = dashboardSessionOpenMenuIconParent.querySelector('.dashboard-session-menu');
 
-    const isOpen = deleteBtn.style.display === 'flex';
-    if (isOpen) {
-        deleteBtn.style.display = 'none'
-        sessionMenuBtn.style.width = '50px';
-        sessionMenuBtn.style.height = '50px';
-        sessionMenuBtn.style.border = 'none';
-        return;
-    }
-    deleteBtn.style.display = 'flex';
-    sessionMenuBtn.style.width = '100px';
-    sessionMenuBtn.style.height = '80px';
-    sessionMenuBtn.style.border = '1px solid #fff';
+    dashboardSessionOpenMenuIcon.style.pointerEvents = 'none';
+    dashboardSessionMenu.style.display = 'flex';
 });
 
-sessionsListContainer.addEventListener('click', async (event) => {
-    const deleteBtn = event.target.closest('.delete-session-btn');
+dashboardSessionsListContainer.addEventListener('click', (event) => {
+    const dashboardSessionCloseMenuIcon = event.target.closest('.dashboard-session-close-menu-icon');
+    if (!dashboardSessionCloseMenuIcon) return;
+    const dashboardSessionMenu = dashboardSessionCloseMenuIcon.parentElement;
+    const dashboardSessionMenuParent = dashboardSessionMenu.parentElement;
+    const dashboardSessionOpenMenuIcon = dashboardSessionMenuParent.querySelector('.dashboard-session-open-menu-icon');
+
+    dashboardSessionOpenMenuIcon.style.pointerEvents = 'auto';
+    dashboardSessionMenu.style.display = 'none';
+})
+
+dashboardSessionsListContainer.addEventListener('click', async (event) => {
+    const deleteBtn = event.target.closest('.dashboard-delete-session-btn');
     if (!deleteBtn) return;
 
     if (!confirm("Delete this session?")) return;
