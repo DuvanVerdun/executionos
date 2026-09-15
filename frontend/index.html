@@ -135,11 +135,23 @@
 
             <header class="plan-header">
                 <h1 class="wordmark">ExecutionOS</h1>
-                <span id="plan-user-icon" class="user-icon"></span>
+                <svg id="plan-user-icon" class="user-icon" viewBox="0 0 48 48" aria-label="Open user menu">
+                    <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/>
+
+                    <circle cx="24" cy="17" r="7" fill="currentColor" />
+
+                    <path
+                        d="M9.5 38
+                        C11.5 29.5 17 25.5 24 25.5
+                        C31 25.5 36.5 29.5 38.5 38
+                        C34.7 42.3 29.7 44.5 24 44.5
+                        C18.3 44.5 13.3 42.3 9.5 38Z"
+                        fill="currentColor"
+                    />
+                </svg>
                 <div id="plan-user-menu">
                     <div id="plan-user-menu-information">
                         <p id="plan-user-menu-username"></p>
-                        <span id="plan-user-menu-icon" class="user-icon"></span>
                     </div>
                     <span class="plan-user-menu-divisor-line"></span>
                     <button id="plan-user-menu-logout-btn">Logout</button>
@@ -240,19 +252,33 @@
             
             <header class="dashboard-header">
                 <button id="dashboard-new-mission-btn" class="cta-button">Start New Mission</button>
-                <span id="dashboard-user-icon" class="user-icon"></span>
+                <svg id="dashboard-user-icon" class="user-icon" viewBox="0 0 48 48" aria-label="Open user menu">
+                    <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/>
+
+                    <circle cx="24" cy="17" r="7" fill="currentColor" />
+
+                    <path
+                        d="M9.5 38
+                        C11.5 29.5 17 25.5 24 25.5
+                        C31 25.5 36.5 29.5 38.5 38
+                        C34.7 42.3 29.7 44.5 24 44.5
+                        C18.3 44.5 13.3 42.3 9.5 38Z"
+                        fill="currentColor"
+                    />
+                </svg>
                 <div id="dashboard-user-menu">
                     <div id="dashboard-user-menu-information">
                         <p id="dashboard-user-menu-username"></p>
-                        <span id="dashboard-user-menu-icon" class="user-icon"></span>
                     </div>
                     <span class="dashboard-user-menu-divisor-line"></span>
                     <button id="dashboard-user-menu-logout-btn">Logout</button>
                 </div>
             </header>
 
-            <section class="dashboard-content">
-                <div class="dashboard-weekly-stats-container">
+            <section id="dashboard-content" class="dashboard-content">
+
+                <!-- If there is at least 1 session this week -->
+                <div id="dashboard-weekly-stats-container" class="dashboard-weekly-stats-container">
                     <h2 class="dashboard-content-title">Weekly Stats</h2>
                     <div class="dashboard-weekly-stats-card">
                         <p id="dashboard-amount-of-sessions-display"></p>
@@ -263,6 +289,14 @@
                 <div id="dashboard-sessions-list-container">
                     <h2 class="dashboard-content-title">Sessions</h2>            
                 </div>
+
+                <!-- If there are no sessions this week -->
+                <div id="empty-dashboard-cta-container" class="empty-dashboard-cta-container">
+                    <h2 class="empty-dashboard-cta-title">No sessions this week</h2>
+                    <p class="empty-dashboard-cta-paragraph">Start a mission and build your consistency.</p>
+                    <button id="empty-dashboard-start-mission-btn" class="empty-dashboard-start-mission-btn white-filled-button">Start Mission</button>
+                </div>
+
             </section>
 
             <footer class="dashboard-footer">

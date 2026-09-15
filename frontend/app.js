@@ -157,10 +157,14 @@ const dashboardUserMenuUsername = document.getElementById('dashboard-user-menu-u
 const dashboardUserMenuIcon = document.getElementById('dashboard-user-menu-icon');
 const dashboardUserMenuLogoutBtn = document.getElementById('dashboard-user-menu-logout-btn');
 
+const dashboardContent = document.getElementById('dashboard-content');
+const dashboardWeeklyStatsContainer = document.getElementById('dashboard-weekly-stats-container');
 const dashboardAmountOfSessionsDisplay = document.getElementById('dashboard-amount-of-sessions-display');
 const dashboardAveragePercentageDisplay = document.getElementById('dashboard-average-percentage-display');
 const dashboardTotalTimeDisplay = document.getElementById('dashboard-total-time-display');
 const dashboardSessionsListContainer = document.getElementById("dashboard-sessions-list-container");
+const emptyDashboardCTAContainer = document.getElementById("empty-dashboard-cta-container");
+const emptyDashboardStartMissionBtn = document.getElementById("empty-dashboard-start-mission-btn");
 
 
 // general
@@ -266,13 +270,15 @@ async function resetApp() {
     AppState.pauseStartTimestamp = '';
     AppState.pausedTimeSeconds = 0
 
+    targetTimeDigits = 0;
+
     planMissionInput.value = '';
     planTargetTimeInput.value = '00:00';
     focusCurrentTimeDisplay.textContent = '00:00:00';
     focusTimerRingContainer.style.setProperty('--pct', '0%');
-    reviewContinueBtn.classList.replace('normal-button', 'cta-button');
 
     clearActiveSession();
+    reviewContinueBtn.classList.replace('normal-button', 'cta-button');
 }
 
 async function unauthFetch(options) {
@@ -456,6 +462,17 @@ function clearActiveSession() {
 
 function renderDashboardData(sessions) {
     const [sessionsList, weeklyStats] = getDashboardData(sessions)
+    
+    if (sessionsList.length === 0) {
+        dashboardWeeklyStatsContainer.style.display = "none";
+        dashboardSessionsListContainer.style.display = "none";
+        emptyDashboardCTAContainer.style.display = "flex";
+        return;
+    }
+    dashboardWeeklyStatsContainer.style.display = "flex";
+    dashboardSessionsListContainer.style.display = "flex";
+    emptyDashboardCTAContainer.style.display = "none";
+
     dashboardSessionsListContainer.innerHTML = '';
     renderDashboardSessionsListTitle();
     displaySessionsOnContainer(sessionsList);
@@ -516,14 +533,12 @@ function getThisWeekStats(sessions) {
 }
 
 
-/* FIND BETTER SOLUTION LATER, THIS IS A TEMPORAL ONE */
 function renderDashboardSessionsListTitle() {
     const dashboardSessionsListTitle = document.createElement("h2");
     dashboardSessionsListTitle.className = "dashboard-content-title";
     dashboardSessionsListTitle.textContent = "Sessions";
     dashboardSessionsListContainer.appendChild(dashboardSessionsListTitle);
 }
-
 
 
 
@@ -639,38 +654,22 @@ function getPasswordError(password) {
     return '';
 }
 
-function toggleUserMenu(screen) {  // relies on only one screen's menu ever being open at a time
-    if (screen === "plan") {
-        if (isUserMenuOpened) {
-            planUserIcon.style.display = 'flex';
-            planUserMenu.style.display = 'none';
-
-            isUserMenuOpened = false;
-            return;
-        }
-        planUserIcon.style.display = 'none';
-        planUserMenu.style.display = 'flex';
-        isUserMenuOpened = true;
+function toggleUserMenu(screen) {
+    const userMenu = screen === "plan" ? planUserMenu : dashboardUserMenu;
+    
+    if (isUserMenuOpened) {
+        userMenu.style.display = 'none';
+        isUserMenuOpened = false;
+        return;
     }
-    if (screen === "dashboard") {
-        if (isUserMenuOpened) {
-            dashboardUserIcon.style.display = 'flex';
-            dashboardUserMenu.style.display = 'none';
-
-            isUserMenuOpened = false;
-            return;
-        }
-        dashboardUserIcon.style.display = 'none';
-        dashboardUserMenu.style.display = 'flex';
+    userMenu.style.display = 'flex';
     isUserMenuOpened = true;
-    }
 }
 
 
 function togglePasswordVisibility(passwordInput, visibilityButton) {
     const showIcon = visibilityButton.querySelector('.password-show-icon');
     const hideIcon = visibilityButton.querySelector('.password-hide-icon');
-    
     if (passwordInput.type === "password") {
         passwordInput.type = "text";
         showIcon.style.display = 'none';
@@ -678,6 +677,16 @@ function togglePasswordVisibility(passwordInput, visibilityButton) {
         visibilityButton.ariaLabel = "Hide password"
         return;
     }
+    passwordInput.type = "password";
+    showIcon.style.display = 'block';
+    hideIcon.style.display = 'none';
+    visibilityButton.ariaLabel = "Show password";
+}
+
+function hidePassword(passwordInput) {
+    const visibilityButton = passwordInput.parentElement.querySelector('.password-visibility-btn');
+    const showIcon = visibilityButton.querySelector('.password-show-icon');
+    const hideIcon = visibilityButton.querySelector('.password-hide-icon');
     passwordInput.type = "password";
     showIcon.style.display = 'block';
     hideIcon.style.display = 'none';
@@ -842,6 +851,7 @@ passwordVisibilityButtons.forEach((passwordVisibilityButton) => {
 });
 
 registerSwitchToLoginBtn.addEventListener('click', () => {
+    hidePassword(registerPasswordInput);
     changeToLoginScreen("register");
 });
 
@@ -886,6 +896,7 @@ registerForm.addEventListener('submit', async () => {
 });
 
 loginSwitchToRegisterBtn.addEventListener('click', () => {
+    hidePassword(loginPasswordInput);
     changeToRegisterScreen("login");
 });
 
@@ -923,10 +934,6 @@ planUserIcon.addEventListener('click', () => {
     toggleUserMenu("plan");
 });
 
-planUserMenuIcon.addEventListener('click', () => {
-    toggleUserMenu("plan");
-});
-
 planUserMenuLogoutBtn.addEventListener('click', async () => {
     if (!confirm("Are you sure you want to log out?")) {
         return;
@@ -948,37 +955,24 @@ planDashboardBtn.addEventListener('click', async () => {
 });
 
 
-
-let targetTimeDigits = '';
-
 planTargetTimeInput.addEventListener('keydown', (event) => {
-    if (/^\d$/.test(event.key)) {
-        event.preventDefault();
-        if (targetTimeDigits.length >= 4) {
-            return;
-        }
-        targetTimeDigits += event.key;
-    }
-    else if (event.key === 'Backspace') {
-        event.preventDefault();
-        targetTimeDigits = targetTimeDigits.slice(0, -1);
-    }
-    else {
-        event.preventDefault();
-        return;
-    }
-    if (!targetTimeDigits) {
-        planTargetTimeInput.value = '00:00';
-        return;
-    }
-    if (targetTimeDigits.length <= 2) {
-        const hours = targetTimeDigits.padStart(2, '0');
-        planTargetTimeInput.value = `${hours}:00`;
-        return;
-    }
-    const hours = targetTimeDigits.slice(0, -2).padStart(2, '0');
-    const minutes = targetTimeDigits.slice(-2);
-    planTargetTimeInput.value = `${hours}:${minutes}`;
+    const allowedKeys = /^\d$/.test(event.key) || event.key === 'Backspace';
+    if (!allowedKeys) return;
+
+    event.preventDefault();
+
+    let caretPosition = planTargetTimeInput.selectionStart;
+    if (caretPosition === null || caretPosition === 0) return;
+    if (caretPosition === 3) caretPosition = 2;
+
+    const digitPosition = caretPosition - 1;
+    const replacement = event.key === 'Backspace' ? '0' : event.key;
+
+    const characters = planTargetTimeInput.value.split('');
+    characters[digitPosition] = replacement;
+    planTargetTimeInput.value = characters.join('');
+
+    planTargetTimeInput.setSelectionRange(caretPosition, caretPosition);
 });
 
 
@@ -1087,8 +1081,8 @@ dashboardUserIcon.addEventListener('click', () => {
     toggleUserMenu("dashboard");
 });
 
-dashboardUserMenuIcon.addEventListener('click', () => {
-    toggleUserMenu("dashboard");
+emptyDashboardStartMissionBtn.addEventListener('click', () => {
+    changeToPlanScreen("dashboard");
 });
 
 dashboardUserMenuLogoutBtn.addEventListener('click', async () => {
@@ -1140,6 +1134,23 @@ dashboardSessionsListContainer.addEventListener('click', async (event) => {
     } catch (error) {
         alert("An unexpected network/server conection error occurred");
     }
+});
+
+
+
+document.addEventListener('click', (event) => {
+    if (!isUserMenuOpened) return;
+
+    const clickedInsidePlanMenu = planUserMenu.contains(event.target);
+    const clickedPlanIcon = planUserIcon.contains(event.target);
+    const clickedInsideDashboardMenu = dashboardUserMenu.contains(event.target);
+    const clickedDashboardIcon = dashboardUserIcon.contains(event.target);
+
+    if (clickedInsidePlanMenu || clickedPlanIcon || clickedInsideDashboardMenu || clickedDashboardIcon) return;
+
+    planUserMenu.style.display = 'none';
+    dashboardUserMenu.style.display = 'none';
+    isUserMenuOpened = false;
 });
 
 

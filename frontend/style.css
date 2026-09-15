@@ -34,6 +34,7 @@ body {
 
 p, h1, h2, h3 {
     margin: 0;
+    user-select: none;
 }
 
 .screen {
@@ -126,6 +127,10 @@ p, h1, h2, h3 {
     top: 50%;
     transform: translateY(-50%);
 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
     padding: 0;
     border: none;
     background: none;
@@ -133,9 +138,15 @@ p, h1, h2, h3 {
     cursor: pointer;
 }
 
+.password-hide-icon,
+.password-show-icon {
+    display: block;
+}
+
 .password-hide-icon {
     display: none;
 }
+
 
 .register-password-input-container .input,
 .login-password-input-container .input {
@@ -156,6 +167,7 @@ button {
     padding: clamp(16px, 1.04vw, 20px) clamp(32px, 2.08vw, 40px);
 
     transition: .1s ease-in;
+    user-select: none;
 }
 
 .normal-button {
@@ -188,6 +200,12 @@ button {
     color: var(--base);
 }
 
+.white-filled-button {
+    background-color: var(--white);
+    border: none;
+    color: var(--base);
+}
+
 .switch-btn-container {
     display: flex;
     justify-content: end;
@@ -204,6 +222,26 @@ button {
 .switch-btn:hover {
     color: var(--white);
 }
+
+
+.user-icon {
+    box-sizing: border-box;
+    width: clamp(44px, 2.92vw, 56px);
+    height: clamp(44px, 2.92vw, 56px);
+
+    color: var(--text);
+
+    z-index: 50;
+
+    border-radius: 50%;
+}
+
+.user-icon:hover {
+    cursor: pointer;
+}
+
+
+
 
 
 /* loading screen styles */
@@ -333,8 +371,11 @@ button {
     background-color: var(--base);
     
     position: absolute;
-    top: clamp(1.5px, 0.31vw, 6px);
-    right: clamp(-6.5px, -0.1vw, -2px);
+
+    top: calc(clamp(20px, 1.3vw, 28px) - 16px);
+    right: calc(clamp(20px, 1.3vw, 28px) - 24px);
+    
+    z-index: 20;
 }
 
 #plan-user-menu-information {
@@ -343,30 +384,22 @@ button {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    min-height: 44px;
 }
 
 #plan-user-menu-username {
     font-size: var(--button);
     color: var(--text);
-}
-
-.user-icon {
-    display: flex;
-    box-sizing: border-box;
-    width: clamp(44px, 2.92vw, 56px);
-    height: clamp(44px, 2.92vw, 56px);
-    border-radius: 50%;
-    border: 3px solid var(--text);
-}
-
-.user-icon:hover {
-    cursor: pointer;
+    user-select: none;
 }
 
 .plan-user-menu-divisor-line {
     width: 100%;
     border: 2px solid var(--border);
 }
+
+
+
 
 #plan-user-menu-logout-btn {
     display: flex;
@@ -657,7 +690,6 @@ button {
     justify-content: space-between;
     align-items: center;
     gap: clamp(64px, 4.17vw, 80px);
-    min-height: 100vh;
 }
 
 .dashboard-header {
@@ -682,15 +714,18 @@ button {
     align-items: center;
     justify-content: center;
     width: 200px;
-    gap: 16px;
+    gap: 24px;
     padding: 16px 24px;
     border-radius: 8px;
     border: solid 3px var(--border);
     background-color: var(--base);
     
     position: absolute;
-    top: clamp(10px, 0.83vw, 16px);
-    right: clamp(-6.5px, -0.1vw, -2px);
+    
+    top: calc(clamp(20px, 1.3vw, 28px) - 16px);
+    right: calc(clamp(20px, 1.3vw, 28px) - 24px);
+    
+    z-index: 20;
 }
 
 #dashboard-user-menu-information {
@@ -699,11 +734,13 @@ button {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    min-height: 44px;
 }
 
 #dashboard-user-menu-username {
     font-size: var(--button);
     color: var(--text);
+    user-select: none;
 }
 
 .dashboard-user-menu-divisor-line {
@@ -733,10 +770,14 @@ button {
 .dashboard-content {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: start;
     align-items: center;
     gap: clamp(64px, 4.17vw, 80px);
+    min-height: 70vh;
 }
+
+
+/* If there is at least a session this week */
 
 .dashboard-weekly-stats-container {
     display: flex;
@@ -890,6 +931,33 @@ button {
     background-color: var(--dark-border);
 }
 
+
+
+/* If there are no sessions this week */
+
+.empty-dashboard-cta-container {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--white);
+
+    flex: 1;
+    justify-content: center;
+}
+
+.empty-dashboard-cta-title {
+    font-size: var(--title);
+}
+
+.empty-dashboard-cta-paragraph {
+    font-size: var(--button);
+    margin-bottom: 12px;
+}
+
+
+
+/* dashboard footer */
 
 .dashboard-footer {
     box-sizing: border-box;
