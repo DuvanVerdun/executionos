@@ -158,6 +158,7 @@ const dashboardUserMenuIcon = document.getElementById('dashboard-user-menu-icon'
 const dashboardUserMenuLogoutBtn = document.getElementById('dashboard-user-menu-logout-btn');
 
 const dashboardContent = document.getElementById('dashboard-content');
+const dashboardLoading = document.getElementById("dashboard-loading");
 const dashboardWeeklyStatsContainer = document.getElementById('dashboard-weekly-stats-container');
 const dashboardAmountOfSessionsDisplay = document.getElementById('dashboard-amount-of-sessions-display');
 const dashboardAveragePercentageDisplay = document.getElementById('dashboard-average-percentage-display');
@@ -500,7 +501,6 @@ function getDashboardDataDateRange() {
 function getThisWeekSessions(sessions, today, firstDayOfTheWeek) {
     const thisWeekSessions = [];
     for (const session of sessions) {
-        console.log(session);
         const sessionDate = new Date(session.date + 'Z');
         if (sessionDate >= firstDayOfTheWeek && sessionDate <= today) {
             thisWeekSessions.push(session);
@@ -694,6 +694,34 @@ function hidePassword(passwordInput) {
 }
 
 
+function showDashboardLoading() {
+    dashboardWeeklyStatsContainer.style.display = "none";
+    dashboardSessionsListContainer.style.display = "none";
+    emptyDashboardCTAContainer.style.display = "none";
+
+    dashboardLoading.style.display = "flex";
+}
+
+function hideDashboardLoading() {
+    dashboardLoading.style.display = "none";
+}
+
+async function loadDashboard() {
+    showDashboardLoading();
+
+    try {
+        const sessions = await getSessions();
+        renderDashboardData(sessions);
+    }
+    catch (error) {
+        console.error("Dashboard loading error:", error);
+    }
+    finally {
+        hideDashboardLoading();
+    }
+}
+
+
 
 // ========== 5. SCREEN CHANGE FUNCTIONS ==========
 
@@ -817,9 +845,7 @@ function changeToReviewScreen(appState) {
     }
 }
 
-function changeToDashboardScreen(sessions, currentScreen) {
-    renderDashboardData(sessions);
-
+function changeToDashboardScreen(currentScreen) {
     if (currentScreen === "plan") {
         if (isUserMenuOpened) {
             toggleUserMenu("plan");
@@ -949,11 +975,6 @@ planUserMenuLogoutBtn.addEventListener('click', async () => {
     }
 });
 
-planDashboardBtn.addEventListener('click', async () => {
-    const sessions = await getSessions();
-    changeToDashboardScreen(sessions, "plan");
-});
-
 
 planTargetTimeInput.addEventListener('keydown', (event) => {
     const allowedKeys = /^\d$/.test(event.key) || event.key === 'Backspace';
@@ -976,6 +997,10 @@ planTargetTimeInput.addEventListener('keydown', (event) => {
 });
 
 
+planDashboardBtn.addEventListener('click', async () => {
+    changeToDashboardScreen("plan");
+    await loadDashboard();
+});
 
 planStartWorkBtn.addEventListener('click', () => {
     if (!planMissionInput.value) {
@@ -1013,7 +1038,7 @@ focusPauseBtn.addEventListener('click', () => {
         AppState.isTimerRunning = false;
         focusPauseBtn.textContent = 'Resume';
         AppState.pauseStartTimestamp = new Date();
-        saveActiveSession();
+        saveActiveSession(AppState);
     }
     else {
         focusPauseBtn.textContent = 'Pause';
@@ -1069,8 +1094,8 @@ reviewFinishBtn.addEventListener('click', async () => {
     
     resetApp();
 
-    const sessions = await getSessions();
-    changeToDashboardScreen(sessions, "review");
+    changeToDashboardScreen("review");
+    await loadDashboard();
 });
 
 dashboardNewMissionBtn.addEventListener('click', () => {
