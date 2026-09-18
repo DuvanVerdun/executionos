@@ -89,7 +89,7 @@ let timerInterval = null;
 
 // loading screen
 const loadingScreen = document.querySelector('.loading-screen');
-const loadingIcon = document.getElementById('loading-icon');
+const loadingSpinnerContainer = document.getElementById('loading-spinner-container');
 const loadingErrorMessage = document.getElementById('loading-error-message');
 const loadingRetryBtn = document.getElementById('loading-retry-btn');
 
@@ -211,6 +211,28 @@ async function syncOfflineWork() {
 }
 
 
+
+// timer related functions
+
+function syncTimerStateAndUI(appState) {
+    const elapsed = Math.floor(((Date.now() - new Date(appState.startTimestamp).getTime()) / 1000) - appState.pausedTimeSeconds);
+    appState.actualTimeSeconds = elapsed;
+    const formattedTime = formatTime(appState.actualTimeSeconds);
+    focusCurrentTimeDisplay.textContent = formattedTime;
+    let pct = appState.actualTimeSeconds / appState.targetTimeSeconds * 100;
+    appState.percentageCompleted = Math.floor(pct);
+    if (pct < 100) {
+        focusTimerRingContainer.style.setProperty('--pct', `${pct}%`);
+        focusTimerRingContainer.style.background =
+            `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--border) var(--pct), var(--border) 100%)`;
+    } else {
+        const overtimePct = pct - 100;
+        focusTimerRingContainer.style.setProperty('--pct', `${overtimePct}%`);
+        focusTimerRingContainer.style.background =
+            `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--reward) var(--pct), var(--reward) 100%)`;
+    }
+}
+
 function parseTimeFromHHMM(timeStr) {
     const parts = timeStr.split(':');
     const hours = parseInt(parts[0]);
@@ -222,7 +244,10 @@ function formatTime(totalSeconds) {
     const hours = Math.floor(Number(totalSeconds) / 3600);
     const minutes = Math.floor((Number(totalSeconds) % 3600) / 60);
     const seconds = Number(totalSeconds) % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    
+    if (hours >= 1) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    if (minutes >= 1) return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    return seconds;
 }
 
 function formatTimeTohm(totalSeconds) {
@@ -238,25 +263,7 @@ function startTimer(appState) {
 
 function updateTimer(appState) {
     if (!appState.isTimerRunning) return;
-    const elapsed = Math.floor(((Date.now() - new Date(appState.startTimestamp).getTime()) / 1000) - appState.pausedTimeSeconds);
-    appState.actualTimeSeconds = elapsed;
-    const formattedTime = formatTime(appState.actualTimeSeconds);
-    focusCurrentTimeDisplay.textContent = formattedTime;
-
-    let pct = appState.actualTimeSeconds / appState.targetTimeSeconds * 100;
-    appState.percentageCompleted = Math.floor(pct);
-    
-    if (pct < 100) {
-        focusTimerRingContainer.style.setProperty('--pct', `${pct}%`);
-        focusTimerRingContainer.style.background =
-            `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--border) var(--pct), var(--border) 100%)`;
-    } else {
-        const overtimePct = pct - 100;
-        focusTimerRingContainer.style.setProperty('--pct', `${overtimePct}%`);
-        focusTimerRingContainer.style.background =
-            `conic-gradient(var(--white) 0%, var(--white) var(--pct), var(--reward) var(--pct), var(--reward) 100%)`;
-    }
-    
+    syncTimerStateAndUI(appState);
     saveActiveSession(appState)
 }
 
@@ -726,20 +733,20 @@ async function loadDashboard() {
 // ========== 5. SCREEN CHANGE FUNCTIONS ==========
 
 function showLoadingScreenError() {
-    loadingIcon.style.display = 'none';
+    loadingSpinnerContainer.style.display = 'none';
     loadingErrorMessage.style.display = 'flex';
     loadingRetryBtn.style.display = 'flex';
 }
 
-function showLoadingIcon() {
-    loadingIcon.style.display = 'flex';
+function showLoadingSpinner() {
+    loadingSpinnerContainer.style.display = 'flex';
     loadingErrorMessage.style.display = 'none';
     loadingRetryBtn.style.display = 'none';
 }
 
 function changeToRegisterScreen(currentScreen) {
     if (currentScreen === "loading") {
-        loadingIcon.style.display = 'none';
+        loadingSpinnerContainer.style.display = 'none';
         loadingScreen.style.display = 'none';
         registerScreen.style.display = 'grid';
     }
@@ -864,7 +871,7 @@ function changeToDashboardScreen(currentScreen) {
 // ========== 6. EVENT LISTENERS ==========
 
 loadingRetryBtn.addEventListener('click', async () => {
-    showLoadingIcon();
+    showLoadingSpinner();
     await initiateApp();
 });
 
@@ -1052,12 +1059,16 @@ focusPauseBtn.addEventListener('click', () => {
 focusStopBtn.addEventListener('click', () => {
     clearInterval(timerInterval);
     AppState.isTimerRunning = false;
+    
+    syncTimerStateAndUI(AppState);
+
     if (AppState.actualTimeSeconds >= AppState.targetTimeSeconds) {
         AppState.completionStatus = 'completed';
     }
     if (!AppState.pauseStartTimestamp) {
         AppState.pauseStartTimestamp = new Date();
     }
+
     changeToReviewScreen(AppState);
 })
 

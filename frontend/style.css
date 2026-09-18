@@ -246,6 +246,10 @@ button {
 
 /* loading screen styles */
 
+#loading-spinner-container {
+    display: flex;
+}
+
 .loading-retry-container {
     display: flex;
     flex-direction: column;
@@ -777,7 +781,7 @@ button {
 }
 
 
-.dashboard-loading {
+.loading-spinner-container {
     display: none;
     justify-content: center;
     align-items: center;

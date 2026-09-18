@@ -19,7 +19,9 @@
     
     <div class="screen loading-screen">
         <div class="loading-retry-container">
-            <span id="loading-icon"></span>
+            <div id="loading-spinner-container" class="loading-spinner-container">
+                    <div class="loading-spinner"></div>
+                </div>
             <p id="loading-error-message">Couldn't reach the server. Try again in a moment.</p>
             <button id="loading-retry-btn" class="normal-button">Retry</button>
         </div>
@@ -277,7 +279,7 @@
 
             <section id="dashboard-content" class="dashboard-content">
 
-                <div id="dashboard-loading" class="dashboard-loading">
+                <div id="dashboard-loading" class="loading-spinner-container">
                     <div class="loading-spinner"></div>
                 </div>
 
