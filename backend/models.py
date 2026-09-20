@@ -48,3 +48,22 @@ class Session(db.Model):
 
     def __repr__(self) -> str:
         return f"<Session {self.id} user={self.user_id} mission={self.mission!r}>"
+
+class Feedback(db.Model):
+    """Feedback model for the application."""
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    message: Mapped[str] = mapped_column(String(2000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(nullable=False)
+    
+    def __init__(self, user_id: int, message: str, created_at: datetime) -> None:
+        self.user_id = user_id
+        self.message = message
+        self.created_at = created_at
+
+    def __repr__(self) -> str:
+        return f"<Feedback {self.id} user={self.user_id} message={self.message!r}>"

@@ -204,7 +204,7 @@
                 <p id="focus-target-time-display"></p>
             </div>
             
-            <p id="focus-current-time-display">00:00:00</p>
+            <p id="focus-current-time-display">0</p>
 
             <div class="focus-button-container">
                 <button id="focus-pause-btn" class="normal-button">Pause</button>
@@ -308,10 +308,36 @@
             <footer class="dashboard-footer">
                 <h1 class="wordmark">ExecutionOS</h1>
                 <div class="dashboard-footer-feedback-container">
-                    <button id="dashboard-send-feedback-btn">Send Feedback</button>
+                    <button type="button" id="dashboard-open-feedback-form-btn">Send Feedback</button>
                     <p>The app is currently in an early stage, help us improve it sending your problems and ideas.</p>
                 </div>
             </footer>
+
+            <form id="dashboard-feedback-form">
+                
+                <div class="dashboard-feedback-form-header">
+                    <h2>Send Feedback</h2>
+                    <button type="button" id="dashboard-close-feedback-form-btn" aria-label="Close feedback form">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="24"
+                            height="24"
+                            aria-hidden="true"
+                            >
+                            <path
+                                d="M18 6 6 18M6 6l12 12"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                            />
+                        </svg>
+                    </button>
+                </div>
+                
+                <textarea name="send-feedback-input" class="input" id="dashboard-feedback-input" maxlength="2000" aria-label="Your feedback"></textarea>
+                <button type="submit" class="white-filled-button" id="dashboard-send-feedback-btn">Send Feedback</button>
+            </form>
 
         </div>
     

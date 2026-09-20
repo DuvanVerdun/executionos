@@ -166,6 +166,11 @@ const dashboardTotalTimeDisplay = document.getElementById('dashboard-total-time-
 const dashboardSessionsListContainer = document.getElementById("dashboard-sessions-list-container");
 const emptyDashboardCTAContainer = document.getElementById("empty-dashboard-cta-container");
 const emptyDashboardStartMissionBtn = document.getElementById("empty-dashboard-start-mission-btn");
+const dashboardOpenFeedbackFormBtn = document.getElementById("dashboard-open-feedback-form-btn");
+const dashboardFeedbackForm = document.getElementById("dashboard-feedback-form");
+const dashboardCloseFeedbackFormBtn = document.getElementById("dashboard-close-feedback-form-btn");
+const dashboardFeedbackInput = document.getElementById("dashboard-feedback-input");
+const dashboardSendFeedbackBtn = document.getElementById("dashboard-send-feedback-btn");
 
 
 // general
@@ -215,6 +220,12 @@ async function syncOfflineWork() {
 // timer related functions
 
 function syncTimerStateAndUI(appState) {
+    if (appState.pauseStartTimestamp) {
+        const elapsed = (Date.now() - new Date(AppState.pauseStartTimestamp).getTime()) / 1000;
+        AppState.pausedTimeSeconds += elapsed;
+        AppState.pauseStartTimestamp = '';
+    }
+
     const elapsed = Math.floor(((Date.now() - new Date(appState.startTimestamp).getTime()) / 1000) - appState.pausedTimeSeconds);
     appState.actualTimeSeconds = elapsed;
     const formattedTime = formatTime(appState.actualTimeSeconds);
@@ -253,7 +264,23 @@ function formatTime(totalSeconds) {
 function formatTimeTohm(totalSeconds) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
+    if (hours >= 1) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+}
+
+function formatTimeTohms(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    if (hours >= 1) {
+        if (seconds >= 1) return `${hours}h ${minutes}m ${seconds}s`;
+        return `${hours}h ${minutes}m`
+    };
+    if (minutes >= 1) {
+        if (seconds >= 1) return `${minutes}m ${seconds}s`
+        return `${minutes}m`;
+    };
+    return `${seconds} sec`;
 }
 
 function startTimer(appState) {
@@ -365,13 +392,17 @@ async function apiFetch(options) {
             changeToLoginScreen(options.currentScreen);
             throw new Error("Unauthorized: Please log in.");
         }
+        const statusCode = retry.status;
         const retryResult = await retry.json();
+        retryResult.status = statusCode;
         accessToken = result.access_token;
         planUserMenuUsername.textContent = result.username;
         dashboardUserMenuUsername.textContent = result.username;
         return retryResult;
     }
+    const statusCode = response.status;
     const result = await response.json();
+    result.status = statusCode;
     return result;
 }
 
@@ -406,6 +437,16 @@ async function deleteSession(sessionID) {
     const result = await apiFetch({
         path: `delete-session/${sessionID}`,
         method: "DELETE",
+        currentScreen: "dashboard"
+    });
+    return result;
+}
+
+async function postFeedback(feedbackMessage) {
+    const result = await apiFetch({
+        path: "feedback",
+        method: "POST",
+        body: { message: feedbackMessage },
         currentScreen: "dashboard"
     });
     return result;
@@ -723,7 +764,7 @@ async function loadDashboard() {
     catch (error) {
         console.error("Dashboard loading error:", error);
     }
-    finally {
+     {
         hideDashboardLoading();
     }
 }
@@ -837,7 +878,7 @@ function changeToReviewScreen(appState) {
     reviewTargetTimeDisplay.textContent = formatTime(appState.targetTimeSeconds);
     reviewCompletionPercentageDisplay.textContent = `${appState.percentageCompleted}%`;
     reviewCompletionStatusDisplay.textContent = appState.completionStatus.charAt(0).toUpperCase() + appState.completionStatus.slice(1);
-    reviewActualTimeDisplay.textContent = formatTime(appState.actualTimeSeconds);
+    reviewActualTimeDisplay.textContent = formatTimeTohms(appState.actualTimeSeconds);
     
     const pct = appState.percentageCompleted;
     if (pct < 100) {
@@ -888,7 +929,7 @@ registerSwitchToLoginBtn.addEventListener('click', () => {
     changeToLoginScreen("register");
 });
 
-registerForm.addEventListener('submit', async () => {
+registerForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     registerErrorMessage.textContent = '';
     registerPasswordErrorMessage.textContent = '';
@@ -933,7 +974,7 @@ loginSwitchToRegisterBtn.addEventListener('click', () => {
     changeToRegisterScreen("login");
 });
 
-loginForm.addEventListener('submit', async () => {
+loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     loginErrorMessage.textContent = '';
     if (!loginUsernameOrEmailInput.value) {
@@ -1111,6 +1152,7 @@ reviewFinishBtn.addEventListener('click', async () => {
 
 dashboardNewMissionBtn.addEventListener('click', () => {
     changeToPlanScreen("dashboard");
+    if (dashboardFeedbackForm.style.display === 'flex') dashboardFeedbackForm.style.display = 'none';
 });
 
 dashboardUserIcon.addEventListener('click', () => {
@@ -1119,6 +1161,7 @@ dashboardUserIcon.addEventListener('click', () => {
 
 emptyDashboardStartMissionBtn.addEventListener('click', () => {
     changeToPlanScreen("dashboard");
+    if (dashboardFeedbackForm.style.display === 'flex') dashboardFeedbackForm.style.display = 'none';
 });
 
 dashboardUserMenuLogoutBtn.addEventListener('click', async () => {
@@ -1187,6 +1230,84 @@ document.addEventListener('click', (event) => {
     planUserMenu.style.display = 'none';
     dashboardUserMenu.style.display = 'none';
     isUserMenuOpened = false;
+});
+
+
+document.addEventListener('click', (event) => {
+    if (dashboardFeedbackForm.style.display !== "flex") return;
+    const clickedInsideDashboardFeedbackForm = dashboardFeedbackForm.contains(event.target);
+    const clickedDashboardOpenFeedbackFormBtn = dashboardOpenFeedbackFormBtn.contains(event.target);
+    if (clickedInsideDashboardFeedbackForm || clickedDashboardOpenFeedbackFormBtn) return;
+    dashboardFeedbackForm.style.display = 'none';
+});
+
+dashboardOpenFeedbackFormBtn.addEventListener('click', () => {
+    dashboardFeedbackForm.style.display = 'flex';
+});
+
+dashboardCloseFeedbackFormBtn.addEventListener('click', () => {
+    dashboardFeedbackForm.style.display = 'none';
+});
+
+dashboardFeedbackForm.addEventListener('submit', async (event) => {
+
+    event.preventDefault();
+
+    dashboardSendFeedbackBtn.disabled = true;
+
+    if (!dashboardFeedbackInput.value) {
+        alert('Message is empty');
+        dashboardSendFeedbackBtn.disabled = false;
+        return;
+    };
+    if (dashboardFeedbackInput.value.trim().length === 0) {
+        alert('Message is only whitespace');
+        dashboardSendFeedbackBtn.disabled = false;
+        return;
+    };
+    if (dashboardFeedbackInput.value.length > 2000) {
+        alert('Message exceeds 2000 characters');
+        dashboardSendFeedbackBtn.disabled = false;
+        return;
+    };
+
+    let result;
+    try {
+        result = await postFeedback(dashboardFeedbackInput.value);
+    } catch (error) {
+        alert('Network/Server connection failed. Please try again');
+        dashboardSendFeedbackBtn.disabled = false;
+        return;
+    } finally {
+        dashboardSendFeedbackBtn.disabled = false;
+    }
+
+    if (result.status === 400) {
+        alert('Message is invalid. Please check and try again');
+        return;
+    }
+    if (result.success !== true) {
+        alert('Something went wrong. Please try again');
+        return;
+    }
+    else if (result.success === true) {
+        alert('Feedback message was sent. Thank you');
+        dashboardFeedbackInput.value = '';
+        dashboardFeedbackInput.style.height = '';
+        dashboardFeedbackForm.style.display = 'none';
+    }
+});
+
+dashboardFeedbackInput.addEventListener('input', () => {
+    dashboardFeedbackInput.style.overflowY = 'hidden';
+    dashboardFeedbackInput.style.height = 'auto';
+
+    const borderHeight = dashboardFeedbackInput.offsetHeight - dashboardFeedbackInput.clientHeight;
+    dashboardFeedbackInput.style.height = `${dashboardFeedbackInput.scrollHeight + borderHeight}px`;
+
+    if (dashboardFeedbackInput.scrollHeight > dashboardFeedbackInput.clientHeight + 1) {
+        dashboardFeedbackInput.style.overflowY = 'auto';
+    }
 });
 
 
