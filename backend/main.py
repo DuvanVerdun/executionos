@@ -54,24 +54,60 @@ def create_app() -> Flask:
             email = data["email"]
             password = data["password"]
 
-            username_exists = db.session.execute(select(User.id).filter_by(username=username)).scalar_one_or_none()
-            if username_exists:
+            if not isinstance(username, str):
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "username is not a string"
+                }), 400
+            if not isinstance(email, str):
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "email is not a string"
+                }), 400
+            if not isinstance(password, str):
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "password is not a string"
+                }), 400
+                        
+
+            normalized_username = username.strip().lower()
+            normalized_email = email.strip().lower()
+
+            if not normalized_username or not normalized_email:
+                return jsonify({  #type: ignore
+                    "success": False,
+                    "error": "Username and email are required"
+                }), 400
+
+            if len(normalized_username) > 50:
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "Username too long. Expected 50 characters or less"
+                }), 400
+            if len(normalized_email) > 120:
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "Email too long. Expected 120 characters or less"
+                }), 400
+
+            username_exists = db.session.execute(select(User.id).filter_by(username=normalized_username)).scalar_one_or_none()
+            if username_exists is not None:
                 return jsonify({  # type: ignore
                     "success": False,
                     "error": "username already registered"
                 }), 409
 
-            email_exists = db.session.execute(select(User.id).filter_by(email=email)).scalar_one_or_none()
-
-            if email_exists:
+            email_exists = db.session.execute(select(User.id).filter_by(email=normalized_email)).scalar_one_or_none()
+            if email_exists is not None:
                 return jsonify({  # type: ignore
                     "success": False,
                     "error": "email already registered"
                 }), 409
 
             new_user = User(
-                username=username,
-                email=email,
+                username=normalized_username,
+                email=normalized_email,
                 password_hash=cast(str, generate_password_hash(password))
             )
 
@@ -118,10 +154,22 @@ def create_app() -> Flask:
         try:
             data: dict[str, Any] = cast(dict[str, Any], request.get_json())  # type: ignore
 
-            if "@" in data["usernameOrEmail"]:
-                user = db.session.execute(select(User).filter_by(email=data["usernameOrEmail"])).scalar_one_or_none()
+            if not isinstance(data["usernameOrEmail"], str):
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "username or email is not a string"
+                }), 400
+            if not isinstance(data["password"], str):
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": "password is not a string"
+                }), 400
+            
+            normalized_username_or_email = data["usernameOrEmail"].strip().lower()
+            if "@" in normalized_username_or_email:
+                user = db.session.execute(select(User).filter_by(email=normalized_username_or_email)).scalar_one_or_none()
             else:
-                user = db.session.execute(select(User).filter_by(username=data["usernameOrEmail"])).scalar_one_or_none()
+                user = db.session.execute(select(User).filter_by(username=normalized_username_or_email)).scalar_one_or_none()
 
             if user is None or not cast(bool, check_password_hash(user.password_hash, data["password"])):
                 return jsonify({  # type: ignore
@@ -359,7 +407,7 @@ def create_app() -> Flask:
             user_id = int(get_jwt_identity())
 
 
-            if not isinstance(data, dict):
+            if not isinstance(data, dict):  # type: ignore
                 return jsonify({  # type: ignore
                     "success": False,
                     "error": "JSON is not a object/dictionary"
