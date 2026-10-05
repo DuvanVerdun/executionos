@@ -137,6 +137,22 @@
 
             <header class="plan-header">
                 <h1 class="wordmark">ExecutionOS</h1>
+                <div class="streak-container">
+                    <button
+                        type="button"
+                        id="plan-streak-btn"
+                        class="streak-btn"
+                        aria-label="Open consistency calendar"
+                    >
+                        🔥 0
+                    </button>
+
+                    <div
+                        id="plan-streak-popup"
+                        class="streak-popup"
+                        style="display: none;"
+                    ></div>
+                </div>
                 <svg id="plan-user-icon" class="user-icon" viewBox="0 0 48 48" aria-label="Open user menu">
                     <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/>
 
@@ -254,6 +270,22 @@
             
             <header class="dashboard-header">
                 <button id="dashboard-new-mission-btn" class="cta-button">Start New Mission</button>
+                <div class="streak-container">
+                    <button
+                        type="button"
+                        id="dashboard-streak-btn"
+                        class="streak-btn"
+                        aria-label="Open consistency calendar"
+                    >
+                        🔥 0
+                    </button>
+
+                    <div
+                        id="dashboard-streak-popup"
+                        class="streak-popup"
+                        style="display: none;"
+                    ></div>
+                </div>
                 <svg id="dashboard-user-icon" class="user-icon" viewBox="0 0 48 48" aria-label="Open user menu">
                     <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/>
 
@@ -284,21 +316,143 @@
                 </div>
 
                 <!-- If there is at least 1 session this week -->
-                <div id="dashboard-weekly-stats-container" class="dashboard-weekly-stats-container">
-                    <h2 class="dashboard-content-title">Weekly Stats</h2>
-                    <div class="dashboard-weekly-stats-card">
-                        <p id="dashboard-amount-of-sessions-display"></p>
-                        <p id="dashboard-average-percentage-display"></p>
-                        <p id="dashboard-total-time-display"></p>
+                <section class="dashboard-period-controls">
+
+                    <div class="dashboard-period-toggle">
+                        <button
+                            type="button"
+                            data-dashboard-period="week"
+                            class="active"
+                        >
+                            Week
+                        </button>
+
+                        <button
+                            type="button"
+                            data-dashboard-period="month"
+                        >
+                            Month
+                        </button>
+
+                        <button
+                            type="button"
+                            data-dashboard-period="year"
+                        >
+                            Year
+                        </button>
+
+                        <button
+                            type="button"
+                            data-dashboard-period="all_time"
+                        >
+                            All Time
+                        </button>
                     </div>
-                </div>
-                <div id="dashboard-sessions-list-container">
-                    <h2 class="dashboard-content-title">Sessions</h2>            
+
+                    <div class="dashboard-period-navigation">
+                        <button
+                            type="button"
+                            id="dashboard-previous-period-btn"
+                            aria-label="Previous period"
+                        >
+                            ‹
+                        </button>
+
+                        <p id="dashboard-period-label"></p>
+
+                        <button
+                            type="button"
+                            id="dashboard-next-period-btn"
+                            aria-label="Next period"
+                        >
+                            ›
+                        </button>
+                    </div>
+
+                </section>
+
+
+                <div id="dashboard-data-container">
+
+                    <section
+                        id="dashboard-summary-container"
+                        class="dashboard-weekly-stats-container"
+                    >
+                        <h2 class="dashboard-content-title">
+                            Summary
+                        </h2>
+
+                        <div class="dashboard-weekly-stats-card">
+
+                            <p id="dashboard-total-time-display"></p>
+
+                            <p id="dashboard-amount-of-sessions-display"></p>
+
+                            <p id="dashboard-average-percentage-display"></p>
+
+                            <p id="dashboard-average-session-time-display"></p>
+
+                        </div>
+                    </section>
+
+
+                    <section class="dashboard-trend-section">
+
+                        <div class="dashboard-metric-toggle">
+
+                            <button
+                                type="button"
+                                data-dashboard-metric="time"
+                                class="active"
+                            >
+                                Time
+                            </button>
+
+                            <button
+                                type="button"
+                                data-dashboard-metric="completion"
+                            >
+                                Completion
+                            </button>
+
+                            <button
+                                type="button"
+                                data-dashboard-metric="sessions"
+                            >
+                                Sessions
+                            </button>
+
+                        </div>
+
+                        <svg
+                            id="dashboard-trend-chart"
+                            width="100%"
+                            height="260"
+                            role="img"
+                            aria-label="Execution trend"
+                        ></svg>
+
+                    </section>
+
+
+                    <div id="dashboard-sessions-list-container">
+
+                        <h2 class="dashboard-content-title">
+                            Sessions
+                        </h2>
+
+                        <div
+                            id="dashboard-sessions-load-sentinel"
+                            aria-live="polite"
+                        ></div>
+
+                    </div>
+
                 </div>
 
                 <!-- If there are no sessions this week -->
                 <div id="empty-dashboard-cta-container" class="empty-dashboard-cta-container">
-                    <h2 class="empty-dashboard-cta-title">No sessions this week</h2>
+                    <h2 class="empty-dashboard-cta-title">No sessions in this period</h2>
                     <p class="empty-dashboard-cta-paragraph">Start a mission and build your consistency.</p>
                     <button id="empty-dashboard-start-mission-btn" class="empty-dashboard-start-mission-btn white-filled-button">Start Mission</button>
                 </div>

@@ -59,6 +59,24 @@ const sessionQueue = {
     }
 };
 
+const dashboardState = {
+    period: 'week',
+    anchorDate: '',
+    metric: 'time',
+    data: null,
+    sessions: [],
+    dailySummaries: {},
+    nextCursor: null,
+    isLoadingMore: false,
+    sessionObserver: null
+};
+
+const streakState = {
+    anchorDate: '',
+    data: null,
+    openScreen: null
+};
+
 
 // ========== DOM REFERENCES ==========
 
@@ -91,6 +109,8 @@ const dom = {
     },
     plan: {
         screen: document.querySelector('.plan-screen'),
+        streakButton: document.getElementById('plan-streak-btn'),
+        streakPopup: document.getElementById('plan-streak-popup'),
         userIcon: document.getElementById('plan-user-icon'),
         userMenu: document.getElementById('plan-user-menu'),
         username: document.getElementById('plan-user-menu-username'),
@@ -124,6 +144,8 @@ const dom = {
     dashboard: {
         screen: document.querySelector('.dashboard-screen'),
         newMissionButton: document.getElementById('dashboard-new-mission-btn'),
+        streakButton: document.getElementById('dashboard-streak-btn'),
+        streakPopup: document.getElementById('dashboard-streak-popup'),
         userIcon: document.getElementById('dashboard-user-icon'),
         userMenu: document.getElementById('dashboard-user-menu'),
         username: document.getElementById('dashboard-user-menu-username'),
@@ -131,7 +153,18 @@ const dom = {
         logoutButton: document.getElementById('dashboard-user-menu-logout-btn'),
         content: document.getElementById('dashboard-content'),
         loading: document.getElementById('dashboard-loading'),
-        weeklyStats: document.getElementById('dashboard-weekly-stats-container'),
+        dataContainer: document.getElementById('dashboard-data-container'),
+        
+        periodButtons: document.querySelectorAll('[data-dashboard-period]'),
+        previousPeriodButton: document.getElementById('dashboard-previous-period-btn'),
+        nextPeriodButton: document.getElementById('dashboard-next-period-btn'),
+        periodLabel: document.getElementById('dashboard-period-label'),
+        averageSessionTime: document.getElementById('dashboard-average-session-time-display'),
+        metricButtons: document.querySelectorAll('[data-dashboard-metric]'),
+        trendChart: document.getElementById('dashboard-trend-chart'),
+        sessionsLoadSentinel: document.getElementById('dashboard-sessions-load-sentinel'),
+
+        summaryContainer: document.getElementById('dashboard-summary-container'),
         sessionCount: document.getElementById('dashboard-amount-of-sessions-display'),
         averagePercentage: document.getElementById('dashboard-average-percentage-display'),
         totalTime: document.getElementById('dashboard-total-time-display'),
@@ -399,9 +432,59 @@ function postSession(sessionData) {
     return apiFetch({ path: 'save-session', method: 'POST', body: sessionData, currentScreen: 'review' });
 }
 
-async function getSessions(currentScreen) {
-    const result = await apiFetch({ path: 'get-sessions', method: 'GET', currentScreen });
-    return result.sessions;
+function getBrowserTimezone() {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+function fetchDashboardData(period, anchorDate, currentScreen = 'dashboard') {
+    const params = new URLSearchParams({
+        period,
+        anchor_date: anchorDate,
+        timezone: getBrowserTimezone()
+    });
+
+    return apiFetch({
+        path: `dashboard?${params.toString()}`,
+        method: 'GET',
+        currentScreen
+    });
+}
+
+function fetchSessionsPage(
+    period,
+    anchorDate,
+    cursor = null,
+    currentScreen = 'dashboard'
+) {
+    const params = new URLSearchParams({
+        period,
+        anchor_date: anchorDate,
+        timezone: getBrowserTimezone()
+    });
+
+    if (cursor) {
+        params.set('cursor_date', cursor.date);
+        params.set('cursor_id', String(cursor.id));
+    }
+
+    return apiFetch({
+        path: `get-sessions?${params.toString()}`,
+        method: 'GET',
+        currentScreen
+    });
+}
+
+function fetchStreak(anchorDate, currentScreen) {
+    const params = new URLSearchParams({
+        anchor_date: anchorDate,
+        timezone: getBrowserTimezone()
+    });
+
+    return apiFetch({
+        path: `streak?${params.toString()}`,
+        method: 'GET',
+        currentScreen
+    });
 }
 
 function deleteSession(sessionId) {
@@ -415,48 +498,109 @@ function postFeedback(feedbackMessage) {
 
 // ========== DASHBOARD DATA ==========
 
-function getCurrentWeekRange() {
-    const today = new Date();
-    const firstDayOfTheWeek = new Date(today);
-    const daysSinceMonday = (today.getDay() + 6) % 7;
-    firstDayOfTheWeek.setDate(today.getDate() - daysSinceMonday);
-    firstDayOfTheWeek.setHours(0, 0, 0, 0);
-    return { today, firstDayOfTheWeek };
+function formatLocalDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
-function filterCurrentWeekSessions(sessions, today, firstDayOfTheWeek) {
-    const thisWeekSessions = [];
-    for (const session of sessions) {
-        const sessionDate = new Date(session.date + 'Z');
-        if (sessionDate >= firstDayOfTheWeek && sessionDate <= today) {
-            thisWeekSessions.push(session);
-        }
+function initializeDashboardState() {
+    if (!dashboardState.anchorDate) {
+        dashboardState.anchorDate = formatLocalDate(new Date());
     }
-    thisWeekSessions.sort((a, b) => new Date(b.date + 'Z') - new Date(a.date + 'Z'));
-    return thisWeekSessions;
 }
 
-function calculateWeeklyStats(sessions) {
-    if (sessions.length === 0) {
-        return { sessionCount: 0, averageCompletionPercentage: 0, totalTimeSeconds: 0 };
+function initializeStreakState() {
+    if (!streakState.anchorDate) {
+        streakState.anchorDate = formatLocalDate(new Date());
     }
-    let totalCombinedPercentages = 0;
-    let totalTimeSeconds = 0;
-    for (const session of sessions) {
-        totalCombinedPercentages += session.percentage_completed;
-        totalTimeSeconds += session.actual_time_seconds;
-    }
-    return {
-        sessionCount: sessions.length,
-        averageCompletionPercentage: Math.round(totalCombinedPercentages / sessions.length),
-        totalTimeSeconds
-    };
 }
 
-function getDashboardData(sessions) {
-    const { today, firstDayOfTheWeek } = getCurrentWeekRange();
-    const thisWeekSessions = filterCurrentWeekSessions(sessions, today, firstDayOfTheWeek);
-    return { sessions: thisWeekSessions, weeklyStats: calculateWeeklyStats(thisWeekSessions) };
+function parseLocalDate(dateString) {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function normalizePeriodAnchor(period, anchorDate) {
+    const date = parseLocalDate(anchorDate);
+    if (period === 'week') {
+        const daysSinceMonday = (date.getDay() + 6) % 7;
+        date.setDate(date.getDate() - daysSinceMonday);
+    } else if (period === 'month') {
+        date.setDate(1);
+    } else if (period === 'year') {
+        date.setMonth(0, 1);
+    }
+    return formatLocalDate(date);
+}
+
+function shiftPeriodAnchor(period, anchorDate, direction) {
+    const date = parseLocalDate(
+        normalizePeriodAnchor(period, anchorDate)
+    );
+
+    if (period === 'week') {
+        date.setDate(date.getDate() + 7 * direction);
+    } else if (period === 'month') {
+        date.setMonth(date.getMonth() + direction);
+    } else if (period === 'year') {
+        date.setFullYear(date.getFullYear() + direction);
+    }
+
+    return formatLocalDate(date);
+}
+
+function shiftMonthAnchor(anchorDate, direction) {
+    const date = parseLocalDate(anchorDate);
+    date.setDate(1);
+    date.setMonth(date.getMonth() + direction);
+    return formatLocalDate(date);
+}
+
+function getSessionLocalDate(session) {
+    return new Date(`${session.date}Z`);
+}
+
+function getSessionLocalDateKey(session) {
+    return formatLocalDate(getSessionLocalDate(session));
+}
+
+function formatSessionDateLabel(session) {
+    return new Intl.DateTimeFormat('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+    }).format(getSessionLocalDate(session));
+}
+
+function formatPeriodDate(dateString) {
+    if (!dateString) return '';
+
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    }).format(parseLocalDate(dateString));
+}
+
+function formatTrendBucketLabel(bucketStart, period) {
+    const date = parseLocalDate(bucketStart);
+
+    if (period === 'week') {
+        return new Intl.DateTimeFormat('en-US', {
+            weekday: 'short'
+        }).format(date);
+    }
+
+    if (period === 'month') {
+        return String(date.getDate());
+    }
+
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short'
+    }).format(date);
 }
 
 
@@ -602,8 +746,7 @@ function navigateTo(nextScreen, currentScreen) {
 }
 
 function showDashboardLoading() {
-    dom.dashboard.weeklyStats.style.display = 'none';
-    dom.dashboard.sessionsList.style.display = 'none';
+    dom.dashboard.dataContainer.style.display = 'none';
     dom.dashboard.emptyCTA.style.display = 'none';
     dom.dashboard.loading.style.display = 'flex';
 }
@@ -679,64 +822,430 @@ function createSessionTimeSection(session) {
     return container;
 }
 
+function createDailySummarySection(summary) {
+    const container = document.createElement('div');
+
+    const sessions = document.createElement('p');
+    const totalTime = document.createElement('p');
+    const completion = document.createElement('p');
+    const averageSession = document.createElement('p');
+
+    container.className = 'dashboard-daily-summary';
+
+    sessions.textContent =
+        `${summary.total_sessions} sessions`;
+
+    totalTime.textContent =
+        `${formatDurationHoursMinutes(
+            summary.total_time_seconds
+        )} focused`;
+
+    completion.textContent =
+        `${summary.average_completion_percentage}% avg completion`;
+
+    averageSession.textContent =
+        `${formatDurationHoursMinutes(
+            summary.average_session_time_seconds
+        )} avg session`;
+
+    container.append(
+        sessions,
+        totalTime,
+        completion,
+        averageSession
+    );
+
+    return container;
+}
+
 function appendSessionToCard(session, card) {
     card.append(createSessionMissionSection(session), createSessionTimeSection(session));
 }
 
-function createSessionDateCard(session, uiDate, dateObject) {
+function groupSessionsByLocalDate(sessions) {
+    const groups = new Map();
+    for (const session of sessions) {
+        const dateKey = getSessionLocalDateKey(session);
+        if (!groups.has(dateKey)) {
+            groups.set(dateKey, []);
+        }
+        groups.get(dateKey).push(session);
+    }
+    return groups;
+}
+
+function createSessionDateCard(
+    sessions,
+    dailySummary
+) {
+    const firstSession = sessions[0];
+
     const card = document.createElement('div');
     const dateLabel = document.createElement('p');
+
+    const dateKey =
+        getSessionLocalDateKey(firstSession);
+
     card.className = 'dashboard-session-card';
-    card.id = `session-card-${dateObject.getMonth() + 1}-${dateObject.getDate()}`;
+    card.id = `session-card-${dateKey}`;
+
     dateLabel.className = 'dashboard-session-date';
-    dateLabel.textContent = uiDate;
+    dateLabel.textContent =
+        formatSessionDateLabel(firstSession);
+
     card.appendChild(dateLabel);
-    appendSessionToCard(session, card);
+
+    if (
+        dailySummary
+        && dailySummary.total_sessions > 1
+    ) {
+        card.appendChild(
+            createDailySummarySection(dailySummary)
+        );
+    }
+
+    sessions.forEach((session, index) => {
+        if (index > 0) {
+            const divider =
+                document.createElement('span');
+
+            divider.className =
+                'dashboard-session-division-line';
+
+            card.appendChild(divider);
+        }
+
+        appendSessionToCard(session, card);
+    });
+
     return card;
 }
 
-function appendSessionToExistingCard(session, cardId) {
-    const card = document.getElementById(cardId);
-    const divider = document.createElement('span');
-    divider.className = 'dashboard-session-division-line';
-    card.appendChild(divider);
-    appendSessionToCard(session, card);
-}
-
 function renderSessionsByDate(sessions) {
-    let lastDate = '';
-    for (const session of sessions) {
-        const dateObject = new Date(session.date + 'Z');
-        const weekday = WEEKDAY_ABBREVIATIONS[dateObject.getDay()];
-        const month = MONTH_ABBREVIATIONS[dateObject.getMonth() + 1];
-        const uiDate = `${weekday}, ${month} ${dateObject.getDate()}`;
-        if (lastDate !== uiDate) {
-            dom.dashboard.sessionsList.appendChild(createSessionDateCard(session, uiDate, dateObject));
-        } else {
-            const cardId = `session-card-${dateObject.getMonth() + 1}-${dateObject.getDate()}`;
-            appendSessionToExistingCard(session, cardId);
-        }
-        lastDate = uiDate;
+    dom.dashboard.sessionsList.innerHTML = '';
+    dom.dashboard.sessionsList.appendChild(createSessionListTitle());
+    if (sessions.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.textContent = 'No sessions in this period.';
+        emptyMessage.className = 'dashboard-empty-period-message';
+        dom.dashboard.sessionsList.appendChild(emptyMessage);
+        return;
     }
+    const groups = groupSessionsByLocalDate(sessions);
+    for (const [dateKey, daySessions] of groups.entries()) {
+    const dailySummary =
+        dashboardState.dailySummaries[dateKey];
+
+    dom.dashboard.sessionsList.appendChild(
+        createSessionDateCard(
+            daySessions,
+            dailySummary
+        )
+    );
+}
+    dom.dashboard.sessionsList.appendChild(
+        dom.dashboard.sessionsLoadSentinel
+    );
 }
 
-function renderDashboardData(sessions) {
-    const { sessions: weeklySessions, weeklyStats } = getDashboardData(sessions);
-    if (weeklySessions.length === 0) {
-        dom.dashboard.weeklyStats.style.display = 'none';
-        dom.dashboard.sessionsList.style.display = 'none';
+function renderDashboardSummary(summary) {
+    dom.dashboard.sessionCount.textContent = `${summary.total_sessions} sessions`;
+    dom.dashboard.totalTime.textContent = `${formatDurationHoursMinutes(summary.total_time_seconds)} focused`;
+    dom.dashboard.averagePercentage.textContent =
+        summary.average_completion_percentage === null
+            ? '— avg completion'
+            : `${summary.average_completion_percentage}% avg completion`;
+    dom.dashboard.averageSessionTime.textContent =
+        summary.average_session_time_seconds === null
+            ? '— avg session'
+            : `${formatDurationHoursMinutes(
+                summary.average_session_time_seconds
+            )} avg session`;
+}
+
+function renderDashboardPeriod(periodData) {
+    dom.dashboard.periodButtons.forEach((button) => {
+        button.classList.toggle(
+            'active',
+            button.dataset.dashboardPeriod === dashboardState.period
+        );
+    });
+
+    if (dashboardState.period === 'all_time') {
+        dom.dashboard.periodLabel.textContent = 'All time';
+    } else {
+        dom.dashboard.periodLabel.textContent =
+            `${formatPeriodDate(periodData.start_date)} – ` +
+            `${formatPeriodDate(periodData.end_date)}`;
+    }
+
+    dom.dashboard.previousPeriodButton.disabled =
+        dashboardState.period === 'all_time';
+
+    const today = formatLocalDate(new Date());
+
+    dom.dashboard.nextPeriodButton.disabled =
+        dashboardState.period === 'all_time'
+        || periodData.end_date >= today;
+}
+
+function getTrendMetricValue(bucket, metric) {
+    if (metric === 'time') {
+        return bucket.total_time_seconds;
+    }
+    if (metric === 'completion') {
+        return bucket.average_completion_percentage ?? 0;
+    }
+    return bucket.total_sessions;
+}
+
+function formatTrendMetricValue(value, metric) {
+    if (metric === 'time') {
+        return formatDurationHoursMinutes(value);
+    }
+    if (metric === 'completion') {
+        return `${Math.round(value)}%`;
+    }
+    return String(value);
+}
+
+function renderTrendMetricButtons() {
+    dom.dashboard.metricButtons.forEach((button) => {
+        button.classList.toggle(
+            'active',
+            button.dataset.dashboardMetric === dashboardState.metric
+        );
+    });
+}
+
+function renderTrendChart() {
+    const svg = dom.dashboard.trendChart;
+    const trend = dashboardState.data?.trend ?? [];
+
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', '0 0 700 260');
+
+    if (trend.length === 0) return;
+
+    const width = 700;
+    const height = 260;
+
+    const left = 55;
+    const right = 20;
+    const top = 25;
+    const bottom = 45;
+
+    const chartWidth = width - left - right;
+    const chartHeight = height - top - bottom;
+
+    const values = trend.map((bucket) =>
+        getTrendMetricValue(bucket, dashboardState.metric)
+    );
+
+    const maxValue = Math.max(...values, 1);
+
+    const createSvgElement = (tag) =>
+        document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            tag
+        );
+
+    const baseline = createSvgElement('line');
+
+    baseline.setAttribute('x1', left);
+    baseline.setAttribute('y1', top + chartHeight);
+    baseline.setAttribute('x2', left + chartWidth);
+    baseline.setAttribute('y2', top + chartHeight);
+    baseline.setAttribute('stroke', 'currentColor');
+    baseline.setAttribute('opacity', '0.35');
+
+    svg.appendChild(baseline);
+
+    const points = trend.map((bucket, index) => {
+        const x = trend.length === 1
+            ? left + chartWidth / 2
+            : left + (index / (trend.length - 1)) * chartWidth;
+
+        const value = values[index];
+
+        const y =
+            top
+            + chartHeight
+            - (value / maxValue) * chartHeight;
+
+        return {
+            x,
+            y,
+            value,
+            bucket
+        };
+    });
+
+    const polyline = createSvgElement('polyline');
+
+    polyline.setAttribute(
+        'points',
+        points.map(({ x, y }) => `${x},${y}`).join(' ')
+    );
+
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', 'currentColor');
+    polyline.setAttribute('stroke-width', '3');
+
+    svg.appendChild(polyline);
+
+    const labelInterval = Math.max(
+        1,
+        Math.ceil(points.length / 8)
+    );
+
+    points.forEach((point, index) => {
+        const circle = createSvgElement('circle');
+
+        circle.setAttribute('cx', point.x);
+        circle.setAttribute('cy', point.y);
+        circle.setAttribute('r', '4');
+        circle.setAttribute('fill', 'currentColor');
+
+        const title = createSvgElement('title');
+
+        title.textContent =
+            `${formatTrendBucketLabel(
+                point.bucket.bucket_start,
+                dashboardState.period
+            )}: ${formatTrendMetricValue(
+                point.value,
+                dashboardState.metric
+            )}`;
+
+        circle.appendChild(title);
+        svg.appendChild(circle);
+
+        const shouldRenderLabel =
+            index % labelInterval === 0
+            || index === points.length - 1;
+
+        if (!shouldRenderLabel) return;
+
+        const label = createSvgElement('text');
+
+        label.setAttribute('x', point.x);
+        label.setAttribute('y', height - 15);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('fill', 'currentColor');
+        label.setAttribute('font-size', '12');
+
+        label.textContent = formatTrendBucketLabel(
+            point.bucket.bucket_start,
+            dashboardState.period
+        );
+
+        svg.appendChild(label);
+    });
+}
+
+function renderDashboardData() {
+    if (!dashboardState.data) return;
+
+    renderDashboardPeriod(
+        dashboardState.data.period
+    );
+
+    if (
+        dashboardState.data.summary.total_sessions === 0
+    ) {
+        dom.dashboard.dataContainer.style.display = 'none';
         dom.dashboard.emptyCTA.style.display = 'flex';
         return;
     }
-    dom.dashboard.weeklyStats.style.display = 'flex';
-    dom.dashboard.sessionsList.style.display = 'flex';
+
+    dom.dashboard.dataContainer.style.display = 'block';
     dom.dashboard.emptyCTA.style.display = 'none';
-    dom.dashboard.sessionsList.innerHTML = '';
-    dom.dashboard.sessionsList.appendChild(createSessionListTitle());
-    renderSessionsByDate(weeklySessions);
-    dom.dashboard.sessionCount.textContent = `${weeklyStats.sessionCount} sessions`;
-    dom.dashboard.averagePercentage.textContent = `${weeklyStats.averageCompletionPercentage}%`;
-    dom.dashboard.totalTime.textContent = `${formatDurationHoursMinutes(weeklyStats.totalTimeSeconds)}`;
+
+    renderDashboardSummary(
+        dashboardState.data.summary
+    );
+
+    renderTrendMetricButtons();
+    renderTrendChart();
+
+    renderSessionsByDate(
+        dashboardState.sessions
+    );
+
+    setupSessionsPaginationObserver();
+}
+
+function setupSessionsPaginationObserver() {
+    if (dashboardState.sessionObserver) {
+        dashboardState.sessionObserver.disconnect();
+    }
+
+    if (!dashboardState.nextCursor) {
+        dom.dashboard.sessionsLoadSentinel.style.display = 'none';
+        return;
+    }
+
+    dom.dashboard.sessionsLoadSentinel.style.display = 'block';
+
+    dashboardState.sessionObserver = new IntersectionObserver(
+        async (entries) => {
+            if (!entries[0].isIntersecting) return;
+
+            await loadMoreSessions();
+        },
+        {
+            root: null,
+            rootMargin: '300px'
+        }
+    );
+
+    dashboardState.sessionObserver.observe(
+        dom.dashboard.sessionsLoadSentinel
+    );
+}
+
+async function loadMoreSessions() {
+    if (
+        dashboardState.isLoadingMore
+        || !dashboardState.nextCursor
+    ) {
+        return;
+    }
+
+    dashboardState.isLoadingMore = true;
+    dom.dashboard.sessionsLoadSentinel.textContent =
+        'Loading sessions...';
+
+    try {
+        const result = await fetchSessionsPage(
+            dashboardState.period,
+            dashboardState.anchorDate,
+            dashboardState.nextCursor
+        );
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        dashboardState.sessions.push(...result.sessions);
+
+        Object.assign(
+            dashboardState.dailySummaries,
+            result.daily_summaries
+        );
+
+        dashboardState.nextCursor = result.next_cursor;
+
+        renderSessionsByDate(dashboardState.sessions);
+        setupSessionsPaginationObserver();
+
+    } catch (error) {
+        console.error('Session pagination error:', error);
+
+    } finally {
+        dashboardState.isLoadingMore = false;
+    }
 }
 
 function openSessionMenu(event) {
@@ -779,6 +1288,8 @@ async function initializeApp() {
     try {
         const result = await refreshAccessToken();
         setAuthenticatedUser(result);
+        initializeDashboardState();
+        initializeStreakState();
     } catch (error) {
         showLoadingScreenError();
         return;
@@ -795,6 +1306,7 @@ async function routeToInitialScreen() {
     const restoredSession = loadActiveSession(activeSessionState);
     if (!restoredSession) {
         navigateTo('plan', 'loading');
+        await loadStreak('plan');
         return;
     }
     alert('Returning to uncompleted session...');
@@ -884,11 +1396,59 @@ async function handleFinishWork() {
 
 async function loadDashboard() {
     showDashboardLoading();
+
     try {
-        const sessions = await getSessions();
-        renderDashboardData(sessions);
+        const [
+            dashboardResult,
+            sessionsResult
+        ] = await Promise.all([
+            fetchDashboardData(
+                dashboardState.period,
+                dashboardState.anchorDate
+            ),
+            fetchSessionsPage(
+                dashboardState.period,
+                dashboardState.anchorDate
+            )
+        ]);
+
+        if (!dashboardResult.success) {
+            throw new Error(dashboardResult.error);
+        }
+
+        if (!sessionsResult.success) {
+            throw new Error(sessionsResult.error);
+        }
+
+        dashboardState.data = dashboardResult;
+
+        dashboardState.sessions =
+            sessionsResult.sessions;
+        
+        dashboardState.dailySummaries =
+            sessionsResult.daily_summaries;
+
+        dashboardState.nextCursor =
+            sessionsResult.next_cursor;
+
+        if (
+            dashboardState.period !== 'all_time'
+            && dashboardResult.period.start_date
+        ) {
+            dashboardState.anchorDate =
+                dashboardResult.period.start_date;
+        }
+
+        renderDashboardData();
+
+        await loadStreak('dashboard');
+
     } catch (error) {
-        console.error('Dashboard loading error:', error);
+        console.error(
+            'Dashboard loading error:',
+            error
+        );
+
     } finally {
         hideDashboardLoading();
     }
@@ -927,6 +1487,7 @@ async function handleRegister(event) {
     } else if (result.success === true) {
         setAuthenticatedUser(result);
         navigateTo('plan', 'register');
+        await loadStreak('plan');
     }
 }
 
@@ -953,6 +1514,7 @@ async function handleLogin(event) {
     } else if (result.success === true) {
         setAuthenticatedUser(result);
         navigateTo('plan', 'login');
+        await loadStreak('plan');
     }
 }
 
@@ -988,10 +1550,9 @@ async function handleDeleteSession(event) {
     if (!confirm('Delete this session?')) return;
     try {
         await deleteSession(deleteButton.dataset.sessionId);
-        const sessions = await getSessions();
-        renderDashboardData(sessions);
+        await loadDashboard();
     } catch (error) {
-        alert('An unexpected network/server conection error occurred');
+        alert('An unexpected network/server connection error occurred');
     }
 }
 
@@ -1065,6 +1626,221 @@ function handleDashboardToPlan() {
     if (dom.dashboard.feedbackForm.style.display === 'flex') closeFeedbackForm();
 }
 
+async function handleDashboardPeriodChange(event) {
+    const button = event.target.closest(
+        '[data-dashboard-period]'
+    );
+
+    if (!button) return;
+
+    const newPeriod = button.dataset.dashboardPeriod;
+
+    if (
+        dashboardState.period === 'all_time'
+        || newPeriod === 'all_time'
+    ) {
+        dashboardState.anchorDate =
+            formatLocalDate(new Date());
+    }
+
+    dashboardState.period = newPeriod;
+
+    if (newPeriod !== 'all_time') {
+        dashboardState.anchorDate = normalizePeriodAnchor(
+            newPeriod,
+            dashboardState.anchorDate
+        );
+    }
+
+    await loadDashboard();
+}
+
+async function handleDashboardPeriodNavigation(direction) {
+    if (dashboardState.period === 'all_time') return;
+
+    dashboardState.anchorDate = shiftPeriodAnchor(
+        dashboardState.period,
+        dashboardState.anchorDate,
+        direction
+    );
+
+    await loadDashboard();
+}
+
+function handleDashboardMetricChange(event) {
+    const button = event.target.closest(
+        '[data-dashboard-metric]'
+    );
+
+    if (!button) return;
+
+    dashboardState.metric =
+        button.dataset.dashboardMetric;
+
+    renderTrendMetricButtons();
+    renderTrendChart();
+}
+
+function renderStreakPopup(screen, data) {
+    const popup = dom[screen].streakPopup;
+
+    popup.innerHTML = '';
+
+    const header = document.createElement('div');
+    const previousButton = document.createElement('button');
+    const title = document.createElement('p');
+    const nextButton = document.createElement('button');
+
+    previousButton.textContent = '<';
+    nextButton.textContent = '>';
+
+    const monthDate = parseLocalDate(
+        `${data.calendar.month}-01`
+    );
+
+    title.textContent = new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        year: 'numeric'
+    }).format(monthDate);
+
+    header.append(
+        previousButton,
+        title,
+        nextButton
+    );
+
+    popup.appendChild(header);
+
+    const calendar = document.createElement('div');
+    calendar.className = 'streak-calendar';
+
+    ['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach(
+        (weekday) => {
+            const label = document.createElement('span');
+            label.textContent = weekday;
+            calendar.appendChild(label);
+        }
+    );
+
+    const firstDay = parseLocalDate(
+        data.calendar.days[0].date
+    );
+
+    const emptyCellsBeforeFirstDay =
+        (firstDay.getDay() + 6) % 7;
+
+    for (
+        let index = 0;
+        index < emptyCellsBeforeFirstDay;
+        index++
+    ) {
+        calendar.appendChild(
+            document.createElement('span')
+        );
+    }
+
+    data.calendar.days.forEach((day) => {
+        const dayElement = document.createElement('span');
+
+        dayElement.className =
+            `streak-calendar-day streak-calendar-day-${day.state}`;
+
+        dayElement.textContent =
+            String(parseLocalDate(day.date).getDate());
+
+        dayElement.title = day.state;
+
+        calendar.appendChild(dayElement);
+    });
+
+    popup.appendChild(calendar);
+
+    const restDays = document.createElement('p');
+
+    restDays.textContent =
+        `${data.rest_days_remaining_this_week} rest days remaining this week`;
+
+    popup.appendChild(restDays);
+
+    previousButton.addEventListener('click', async () => {
+        streakState.anchorDate = shiftMonthAnchor(
+            streakState.anchorDate,
+            -1
+        );
+
+        await loadStreak(screen);
+    });
+
+    nextButton.addEventListener('click', async () => {
+        streakState.anchorDate = shiftMonthAnchor(
+            streakState.anchorDate,
+            1
+        );
+
+        await loadStreak(screen);
+    });
+}
+
+function renderStreak(data) {
+    for (const screen of ['plan', 'dashboard']) {
+        dom[screen].streakButton.textContent =
+            `🔥 ${data.current_streak}`;
+
+        renderStreakPopup(screen, data);
+    }
+}
+
+async function loadStreak(currentScreen) {
+    try {
+        const result = await fetchStreak(
+            streakState.anchorDate,
+            currentScreen
+        );
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        streakState.data = result;
+        renderStreak(result);
+
+    } catch (error) {
+        console.error('Streak loading error:', error);
+    }
+}
+
+function toggleStreakPopup(screen) {
+    const isOpen =
+        streakState.openScreen === screen;
+
+    dom.plan.streakPopup.style.display = 'none';
+    dom.dashboard.streakPopup.style.display = 'none';
+
+    if (isOpen) {
+        streakState.openScreen = null;
+        return;
+    }
+
+    dom[screen].streakPopup.style.display = 'block';
+    streakState.openScreen = screen;
+}
+
+function closeStreakPopupsOnOutsideClick(event) {
+    if (!streakState.openScreen) return;
+
+    const screen = streakState.openScreen;
+
+    if (
+        dom[screen].streakPopup.contains(event.target)
+        || dom[screen].streakButton.contains(event.target)
+    ) {
+        return;
+    }
+
+    dom[screen].streakPopup.style.display = 'none';
+    streakState.openScreen = null;
+}
+
 
 // ========== EVENT WIRING ==========
 
@@ -1105,6 +1881,18 @@ function registerEventListeners() {
     dom.focus.stopButton.addEventListener('click', handleStopWork);
     dom.review.continueButton.addEventListener('click', handleContinueWork);
     dom.review.finishButton.addEventListener('click', handleFinishWork);
+
+    dom.dashboard.periodButtons.forEach((button) => {
+        button.addEventListener('click', handleDashboardPeriodChange);
+    });
+    dom.dashboard.previousPeriodButton.addEventListener('click', () => handleDashboardPeriodNavigation(-1));
+    dom.dashboard.nextPeriodButton.addEventListener('click', () => handleDashboardPeriodNavigation(1));
+    dom.dashboard.metricButtons.forEach((button) => {
+        button.addEventListener('click', handleDashboardMetricChange);
+    });
+    dom.plan.streakButton.addEventListener('click', () => toggleStreakPopup('plan'));
+    dom.dashboard.streakButton.addEventListener('click', () => toggleStreakPopup('dashboard'));
+    document.addEventListener('click', closeStreakPopupsOnOutsideClick);
 
     dom.dashboard.newMissionButton.addEventListener('click', handleDashboardToPlan);
     dom.dashboard.emptyStartButton.addEventListener('click', handleDashboardToPlan);

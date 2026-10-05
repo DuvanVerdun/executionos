@@ -305,6 +305,151 @@ def create_app() -> Flask:
 
     from models import Session  # noqa: F401
 
+    from dashboard_service import (
+        get_dashboard_data,
+        get_paginated_sessions,
+        get_streak_data,
+        parse_anchor_date,
+        parse_cursor_datetime,
+        parse_period,
+        parse_timezone
+    )
+
+    @app.route("/api/streak", methods=["GET"])
+    @jwt_required()
+    def streak() -> tuple[Any, int]:
+        try:
+            user_id = int(get_jwt_identity())
+
+            anchor_date = parse_anchor_date(
+                request.args.get("anchor_date")
+            )
+            timezone = parse_timezone(
+                request.args.get("timezone")
+            )
+
+            streak_data = get_streak_data(
+                user_id=user_id,
+                anchor_date=anchor_date,
+                timezone=timezone,
+            )
+
+            return jsonify({  # type: ignore
+                "success": True,
+                **streak_data,
+            }), 200
+
+        except ValueError as e:
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": str(e),
+            }), 400
+
+        except Exception as e:
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": str(e),
+            }), 500
+
+    @app.route("/api/dashboard", methods=["GET"])
+    @jwt_required()
+    def dashboard() -> tuple[Any, int]:
+        try:
+            user_id = int(get_jwt_identity())
+
+            period = parse_period(request.args.get("period"))
+            anchor_date = parse_anchor_date(
+                request.args.get("anchor_date")
+            )
+            timezone = parse_timezone(
+                request.args.get("timezone")
+            )
+
+            dashboard_data = get_dashboard_data(
+                user_id=user_id,
+                period=period,
+                anchor_date=anchor_date,
+                timezone=timezone,
+            )
+
+            return jsonify({  # type: ignore
+                "success": True,
+                **dashboard_data,
+            }), 200
+
+        except ValueError as e:
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": str(e),
+            }), 400
+
+        except Exception as e:
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": str(e),
+            }), 500
+
+    @app.route("/api/get-sessions", methods=["GET"])
+    @jwt_required()
+    def get_sessions() -> tuple[Any, int]:
+        try:
+            user_id = int(get_jwt_identity())
+
+            period = parse_period(request.args.get("period"))
+            anchor_date = parse_anchor_date(
+                request.args.get("anchor_date")
+            )
+            timezone = parse_timezone(
+                request.args.get("timezone")
+            )
+
+            raw_cursor_date = request.args.get("cursor_date")
+            raw_cursor_id = request.args.get("cursor_id")
+
+            if (raw_cursor_date is None) != (raw_cursor_id is None):
+                return jsonify({  # type: ignore
+                    "success": False,
+                    "error": (
+                        "cursor_date and cursor_id must be "
+                        "provided together"
+                    ),
+                }), 400
+
+            cursor_date: datetime | None = None
+            cursor_id: int | None = None
+
+            if raw_cursor_date is not None:
+                cursor_date = parse_cursor_datetime(
+                    raw_cursor_date
+                )
+                cursor_id = int(raw_cursor_id)
+
+            result = get_paginated_sessions(
+                user_id=user_id,
+                period=period,
+                anchor_date=anchor_date,
+                timezone=timezone,
+                cursor_date=cursor_date,
+                cursor_id=cursor_id,
+            )
+
+            return jsonify({  # type: ignore
+                "success": True,
+                **result,
+            }), 200
+
+        except ValueError as e:
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": str(e),
+            }), 400
+
+        except Exception as e:
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": str(e),
+            }), 500
+
     @app.route("/api/save-session", methods=["POST"])
     @jwt_required()
     def save_session() -> tuple[Any, int]:
@@ -336,34 +481,6 @@ def create_app() -> Flask:
                 "success": False,
                 "error": str(e)
             }), 400
-
-    @app.route("/api/get-sessions", methods=["GET"])
-    @jwt_required()
-    def get_sessions() -> tuple[Any, int]:
-        """Retrieve all sessions for a given user."""
-        user_id = int(get_jwt_identity())
-        sessions = db.session.execute(select(Session).filter_by(user_id=user_id)).scalars().all()
-
-        sessions_list: list[dict[str, Any]] = [
-            {
-                "id": s.id,
-                "date": s.date.isoformat(),
-                "mission": s.mission,
-                "target_time_seconds": s.target_time_seconds,
-                "actual_time_seconds": s.actual_time_seconds,
-                "percentage_completed": round(
-                    s.actual_time_seconds / s.target_time_seconds * 100, 1
-                    ) if s.target_time_seconds else 0,
-                "completion_status": ("completed" if s.actual_time_seconds >= s.target_time_seconds else "partial")
-            }
-            for s in sessions
-        ]
-
-        return jsonify({  # type: ignore
-            "success": True,
-            "total_sessions": len(sessions_list),
-            "sessions": sessions_list
-        }), 200
 
     @app.route("/api/delete-session/<int:session_id>", methods=["DELETE"])
     @jwt_required()
