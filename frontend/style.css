@@ -341,8 +341,7 @@ button {
 .plan-container {
     display: flex;
     flex-direction: column;
-    width: 50%;
-    min-width: 600px;
+    width: 100%;
     height: 100%;
     justify-content: center;
 }
@@ -490,7 +489,7 @@ button {
 .plan-content {
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
+    justify-content: center;
     align-items: center;
     height: 100%;
 }
@@ -501,10 +500,11 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: clamp(64px, 4.17vw, 80px) 48px;
-    gap: clamp(64px, 4.17vw, 80px);
-    border-radius: 8px;
-    border: 3px solid var(--color-border);
+    box-sizing: border-box;
+    width: clamp(540px, 41.4vw, 596px);
+    padding: clamp(24px, 4vh, 48px) clamp(32px, 3.33vw, 48px);
+    gap: clamp(24px, 4vh, 48px);
+    border-radius: 24px;
 }
 
 .plan-mission-container,
@@ -513,33 +513,70 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: clamp(24px, 1.67vw, 32px);
+    gap: clamp(20px, 2.34vh, 24px);
+}
+
+.plan-mission-container,
+.plan-mission-input-container {
+    width: 100%;
 }
 
 .plan-mission-container h3,
 .plan-time-container h3 {
-    font-size: var(--header);
+    font-size: clamp(28px, 2.5vw, 36px);
+    line-height: 1.25;
     color: var(--color-text);
+}
+
+.plan-input-section .input {
+    width: 100%;
+    padding: 14px 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+}
+
+.plan-input-section .input:focus {
+    border-color: var(--color-text);
+}
+
+.plan-input-section .input-placeholder {
+    top: 15px;
+    left: 25px;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+}
+
+.plan-input-section .input:focus ~ .input-placeholder,
+.plan-input-section .input:not(:placeholder-shown) ~ .input-placeholder {
+    top: -15px;
+    left: 20px;
 }
 
 #plan-target-time-input {
     text-align: center;
-    width: clamp(108px, 7.08vw, 136px);
-    padding: clamp(12px, 0.83vw, 16px) clamp(21px, 1.4vw, 23px)
+    width: 128px;
 }
 
 #plan-target-time-input:focus ~ .input-placeholder,
 #plan-target-time-input:not(:placeholder-shown) ~ .input-placeholder {
-    left: clamp(14px, 0.94vw, 18px);
+    left: 14px;
 }
 
 
-.plan-button-section {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    width: clamp(450px, 28vw, 540px);
+#plan-start-work-btn {
+    width: 100%;
+    padding: 16px 24px;
+    border: none;
+    border-radius: 12px;
+    background-color: var(--color-cta);
+    color: var(--color-white);
+    font-family: inherit;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+    font-weight: bold;
+    cursor: pointer;
 }
 
 
