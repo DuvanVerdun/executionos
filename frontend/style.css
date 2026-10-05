@@ -423,63 +423,67 @@ button {
     flex-shrink: 0;
 }
 
-#plan-user-menu {
+#plan-user-menu,
+#dashboard-user-menu {
     display: none;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    width: 200px;
-    gap: 16px;
-    padding: 16px 24px;
-    border-radius: 8px;
-    border: solid 3px var(--color-border);
+    box-sizing: border-box;
+    width: 230px;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 24px;
+    border: 1px solid var(--color-border);
     background-color: var(--color-surface);
-    
     position: absolute;
-
     top: calc(100% + 16px);
     right: 0;
-    
     z-index: 20;
 }
 
-#plan-user-menu-information {
+#plan-user-menu-information,
+#dashboard-user-menu-information {
     display: flex;
-    flex-direction: row;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     width: 100%;
-    min-height: 44px;
+    min-height: 64px;
 }
 
-#plan-user-menu-username {
-    font-size: var(--button);
+#plan-user-menu-username,
+#dashboard-user-menu-username {
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
     color: var(--color-text);
+    text-align: center;
+    overflow-wrap: anywhere;
     user-select: none;
 }
 
-.plan-user-menu-divisor-line {
-    width: 100%;
-    border: 2px solid var(--color-border);
-}
-
-
-
-
-#plan-user-menu-logout-btn {
+#plan-user-menu-logout-btn,
+#dashboard-user-menu-logout-btn,
+#plan-user-menu-feedback-btn,
+#dashboard-user-menu-feedback-btn {
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100%;
-    font-size: var(--header);
-    background-color: var(--color-surface);
-    color: var(--color-text);
+    padding: 16px 8px;
     border: none;
-    font-weight: bold;
-    border-radius: 8px;
+    border-radius: 12px;
+    background-color: var(--color-page);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+    font-weight: normal;
+    cursor: pointer;
 }
 
-#plan-user-menu-logout-btn:hover {
+#plan-user-menu-logout-btn:hover,
+#dashboard-user-menu-logout-btn:hover,
+#plan-user-menu-feedback-btn:hover,
+#dashboard-user-menu-feedback-btn:hover {
     filter: brightness(1.1);
 }
 
@@ -789,6 +793,7 @@ button {
 }
 
 .dashboard-container {
+    padding-bottom: 32px;
     display: flex;
     flex-direction: column;
     width: 50%;
@@ -826,65 +831,6 @@ button {
         backdrop-filter: blur(16px);
     }
 }
-
-#dashboard-user-menu {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 200px;
-    gap: 24px;
-    padding: 16px 24px;
-    border-radius: 8px;
-    border: solid 3px var(--color-border);
-    background-color: var(--color-surface);
-    
-    position: absolute;
-    
-    top: calc(100% + 16px);
-    right: 0;
-    
-    z-index: 20;
-}
-
-#dashboard-user-menu-information {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    min-height: 44px;
-}
-
-#dashboard-user-menu-username {
-    font-size: var(--button);
-    color: var(--color-text);
-    user-select: none;
-}
-
-.dashboard-user-menu-divisor-line {
-    width: 100%;
-    border: 2px solid var(--color-border);
-}
-
-#dashboard-user-menu-logout-btn {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    font-size: var(--header);
-    background-color: var(--color-surface);
-    color: var(--color-text);
-    border: none;
-    font-weight: bold;
-    border-radius: 8px;
-}
-
-#dashboard-user-menu-logout-btn:hover {
-    filter: brightness(1.1);
-}
-
-
 
 .dashboard-content {
     display: flex;
@@ -1100,54 +1046,9 @@ button {
 
 
 
-/* dashboard footer */
-
-.dashboard-footer {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: row;
-    width: 100%;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: center;
-    padding: clamp(20px, 1.3vw, 28px);
-    background-color: var(--color-surface);
-    border-top: 3px solid var(--color-border);
-}
-
-.dashboard-footer-feedback-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: start;
-    align-items: center;
-    gap: 4px;
-    width: 300px;
-}
-
-.dashboard-footer-feedback-container p {
-    color: var(--color-text);
-    font-size: var(--body);
-    text-align: center;
-}
-
-#dashboard-open-feedback-form-btn {
-    color: var(--color-text);
-    background-color: var(--color-surface);
-    border: none;
-    border-radius: 4px;
-    width: fit-content;
-    height: fit-content;
-    padding: 0 4px;
-    
-    transition: .1s ease-in;
-}
-
-#dashboard-open-feedback-form-btn:hover {
-    filter: brightness(1.1);
-}
-
-
 #dashboard-feedback-form {
+    font-family: 'Outfit', sans-serif;
+    z-index: 100;
     background: var(--color-surface);
     padding: 16px;
     display: none;

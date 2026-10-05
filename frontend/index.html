@@ -172,7 +172,7 @@
                     <div id="plan-user-menu-information">
                         <p id="plan-user-menu-username"></p>
                     </div>
-                    <span class="plan-user-menu-divisor-line"></span>
+                    <button type="button" id="plan-user-menu-feedback-btn" data-feedback-screen="plan">Send Feedback</button>
                     <button id="plan-user-menu-logout-btn">Logout</button>
                 </div>
             </header>
@@ -302,7 +302,7 @@
                     <div id="dashboard-user-menu-information">
                         <p id="dashboard-user-menu-username"></p>
                     </div>
-                    <span class="dashboard-user-menu-divisor-line"></span>
+                    <button type="button" id="dashboard-user-menu-feedback-btn" data-feedback-screen="dashboard">Send Feedback</button>
                     <button id="dashboard-user-menu-logout-btn">Logout</button>
                 </div>
             </header>
@@ -457,43 +457,35 @@
 
             </section>
 
-            <footer class="dashboard-footer">
-                <h1 class="wordmark">ExecutionOS</h1>
-                <div class="dashboard-footer-feedback-container">
-                    <button type="button" id="dashboard-open-feedback-form-btn">Send Feedback</button>
-                    <p>The app is currently in an early stage, help us improve it sending your problems and ideas.</p>
-                </div>
-            </footer>
-
-            <form id="dashboard-feedback-form">
-                
-                <div class="dashboard-feedback-form-header">
-                    <h2>Send Feedback</h2>
-                    <button type="button" id="dashboard-close-feedback-form-btn" aria-label="Close feedback form">
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="24"
-                            height="24"
-                            aria-hidden="true"
-                            >
-                            <path
-                                d="M18 6 6 18M6 6l12 12"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.5"
-                                stroke-linecap="round"
-                            />
-                        </svg>
-                    </button>
-                </div>
-                
-                <textarea name="send-feedback-input" class="input" id="dashboard-feedback-input" maxlength="2000" aria-label="Your feedback"></textarea>
-                <button type="submit" class="white-filled-button" id="dashboard-send-feedback-btn">Send Feedback</button>
-            </form>
-
         </div>
     
     </div>
+
+    <form id="dashboard-feedback-form">
+
+        <div class="dashboard-feedback-form-header">
+            <h2>Send Feedback</h2>
+            <button type="button" id="dashboard-close-feedback-form-btn" aria-label="Close feedback form">
+                <svg
+                    viewBox="0 0 24 24"
+                    width="24"
+                    height="24"
+                    aria-hidden="true"
+                    >
+                    <path
+                        d="M18 6 6 18M6 6l12 12"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                    />
+                </svg>
+            </button>
+        </div>
+
+        <textarea name="send-feedback-input" class="input" id="dashboard-feedback-input" maxlength="2000" aria-label="Your feedback"></textarea>
+        <button type="submit" class="white-filled-button" id="dashboard-send-feedback-btn">Send Feedback</button>
+    </form>
 
 </body>
 <script src="app.js"></script>

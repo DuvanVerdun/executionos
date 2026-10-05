@@ -71,6 +71,10 @@ const dashboardState = {
     sessionObserver: null
 };
 
+const feedbackState = {
+    currentScreen: null
+};
+
 const streakState = {
     anchorDate: '',
     data: null,
@@ -171,7 +175,6 @@ const dom = {
         sessionsList: document.getElementById('dashboard-sessions-list-container'),
         emptyCTA: document.getElementById('empty-dashboard-cta-container'),
         emptyStartButton: document.getElementById('empty-dashboard-start-mission-btn'),
-        openFeedbackButton: document.getElementById('dashboard-open-feedback-form-btn'),
         feedbackForm: document.getElementById('dashboard-feedback-form'),
         closeFeedbackButton: document.getElementById('dashboard-close-feedback-form-btn'),
         feedbackInput: document.getElementById('dashboard-feedback-input'),
@@ -491,8 +494,8 @@ function deleteSession(sessionId) {
     return apiFetch({ path: `delete-session/${sessionId}`, method: 'DELETE', currentScreen: 'dashboard' });
 }
 
-function postFeedback(feedbackMessage) {
-    return apiFetch({ path: 'feedback', method: 'POST', body: { message: feedbackMessage }, currentScreen: 'dashboard' });
+function postFeedback(feedbackMessage, currentScreen) {
+    return apiFetch({ path: 'feedback', method: 'POST', body: { message: feedbackMessage }, currentScreen });
 }
 
 
@@ -726,6 +729,7 @@ const ALLOWED_SCREEN_TRANSITIONS = {
 
 function navigateTo(nextScreen, currentScreen) {
     if (!ALLOWED_SCREEN_TRANSITIONS[nextScreen]?.includes(currentScreen)) return;
+    closeFeedbackForm();
     if ((currentScreen === 'plan' || currentScreen === 'dashboard') && isUserMenuOpened) {
         toggleUserMenu(currentScreen);
     }
@@ -1265,18 +1269,21 @@ function closeSessionMenu(event) {
     menu.style.display = 'none';
 }
 
-function openFeedbackForm() {
+function openFeedbackForm(currentScreen) {
+    feedbackState.currentScreen = currentScreen;
+    if (isUserMenuOpened) toggleUserMenu(currentScreen);
     dom.dashboard.feedbackForm.style.display = 'flex';
 }
 
 function closeFeedbackForm() {
+    feedbackState.currentScreen = null;
     dom.dashboard.feedbackForm.style.display = 'none';
 }
 
 function closeFeedbackFormOnOutsideClick(event) {
     if (dom.dashboard.feedbackForm.style.display !== 'flex') return;
     const clickedInsideForm = dom.dashboard.feedbackForm.contains(event.target);
-    const clickedOpenButton = dom.dashboard.openFeedbackButton.contains(event.target);
+    const clickedOpenButton = event.target.closest('[data-feedback-screen]');
     if (clickedInsideForm || clickedOpenButton) return;
     closeFeedbackForm();
 }
@@ -1587,7 +1594,7 @@ async function handleSubmitFeedback(event) {
 
     let result;
     try {
-        result = await postFeedback(feedbackInput.value);
+        result = await postFeedback(feedbackInput.value, feedbackState.currentScreen);
     } catch (error) {
         alert('Network/Server connection failed. Please try again');
         return;
@@ -1900,7 +1907,11 @@ function registerEventListeners() {
     dom.dashboard.sessionsList.addEventListener('click', closeSessionMenu);
     dom.dashboard.sessionsList.addEventListener('click', handleDeleteSession);
 
-    dom.dashboard.openFeedbackButton.addEventListener('click', openFeedbackForm);
+    document.querySelectorAll('[data-feedback-screen]').forEach((button) => {
+        button.addEventListener('click', () => {
+            openFeedbackForm(button.dataset.feedbackScreen);
+        });
+    });
     dom.dashboard.closeFeedbackButton.addEventListener('click', closeFeedbackForm);
     dom.dashboard.feedbackForm.addEventListener('submit', handleSubmitFeedback);
     dom.dashboard.feedbackInput.addEventListener('input', handleFeedbackInput);
