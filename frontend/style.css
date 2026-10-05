@@ -377,6 +377,20 @@ button {
     font-size: clamp(32px, 2.5vw, 36px);
 }
 
+#plan-dashboard-btn {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: clamp(20px, 1.67vw, 24px);
+    cursor: pointer;
+}
+
+#plan-dashboard-btn:hover {
+    filter: brightness(1.1);
+}
+
 .plan-header .streak-container {
     position: relative;
 }
@@ -523,7 +537,7 @@ button {
 .plan-button-section {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     width: clamp(450px, 28vw, 540px);
 }
