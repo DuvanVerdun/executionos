@@ -622,17 +622,17 @@ function renderProgressRing(ring, percentage, beforeTargetColor, afterTargetColo
     if (percentage < 100) {
         ring.style.setProperty('--pct', `${percentage}%`);
         ring.style.background =
-            `conic-gradient(${beforeTargetColor} 0%, ${beforeTargetColor} var(--pct), var(--border) var(--pct), var(--border) 100%)`;
+            `conic-gradient(${beforeTargetColor} 0%, ${beforeTargetColor} var(--pct), var(--color-border) var(--pct), var(--color-border) 100%)`;
     } else {
         ring.style.setProperty('--pct', `${percentage - 100}%`);
         ring.style.background =
-            `conic-gradient(var(--white) 0%, var(--white) var(--pct), ${afterTargetColor} var(--pct), ${afterTargetColor} 100%)`;
+            `conic-gradient(var(--color-white) 0%, var(--color-white) var(--pct), ${afterTargetColor} var(--pct), ${afterTargetColor} 100%)`;
     }
 }
 
 function renderFocusTimer(session, exactPercentage) {
     dom.focus.currentTime.textContent = formatDuration(session.actualTimeSeconds);
-    renderProgressRing(dom.focus.timerRing, exactPercentage, 'var(--white)', 'var(--reward)');
+    renderProgressRing(dom.focus.timerRing, exactPercentage, 'var(--color-white)', 'var(--color-reward)');
 }
 
 function renderFocusSession(session) {
@@ -648,7 +648,7 @@ function renderReviewSession(session) {
     dom.review.status.textContent =
         session.completionStatus.charAt(0).toUpperCase() + session.completionStatus.slice(1);
     dom.review.actualTime.textContent = formatDurationHoursMinutesSeconds(session.actualTimeSeconds);
-    renderProgressRing(dom.review.progressRing, session.percentageCompleted, 'var(--cta)', 'var(--reward)');
+    renderProgressRing(dom.review.progressRing, session.percentageCompleted, 'var(--color-cta)', 'var(--color-reward)');
     if (session.percentageCompleted >= 100) {
         dom.review.continueButton.classList.replace('cta-button', 'normal-button');
     }
