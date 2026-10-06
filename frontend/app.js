@@ -1001,9 +1001,53 @@ function renderTrendMetricButtons() {
     });
 }
 
+function getTrendAxisTicks(maxValue, metric) {
+    // Time ticks use whole minutes; counts and percentages use whole numbers.
+    const unit = metric === 'time' ? 60 : 1;
+    const step = Math.max(unit, Math.floor(maxValue / 4 / unit) * unit);
+    const ticks = [0];
+    for (let value = step; value < maxValue; value += step) {
+        // Avoid crowding the final label when the exact maximum is nearby.
+        if (maxValue - value >= step / 2) ticks.push(value);
+    }
+    ticks.push(maxValue);
+    return ticks;
+}
+
+function createTrendCurvePath(points) {
+    if (points.length < 2) return '';
+    const slopes = points.slice(1).map((point, index) =>
+        (point.y - points[index].y) / (point.x - points[index].x)
+    );
+    const tangents = points.map((point, index) => {
+        if (index === 0) return slopes[0];
+        if (index === points.length - 1) return slopes[index - 1];
+        const before = slopes[index - 1];
+        const after = slopes[index];
+        // Flat tangents at peaks/valleys prevent invented overshooting values.
+        if (before * after <= 0) return 0;
+        return 2 * before * after / (before + after);
+    });
+    let path = `M ${points[0].x},${points[0].y}`;
+    points.slice(1).forEach((point, index) => {
+        const previous = points[index];
+        const thirdWidth = (point.x - previous.x) / 3;
+        path += ` C ${previous.x + thirdWidth},${previous.y + tangents[index] * thirdWidth}`
+            + ` ${point.x - thirdWidth},${point.y - tangents[index + 1] * thirdWidth}`
+            + ` ${point.x},${point.y}`;
+    });
+    return path;
+}
+
 function renderTrendChart() {
     const svg = dom.dashboard.trendChart;
-    const trend = dashboardState.data?.trend ?? [];
+    const today = formatLocalDate(new Date());
+    const currentMonth = `${today.slice(0, 7)}-01`;
+    const allBuckets = dashboardState.data?.trend ?? [];
+    // Week/Month retain their complete calendar axis; Year ends at this month.
+    const trend = dashboardState.period === 'year'
+        ? allBuckets.filter((bucket) => bucket.bucket_start <= currentMonth)
+        : allBuckets;
 
     svg.innerHTML = '';
     svg.setAttribute('viewBox', '0 0 700 260');
@@ -1013,7 +1057,7 @@ function renderTrendChart() {
     const width = 700;
     const height = 260;
 
-    const left = 55;
+    const left = 85;
     const right = 20;
     const top = 25;
     const bottom = 45;
@@ -1021,11 +1065,15 @@ function renderTrendChart() {
     const chartWidth = width - left - right;
     const chartHeight = height - top - bottom;
 
-    const values = trend.map((bucket) =>
+    const plottedBuckets = trend.filter((bucket) => bucket.bucket_start <= today);
+    const values = plottedBuckets.map((bucket) =>
         getTrendMetricValue(bucket, dashboardState.metric)
     );
 
-    const maxValue = Math.max(...values, 1);
+    const minimumMax = dashboardState.metric === 'time'
+        ? 3600
+        : dashboardState.metric === 'completion' ? 100 : 1;
+    const maxValue = Math.max(...values, minimumMax);
 
     const createSvgElement = (tag) =>
         document.createElementNS(
@@ -1033,23 +1081,35 @@ function renderTrendChart() {
             tag
         );
 
-    const baseline = createSvgElement('line');
+    getTrendAxisTicks(maxValue, dashboardState.metric).forEach((value) => {
+        const y = top + chartHeight - (value / maxValue) * chartHeight;
+        const gridline = createSvgElement('line');
+        gridline.setAttribute('x1', left);
+        gridline.setAttribute('x2', left + chartWidth);
+        gridline.setAttribute('y1', y);
+        gridline.setAttribute('y2', y);
+        gridline.setAttribute('class', 'dashboard-trend-gridline');
+        svg.appendChild(gridline);
 
-    baseline.setAttribute('x1', left);
-    baseline.setAttribute('y1', top + chartHeight);
-    baseline.setAttribute('x2', left + chartWidth);
-    baseline.setAttribute('y2', top + chartHeight);
-    baseline.setAttribute('stroke', 'currentColor');
-    baseline.setAttribute('opacity', '0.35');
+        const label = createSvgElement('text');
+        label.setAttribute('x', left - 12);
+        label.setAttribute('y', y);
+        label.setAttribute('text-anchor', 'end');
+        label.setAttribute('dominant-baseline', 'middle');
+        label.setAttribute('class', 'dashboard-trend-axis-label');
+        label.textContent = formatTrendMetricValue(value, dashboardState.metric);
+        const title = createSvgElement('title');
+        title.textContent = label.textContent;
+        label.appendChild(title);
+        svg.appendChild(label);
+    });
 
-    svg.appendChild(baseline);
-
-    const points = trend.map((bucket, index) => {
+    const axisPoints = trend.map((bucket, index) => {
         const x = trend.length === 1
             ? left + chartWidth / 2
             : left + (index / (trend.length - 1)) * chartWidth;
 
-        const value = values[index];
+        const value = getTrendMetricValue(bucket, dashboardState.metric);
 
         const y =
             top
@@ -1064,31 +1124,58 @@ function renderTrendChart() {
         };
     });
 
-    const polyline = createSvgElement('polyline');
+    const points = axisPoints.filter((point) => point.bucket.bucket_start <= today);
+    const labelInterval = Math.max(1, Math.ceil(axisPoints.length / 8));
+    axisPoints.forEach((point, index) => {
+        if (index % labelInterval !== 0 && index !== axisPoints.length - 1) return;
+        const gridline = createSvgElement('line');
+        gridline.setAttribute('x1', point.x);
+        gridline.setAttribute('x2', point.x);
+        gridline.setAttribute('y1', top);
+        gridline.setAttribute('y2', top + chartHeight);
+        gridline.setAttribute('class', 'dashboard-trend-gridline');
+        svg.appendChild(gridline);
+    });
 
-    polyline.setAttribute(
-        'points',
-        points.map(({ x, y }) => `${x},${y}`).join(' ')
-    );
+    const curvePath = createTrendCurvePath(points);
+    if (curvePath) {
+        const defs = createSvgElement('defs');
+        const gradient = createSvgElement('linearGradient');
+        gradient.setAttribute('id', 'dashboard-trend-fill');
+        gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+        gradient.setAttribute('x1', '0');
+        gradient.setAttribute('x2', '0');
+        gradient.setAttribute('y1', top);
+        gradient.setAttribute('y2', top + chartHeight);
+        [0, 1].forEach((offset) => {
+            const stop = createSvgElement('stop');
+            stop.setAttribute('offset', offset);
+            stop.setAttribute('stop-color', 'var(--color-reward)');
+            stop.setAttribute('stop-opacity', offset === 0 ? '0.2' : '0');
+            gradient.appendChild(stop);
+        });
+        defs.appendChild(gradient);
+        svg.appendChild(defs);
 
-    polyline.setAttribute('fill', 'none');
-    polyline.setAttribute('stroke', 'currentColor');
-    polyline.setAttribute('stroke-width', '3');
+        const area = createSvgElement('path');
+        area.setAttribute('d', `${curvePath} L ${points[points.length - 1].x},${top + chartHeight}`
+            + ` L ${points[0].x},${top + chartHeight} Z`);
+        area.setAttribute('fill', 'url(#dashboard-trend-fill)');
+        svg.appendChild(area);
 
-    svg.appendChild(polyline);
+        const line = createSvgElement('path');
+        line.setAttribute('d', curvePath);
+        line.setAttribute('class', 'dashboard-trend-line');
+        svg.appendChild(line);
+    }
 
-    const labelInterval = Math.max(
-        1,
-        Math.ceil(points.length / 8)
-    );
-
-    points.forEach((point, index) => {
+    points.forEach((point) => {
         const circle = createSvgElement('circle');
 
         circle.setAttribute('cx', point.x);
         circle.setAttribute('cy', point.y);
         circle.setAttribute('r', '4');
-        circle.setAttribute('fill', 'currentColor');
+        circle.setAttribute('class', 'dashboard-trend-point');
 
         const title = createSvgElement('title');
 
@@ -1104,9 +1191,12 @@ function renderTrendChart() {
         circle.appendChild(title);
         svg.appendChild(circle);
 
+    });
+
+    axisPoints.forEach((point, index) => {
         const shouldRenderLabel =
             index % labelInterval === 0
-            || index === points.length - 1;
+            || index === axisPoints.length - 1;
 
         if (!shouldRenderLabel) return;
 
@@ -1115,8 +1205,7 @@ function renderTrendChart() {
         label.setAttribute('x', point.x);
         label.setAttribute('y', height - 15);
         label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('fill', 'currentColor');
-        label.setAttribute('font-size', '12');
+        label.setAttribute('class', 'dashboard-trend-axis-label');
 
         label.textContent = formatTrendBucketLabel(
             point.bucket.bucket_start,

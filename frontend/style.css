@@ -1294,3 +1294,74 @@ button {
     opacity: 0.4;
     cursor: default;
 }
+
+/* Chart axes remain neutral; gridlines sit behind the plotted values. */
+.dashboard-trend-gridline {
+    stroke: var(--color-border);
+    stroke-width: 1;
+    opacity: 0.35;
+}
+
+.dashboard-trend-axis-label {
+    fill: var(--color-text);
+    font-size: 12px;
+}
+
+.dashboard-trend-section {
+    box-sizing: border-box;
+    width: 100%;
+    margin-block: clamp(32px, 3.33vw, 48px);
+    padding: 24px;
+    border-radius: 24px;
+    background-color: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.dashboard-metric-toggle {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background-color: var(--color-surface-selected);
+    border-radius: 12px;
+}
+
+.dashboard-metric-toggle button {
+    min-width: 0;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background-color: transparent;
+    font-family: inherit;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+    cursor: pointer;
+}
+
+.dashboard-metric-toggle button.active {
+    color: var(--color-reward);
+    border-color: var(--color-border);
+}
+
+.dashboard-metric-toggle button:hover {
+    filter: brightness(1.1);
+}
+
+#dashboard-trend-chart {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 700 / 260;
+}
+
+.dashboard-trend-line {
+    fill: none;
+    stroke: var(--color-reward);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.dashboard-trend-point {
+    fill: var(--color-reward);
+}
