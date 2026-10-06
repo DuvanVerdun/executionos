@@ -1708,6 +1708,11 @@ function renderStreakPopup(screen, data) {
     const title = document.createElement('p');
     const nextButton = document.createElement('button');
 
+    header.className = 'streak-calendar-header';
+    previousButton.type = 'button';
+    nextButton.type = 'button';
+    previousButton.setAttribute('aria-label', 'Previous month');
+    nextButton.setAttribute('aria-label', 'Next month');
     previousButton.textContent = '<';
     nextButton.textContent = '>';
 
@@ -1731,7 +1736,7 @@ function renderStreakPopup(screen, data) {
     const calendar = document.createElement('div');
     calendar.className = 'streak-calendar';
 
-    ['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach(
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(
         (weekday) => {
             const label = document.createElement('span');
             label.textContent = weekday;
@@ -1758,24 +1763,43 @@ function renderStreakPopup(screen, data) {
 
     data.calendar.days.forEach((day) => {
         const dayElement = document.createElement('span');
+        const visualState = day.state === 'work' || day.state === 'rest'
+            ? day.state
+            : 'neutral';
 
         dayElement.className =
-            `streak-calendar-day streak-calendar-day-${day.state}`;
+            `streak-calendar-day streak-calendar-day-${visualState}`;
 
         dayElement.textContent =
             String(parseLocalDate(day.date).getDate());
 
-        dayElement.title = day.state;
+        dayElement.title = visualState;
 
         calendar.appendChild(dayElement);
     });
 
     popup.appendChild(calendar);
 
+    const legend = document.createElement('div');
+    legend.className = 'streak-calendar-legend';
+    for (const [state, label] of [['work', 'Work'], ['rest', 'Rest']]) {
+        const item = document.createElement('div');
+        const marker = document.createElement('span');
+        const text = document.createElement('span');
+        marker.className = `streak-calendar-legend-marker streak-calendar-day-${state}`;
+        marker.setAttribute('aria-hidden', 'true');
+        text.textContent = label;
+        item.append(marker, text);
+        legend.appendChild(item);
+    }
+    popup.appendChild(legend);
+
     const restDays = document.createElement('p');
+    restDays.className = 'streak-calendar-rest-days';
+    const remaining = data.rest_days_remaining_this_week;
 
     restDays.textContent =
-        `${data.rest_days_remaining_this_week} rest days remaining this week`;
+        `${remaining} rest ${remaining === 1 ? 'day' : 'days'} remaining this week.`;
 
     popup.appendChild(restDays);
 
