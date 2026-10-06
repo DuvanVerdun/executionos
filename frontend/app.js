@@ -574,8 +574,7 @@ function formatSessionDateLabel(session) {
     return new Intl.DateTimeFormat('en-US', {
         weekday: 'long',
         month: 'long',
-        day: 'numeric',
-        year: 'numeric'
+        day: 'numeric'
     }).format(getSessionLocalDate(session));
 }
 
@@ -765,100 +764,70 @@ function hideDashboardLoading() {
 function createSessionListTitle() {
     const title = document.createElement('h2');
     title.className = 'dashboard-content-title';
-    title.textContent = 'Sessions';
+    title.textContent = 'Session History';
     return title;
 }
 
 function createSessionMissionSection(session) {
     const container = document.createElement('div');
-    const missionIcon = document.createElement('span');
     const mission = document.createElement('p');
     const openMenuIcon = document.createElement('span');
     const menu = document.createElement('div');
-    const closeMenuIcon = document.createElement('span');
     const deleteButton = document.createElement('button');
 
     container.className = 'dashboard-session-mission-container';
-    missionIcon.className = 'material-symbols-outlined dashboard-session-mission-icon';
     mission.className = 'dashboard-session-mission';
     openMenuIcon.className = 'material-symbols-outlined dashboard-session-open-menu-icon dashboard-session-toggle-menu-icon';
     menu.className = 'dashboard-session-menu';
-    closeMenuIcon.className = 'material-symbols-outlined dashboard-session-close-menu-icon dashboard-session-toggle-menu-icon';
     deleteButton.className = 'dashboard-delete-session-btn';
 
-    missionIcon.textContent = 'assignment';
     mission.textContent = session.mission;
     openMenuIcon.textContent = 'more_vert';
-    closeMenuIcon.textContent = 'more_vert';
     deleteButton.textContent = 'Delete Session';
     deleteButton.dataset.sessionId = session.id;
 
-    container.append(missionIcon, mission, openMenuIcon, menu);
-    menu.append(deleteButton, closeMenuIcon);
+    container.append(mission, openMenuIcon, menu);
+    menu.append(deleteButton);
     return container;
 }
 
 function createSessionTimeSection(session) {
     const container = document.createElement('div');
-    const timeIcon = document.createElement('span');
     const targetTime = document.createElement('p');
-    const arrowIcon = document.createElement('span');
     const actualTime = document.createElement('p');
     const percentage = document.createElement('p');
-    const checkIcon = document.createElement('span');
 
     container.className = 'dashboard-session-time-and-percentage-container';
-    timeIcon.className = 'material-symbols-outlined dashboard-session-time-icon';
     targetTime.className = 'dashboard-session-target-time';
-    arrowIcon.className = 'material-symbols-outlined dashboard-session-arrow-icon';
     actualTime.className = 'dashboard-session-actual-time';
     percentage.className = 'dashboard-session-percentage';
-    checkIcon.className = 'material-symbols-outlined dashboard-session-check-icon';
 
-    timeIcon.textContent = 'timer';
-    targetTime.textContent = formatDurationHoursMinutes(session.target_time_seconds);
-    arrowIcon.textContent = 'arrow_right_alt';
-    actualTime.textContent = formatDurationHoursMinutes(session.actual_time_seconds);
-    percentage.textContent = `${session.percentage_completed}%`;
-    checkIcon.textContent = 'check';
+    targetTime.textContent = `${formatDurationHoursMinutes(session.target_time_seconds)} target`;
+    actualTime.textContent = `${formatDurationHoursMinutes(session.actual_time_seconds)} focused`;
+    percentage.textContent = `${session.percentage_completed}% completion`;
 
-    container.append(timeIcon, targetTime, arrowIcon, actualTime, percentage, checkIcon);
+    container.append(targetTime, actualTime, percentage);
     return container;
 }
 
 function createDailySummarySection(summary) {
     const container = document.createElement('div');
-
-    const sessions = document.createElement('p');
+    const title = document.createElement('p');
+    const metrics = document.createElement('div');
     const totalTime = document.createElement('p');
+    const sessions = document.createElement('p');
     const completion = document.createElement('p');
-    const averageSession = document.createElement('p');
 
     container.className = 'dashboard-daily-summary';
+    title.className = 'dashboard-daily-summary-title';
+    metrics.className = 'dashboard-daily-summary-metrics';
+    title.textContent = 'Daily Summary';
+    totalTime.textContent = `${formatDurationHoursMinutes(summary.total_time_seconds)} focused`;
+    sessions.textContent = `${summary.total_sessions} sessions`;
+    completion.textContent = `${summary.average_completion_percentage}% avg. completion`;
 
-    sessions.textContent =
-        `${summary.total_sessions} sessions`;
-
-    totalTime.textContent =
-        `${formatDurationHoursMinutes(
-            summary.total_time_seconds
-        )} focused`;
-
-    completion.textContent =
-        `${summary.average_completion_percentage}% avg completion`;
-
-    averageSession.textContent =
-        `${formatDurationHoursMinutes(
-            summary.average_session_time_seconds
-        )} avg session`;
-
-    container.append(
-        sessions,
-        totalTime,
-        completion,
-        averageSession
-    );
-
+    metrics.append(totalTime, sessions, completion);
+    container.append(title, metrics);
     return container;
 }
 
@@ -909,7 +878,7 @@ function createSessionDateCard(
     }
 
     sessions.forEach((session, index) => {
-        if (index > 0) {
+        if (index > 0 || (dailySummary && dailySummary.total_sessions > 1)) {
             const divider =
                 document.createElement('span');
 
@@ -1262,21 +1231,22 @@ async function loadMoreSessions() {
     }
 }
 
-function openSessionMenu(event) {
-    const openIcon = event.target.closest('.dashboard-session-open-menu-icon');
-    if (!openIcon) return;
-    const menu = openIcon.parentElement.querySelector('.dashboard-session-menu');
-    openIcon.style.pointerEvents = 'none';
-    menu.style.display = 'flex';
+function toggleSessionMenu(event) {
+    const toggleIcon = event.target.closest('.dashboard-session-open-menu-icon');
+    if (!toggleIcon) return;
+    const menu = toggleIcon.parentElement.querySelector('.dashboard-session-menu');
+    const wasOpen = menu.style.display === 'flex';
+    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach((otherMenu) => {
+        otherMenu.style.display = 'none';
+    });
+    menu.style.display = wasOpen ? 'none' : 'flex';
 }
 
-function closeSessionMenu(event) {
-    const closeIcon = event.target.closest('.dashboard-session-close-menu-icon');
-    if (!closeIcon) return;
-    const menu = closeIcon.parentElement;
-    const openIcon = menu.parentElement.querySelector('.dashboard-session-open-menu-icon');
-    openIcon.style.pointerEvents = 'auto';
-    menu.style.display = 'none';
+function closeSessionMenusOnOutsideClick(event) {
+    if (event.target.closest('.dashboard-session-menu, .dashboard-session-open-menu-icon')) return;
+    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach((menu) => {
+        menu.style.display = 'none';
+    });
 }
 
 function openFeedbackForm(currentScreen) {
@@ -1937,8 +1907,8 @@ function registerEventListeners() {
 
     dom.dashboard.newMissionButton.addEventListener('click', handleDashboardToPlan);
     dom.dashboard.emptyStartButton.addEventListener('click', handleDashboardToPlan);
-    dom.dashboard.sessionsList.addEventListener('click', openSessionMenu);
-    dom.dashboard.sessionsList.addEventListener('click', closeSessionMenu);
+    dom.dashboard.sessionsList.addEventListener('click', toggleSessionMenu);
+    document.addEventListener('click', closeSessionMenusOnOutsideClick);
     dom.dashboard.sessionsList.addEventListener('click', handleDeleteSession);
 
     document.querySelectorAll('[data-feedback-screen]').forEach((button) => {
