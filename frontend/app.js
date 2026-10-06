@@ -160,6 +160,7 @@ const dom = {
         dataContainer: document.getElementById('dashboard-data-container'),
         
         periodButtons: document.querySelectorAll('[data-dashboard-period]'),
+        periodNavigation: document.querySelector('.dashboard-period-navigation'),
         previousPeriodButton: document.getElementById('dashboard-previous-period-btn'),
         nextPeriodButton: document.getElementById('dashboard-next-period-btn'),
         periodLabel: document.getElementById('dashboard-period-label'),
@@ -583,8 +584,7 @@ function formatPeriodDate(dateString) {
 
     return new Intl.DateTimeFormat('en-US', {
         month: 'short',
-        day: 'numeric',
-        year: 'numeric'
+        day: 'numeric'
     }).format(parseLocalDate(dateString));
 }
 
@@ -953,18 +953,18 @@ function renderSessionsByDate(sessions) {
 }
 
 function renderDashboardSummary(summary) {
-    dom.dashboard.sessionCount.textContent = `${summary.total_sessions} sessions`;
-    dom.dashboard.totalTime.textContent = `${formatDurationHoursMinutes(summary.total_time_seconds)} focused`;
+    dom.dashboard.sessionCount.textContent = String(summary.total_sessions);
+    dom.dashboard.totalTime.textContent = formatDurationHoursMinutes(summary.total_time_seconds);
     dom.dashboard.averagePercentage.textContent =
         summary.average_completion_percentage === null
-            ? '— avg completion'
-            : `${summary.average_completion_percentage}% avg completion`;
+            ? '—'
+            : `${summary.average_completion_percentage}%`;
     dom.dashboard.averageSessionTime.textContent =
         summary.average_session_time_seconds === null
-            ? '— avg session'
+            ? '—'
             : `${formatDurationHoursMinutes(
                 summary.average_session_time_seconds
-            )} avg session`;
+            )}`;
 }
 
 function renderDashboardPeriod(periodData) {
@@ -976,12 +976,22 @@ function renderDashboardPeriod(periodData) {
     });
 
     if (dashboardState.period === 'all_time') {
-        dom.dashboard.periodLabel.textContent = 'All time';
+        dom.dashboard.periodLabel.textContent = '';
+    } else if (dashboardState.period === 'month') {
+        dom.dashboard.periodLabel.textContent = new Intl.DateTimeFormat('en-US', {
+            month: 'long'
+        }).format(parseLocalDate(periodData.start_date));
+    } else if (dashboardState.period === 'year') {
+        dom.dashboard.periodLabel.textContent =
+            String(parseLocalDate(periodData.start_date).getFullYear());
     } else {
         dom.dashboard.periodLabel.textContent =
             `${formatPeriodDate(periodData.start_date)} – ` +
             `${formatPeriodDate(periodData.end_date)}`;
     }
+
+    dom.dashboard.periodNavigation.hidden =
+        dashboardState.period === 'all_time';
 
     dom.dashboard.previousPeriodButton.disabled =
         dashboardState.period === 'all_time';

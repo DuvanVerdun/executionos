@@ -833,6 +833,7 @@ button {
 }
 
 .dashboard-content {
+    width: 75vw;
     display: flex;
     flex-direction: column;
     justify-content: start;
@@ -868,6 +869,8 @@ button {
 /* If there is at least a session this week */
 
 .dashboard-weekly-stats-container {
+    container-type: inline-size;
+    width: 75vw;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -880,21 +883,46 @@ button {
     color: var(--color-white);
 }
 
-.dashboard-weekly-stats-card {
-    background-color: var(--color-surface);
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: clamp(48px, 3.33vw, 64px);
-    border-radius: 8px;
-    border: 3px solid var(--color-border);
-    width: clamp(350px, 20.83vw, 400px);
+.dashboard-weekly-stats-container .dashboard-content-title {
+    width: 100%;
+    color: var(--color-text);
 }
 
-.dashboard-weekly-stats-card p {
+.dashboard-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.dashboard-summary-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: clamp(20px, 1.67vw, 32px);
+    border-radius: 16px;
+    background-color: var(--color-surface);
+    min-width: 0;
+}
+
+.dashboard-summary-value {
     color: var(--color-white);
-    font-size: var(--button);
+    font-size: clamp(36px, 3.33vw, 48px);
+    line-height: 1.15;
+    font-weight: bold;
+    overflow-wrap: anywhere;
+}
+
+.dashboard-summary-label {
+    color: var(--color-text);
+    font-size: clamp(18px, 1.67vw, 24px);
+    line-height: 1.25;
+}
+
+/* Four 260px cards and three 12px gaps need 1076px. */
+@container (width < 1076px) {
+    .dashboard-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 
@@ -1107,4 +1135,70 @@ button {
 .dashboard-period-toggle button.active,
 .dashboard-metric-toggle button.active {
     background-color: var(--color-surface-selected);
+}
+
+.dashboard-period-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    width: 100%;
+    gap: 24px;
+}
+
+.dashboard-period-toggle {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    width: 100%;
+    border-radius: 12px;
+    background-color: var(--color-surface);
+}
+
+.dashboard-period-toggle button {
+    padding: 12px 16px;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+    cursor: pointer;
+}
+
+.dashboard-period-toggle button.active {
+    color: var(--color-white);
+}
+
+.dashboard-period-navigation {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background-color: var(--color-surface);
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+}
+
+.dashboard-period-navigation[hidden] {
+    display: none;
+}
+
+.dashboard-period-navigation button {
+    padding: 0 4px;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    cursor: pointer;
+}
+
+.dashboard-period-toggle button:hover,
+.dashboard-period-navigation button:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.dashboard-period-navigation button:disabled {
+    opacity: 0.4;
+    cursor: default;
 }
