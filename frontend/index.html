@@ -309,10 +309,6 @@
 
             <section id="dashboard-content" class="dashboard-content">
 
-                <div id="dashboard-loading" class="loading-spinner-container">
-                    <div class="loading-spinner"></div>
-                </div>
-
                 <!-- If there is at least 1 session this week -->
                 <section class="dashboard-period-controls">
 
@@ -369,6 +365,18 @@
 
                 </section>
 
+
+                <div id="dashboard-loading" class="dashboard-loading" role="status" aria-label="Loading dashboard">
+                    <section class="dashboard-loading-summary" aria-hidden="true">
+                        <h2 class="dashboard-content-title">Stats</h2>
+                        <div class="dashboard-skeleton dashboard-skeleton-summary"></div>
+                    </section>
+                    <div class="dashboard-skeleton dashboard-skeleton-chart" aria-hidden="true"></div>
+                    <section class="dashboard-loading-history" aria-hidden="true">
+                        <h2 class="dashboard-content-title">Session History</h2>
+                        <div class="dashboard-skeleton dashboard-skeleton-session"></div>
+                    </section>
+                </div>
 
                 <div id="dashboard-data-container">
 
@@ -448,16 +456,23 @@
 
                         <div
                             id="dashboard-sessions-load-sentinel"
-                            aria-live="polite"
-                        ></div>
+                        >
+                            <p id="dashboard-pagination-message" role="status" aria-live="polite"></p>
+                            <button type="button" id="dashboard-pagination-retry-btn" hidden>Retry</button>
+                        </div>
 
                     </div>
 
                 </div>
 
-                <!-- If there are no sessions this week -->
+                <div id="dashboard-error" class="dashboard-error" role="alert">
+                    <p class="dashboard-error-message">Couldn't reach the server.<br>Please try again in a moment.</p>
+                    <button type="button" id="dashboard-retry-btn">Retry</button>
+                </div>
+
+                <!-- If the selected period contains no sessions -->
                 <div id="empty-dashboard-cta-container" class="empty-dashboard-cta-container">
-                    <h2 class="empty-dashboard-cta-title">No sessions in this period</h2>
+                    <h2 class="empty-dashboard-cta-title">No sessions during this period</h2>
                     <p class="empty-dashboard-cta-paragraph">Start a mission and build your consistency.</p>
                     <button id="empty-dashboard-start-mission-btn" class="empty-dashboard-start-mission-btn white-filled-button">Start Mission</button>
                 </div>

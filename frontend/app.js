@@ -68,6 +68,9 @@ const dashboardState = {
     dailySummaries: {},
     nextCursor: null,
     isLoadingMore: false,
+    paginationFailed: false,
+    isLoading: false,
+    loadGeneration: 0,
     sessionObserver: null
 };
 
@@ -157,6 +160,8 @@ const dom = {
         logoutButton: document.getElementById('dashboard-user-menu-logout-btn'),
         content: document.getElementById('dashboard-content'),
         loading: document.getElementById('dashboard-loading'),
+        error: document.getElementById('dashboard-error'),
+        retryButton: document.getElementById('dashboard-retry-btn'),
         dataContainer: document.getElementById('dashboard-data-container'),
         
         periodButtons: document.querySelectorAll('[data-dashboard-period]'),
@@ -168,6 +173,8 @@ const dom = {
         metricButtons: document.querySelectorAll('[data-dashboard-metric]'),
         trendChart: document.getElementById('dashboard-trend-chart'),
         sessionsLoadSentinel: document.getElementById('dashboard-sessions-load-sentinel'),
+        paginationMessage: document.getElementById('dashboard-pagination-message'),
+        paginationRetryButton: document.getElementById('dashboard-pagination-retry-btn'),
 
         summaryContainer: document.getElementById('dashboard-summary-container'),
         sessionCount: document.getElementById('dashboard-amount-of-sessions-display'),
@@ -729,6 +736,12 @@ const ALLOWED_SCREEN_TRANSITIONS = {
 function navigateTo(nextScreen, currentScreen) {
     if (!ALLOWED_SCREEN_TRANSITIONS[nextScreen]?.includes(currentScreen)) return;
     closeFeedbackForm();
+    if (currentScreen === 'dashboard' && nextScreen !== 'dashboard') {
+        dashboardState.loadGeneration += 1;
+        dashboardState.isLoading = false;
+        dashboardState.isLoadingMore = false;
+        dashboardState.sessionObserver?.disconnect();
+    }
     if ((currentScreen === 'plan' || currentScreen === 'dashboard') && isUserMenuOpened) {
         toggleUserMenu(currentScreen);
     }
@@ -749,6 +762,7 @@ function navigateTo(nextScreen, currentScreen) {
 }
 
 function showDashboardLoading() {
+    dom.dashboard.error.style.display = 'none';
     dom.dashboard.dataContainer.style.display = 'none';
     dom.dashboard.emptyCTA.style.display = 'none';
     dom.dashboard.loading.style.display = 'flex';
@@ -758,6 +772,13 @@ function hideDashboardLoading() {
     dom.dashboard.loading.style.display = 'none';
 }
 
+
+function showDashboardError() {
+    hideDashboardLoading();
+    dom.dashboard.dataContainer.style.display = 'none';
+    dom.dashboard.emptyCTA.style.display = 'none';
+    dom.dashboard.error.style.display = 'flex';
+}
 
 // ========== DASHBOARD UI ==========
 
@@ -970,6 +991,19 @@ function renderDashboardPeriod(periodData) {
     dom.dashboard.nextPeriodButton.disabled =
         dashboardState.period === 'all_time'
         || periodData.end_date >= today;
+}
+
+function renderSelectedDashboardPeriod() {
+    if (dashboardState.period === 'all_time') {
+        renderDashboardPeriod({});
+        return;
+    }
+    const start = normalizePeriodAnchor(dashboardState.period, dashboardState.anchorDate);
+    const end = parseLocalDate(start);
+    if (dashboardState.period === 'week') end.setDate(end.getDate() + 6);
+    else if (dashboardState.period === 'month') end.setMonth(end.getMonth() + 1, 0);
+    else end.setMonth(11, 31);
+    renderDashboardPeriod({start_date: start, end_date: formatLocalDate(end)});
 }
 
 function getTrendMetricValue(bucket, metric) {
@@ -1253,12 +1287,13 @@ function setupSessionsPaginationObserver() {
         dashboardState.sessionObserver.disconnect();
     }
 
-    if (!dashboardState.nextCursor) {
+    if (dashboardState.isLoading || !dashboardState.nextCursor) {
         dom.dashboard.sessionsLoadSentinel.style.display = 'none';
         return;
     }
 
-    dom.dashboard.sessionsLoadSentinel.style.display = 'block';
+    dom.dashboard.sessionsLoadSentinel.style.display = 'flex';
+    if (dashboardState.paginationFailed) return;
 
     dashboardState.sessionObserver = new IntersectionObserver(
         async (entries) => {
@@ -1279,15 +1314,18 @@ function setupSessionsPaginationObserver() {
 
 async function loadMoreSessions() {
     if (
-        dashboardState.isLoadingMore
+        dashboardState.isLoading
+        || dashboardState.paginationFailed
+        || dashboardState.isLoadingMore
         || !dashboardState.nextCursor
     ) {
         return;
     }
 
+    const generation = dashboardState.loadGeneration;
     dashboardState.isLoadingMore = true;
-    dom.dashboard.sessionsLoadSentinel.textContent =
-        'Loading sessions...';
+    dom.dashboard.paginationRetryButton.hidden = true;
+    dom.dashboard.paginationMessage.textContent = 'Loading more...';
 
     try {
         const result = await fetchSessionsPage(
@@ -1295,6 +1333,8 @@ async function loadMoreSessions() {
             dashboardState.anchorDate,
             dashboardState.nextCursor
         );
+
+        if (generation !== dashboardState.loadGeneration) return;
 
         if (!result.success) {
             throw new Error(result.error);
@@ -1309,14 +1349,22 @@ async function loadMoreSessions() {
 
         dashboardState.nextCursor = result.next_cursor;
 
+        dom.dashboard.paginationMessage.textContent = '';
         renderSessionsByDate(dashboardState.sessions);
-        setupSessionsPaginationObserver();
 
     } catch (error) {
+        if (generation !== dashboardState.loadGeneration) return;
         console.error('Session pagination error:', error);
+        dashboardState.paginationFailed = true;
+        dashboardState.sessionObserver?.disconnect();
+        dom.dashboard.paginationMessage.textContent = "Couldn't load more sessions.";
+        dom.dashboard.paginationRetryButton.hidden = false;
 
     } finally {
-        dashboardState.isLoadingMore = false;
+        if (generation === dashboardState.loadGeneration) {
+            dashboardState.isLoadingMore = false;
+            if (!dashboardState.paginationFailed) setupSessionsPaginationObserver();
+        }
     }
 }
 
@@ -1471,6 +1519,17 @@ async function handleFinishWork() {
 }
 
 async function loadDashboard() {
+    const generation = ++dashboardState.loadGeneration;
+    const period = dashboardState.period;
+    const anchorDate = dashboardState.anchorDate;
+    dashboardState.isLoading = true;
+    dashboardState.isLoadingMore = false;
+    dashboardState.paginationFailed = false;
+    dom.dashboard.paginationMessage.textContent = '';
+    dom.dashboard.paginationRetryButton.hidden = true;
+    dashboardState.sessionObserver?.disconnect();
+    dom.dashboard.sessionsLoadSentinel.style.display = 'none';
+    renderSelectedDashboardPeriod();
     showDashboardLoading();
 
     try {
@@ -1479,14 +1538,16 @@ async function loadDashboard() {
             sessionsResult
         ] = await Promise.all([
             fetchDashboardData(
-                dashboardState.period,
-                dashboardState.anchorDate
+                period,
+                anchorDate
             ),
             fetchSessionsPage(
-                dashboardState.period,
-                dashboardState.anchorDate
+                period,
+                anchorDate
             )
         ]);
+
+        if (generation !== dashboardState.loadGeneration) return;
 
         if (!dashboardResult.success) {
             throw new Error(dashboardResult.error);
@@ -1515,18 +1576,25 @@ async function loadDashboard() {
                 dashboardResult.period.start_date;
         }
 
+        dashboardState.isLoading = false;
         renderDashboardData();
+        hideDashboardLoading();
 
         await loadStreak('dashboard');
 
     } catch (error) {
+        if (generation !== dashboardState.loadGeneration) return;
         console.error(
             'Dashboard loading error:',
             error
         );
+        showDashboardError();
 
     } finally {
-        hideDashboardLoading();
+        if (generation === dashboardState.loadGeneration) {
+            dashboardState.isLoading = false;
+            hideDashboardLoading();
+        }
     }
 }
 
@@ -1994,6 +2062,14 @@ function registerEventListeners() {
     dom.dashboard.streakButton.addEventListener('click', () => toggleStreakPopup('dashboard'));
     document.addEventListener('click', closeStreakPopupsOnOutsideClick);
 
+    dom.dashboard.paginationRetryButton.addEventListener('click', () => {
+        if (dashboardState.isLoading || dashboardState.isLoadingMore) return;
+        dashboardState.paginationFailed = false;
+        loadMoreSessions();
+    });
+    dom.dashboard.retryButton.addEventListener('click', () => {
+        if (!dashboardState.isLoading) loadDashboard();
+    });
     dom.dashboard.newMissionButton.addEventListener('click', handleDashboardToPlan);
     dom.dashboard.emptyStartButton.addEventListener('click', handleDashboardToPlan);
     dom.dashboard.sessionsList.addEventListener('click', toggleSessionMenu);
