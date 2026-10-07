@@ -414,6 +414,7 @@
                     <section
                         id="dashboard-summary-container"
                         class="dashboard-weekly-stats-container"
+                        tabindex="-1"
                     >
                         <h2 class="dashboard-content-title">
                             Stats
@@ -511,6 +512,12 @@
         </div>
     
     </div>
+
+    <button type="button" id="dashboard-back-to-stats-btn" class="normal-button dashboard-back-to-stats" aria-label="Back to stats" title="Back to stats" aria-hidden="true" disabled>
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <path d="m6 12 6-6 6 6M12 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+    </button>
 
     <form id="dashboard-feedback-form">
 

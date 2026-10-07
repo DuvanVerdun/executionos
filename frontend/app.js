@@ -168,6 +168,7 @@ const dom = {
     },
     dashboard: {
         screen: document.querySelector('.dashboard-screen'),
+        backToStatsButton: document.getElementById('dashboard-back-to-stats-btn'),
         newMissionButton: document.getElementById('dashboard-new-mission-btn'),
         streakButton: document.getElementById('dashboard-streak-btn'),
         streakPopup: document.getElementById('dashboard-streak-popup'),
@@ -917,6 +918,7 @@ function navigateTo(nextScreen, currentScreen) {
     }
     dom[currentScreen].screen.style.display = 'none';
     dom[nextScreen].screen.style.display = SCREEN_DISPLAY[nextScreen];
+    updateBackToStatsButton();
 }
 
 /** Show Dashboard loading surfaces and hide results and errors. */
@@ -925,6 +927,7 @@ function showDashboardLoading() {
     dom.dashboard.dataContainer.style.display = 'none';
     dom.dashboard.emptyCTA.style.display = 'none';
     dom.dashboard.loading.style.display = 'flex';
+    updateBackToStatsButton();
 }
 
 /** Hide Dashboard loading surfaces. */
@@ -939,9 +942,32 @@ function showDashboardError() {
     dom.dashboard.dataContainer.style.display = 'none';
     dom.dashboard.emptyCTA.style.display = 'none';
     dom.dashboard.error.style.display = 'flex';
+    updateBackToStatsButton();
 }
 
 // ========== DASHBOARD UI ==========
+
+/** Show the shortcut when session history reaches the top of the viewport. */
+function updateBackToStatsButton() {
+    const firstCard = dom.dashboard.sessionsList.querySelector('.dashboard-session-card');
+    const disabled = !firstCard
+        || firstCard.getClientRects().length === 0
+        || firstCard.getBoundingClientRect().top > 0;
+    dom.dashboard.backToStatsButton.disabled = disabled;
+    dom.dashboard.backToStatsButton.setAttribute('aria-hidden', String(disabled));
+}
+
+/** Return to Stats below the sticky header, respecting reduced motion. */
+function handleBackToStats() {
+    const header = dom.dashboard.screen.querySelector('.dashboard-header');
+    const top = window.scrollY + dom.dashboard.summaryContainer.getBoundingClientRect().top
+        - header.getBoundingClientRect().bottom - 24;
+    dom.dashboard.summaryContainer.focus({ preventScroll: true });
+    window.scrollTo({
+        top: Math.max(0, top),
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
+    });
+}
 
 /** Create the session history heading. */
 function createSessionListTitle() {
@@ -1092,6 +1118,7 @@ function renderSessionsByDate(sessions) {
         emptyMessage.textContent = 'No sessions in this period.';
         emptyMessage.className = 'dashboard-empty-period-message';
         dom.dashboard.sessionsList.appendChild(emptyMessage);
+        updateBackToStatsButton();
         return;
     }
     const groups = groupSessionsByLocalDate(sessions);
@@ -1109,6 +1136,7 @@ function renderSessionsByDate(sessions) {
     dom.dashboard.sessionsList.appendChild(
         dom.dashboard.sessionsLoadSentinel
     );
+    updateBackToStatsButton();
 }
 
 /** Update the Dashboard's summary values. */
@@ -1442,6 +1470,7 @@ function renderDashboardData() {
     ) {
         dom.dashboard.dataContainer.style.display = 'none';
         dom.dashboard.emptyCTA.style.display = 'flex';
+        updateBackToStatsButton();
         return;
     }
 
@@ -2365,6 +2394,9 @@ function closeStreakPopupsOnOutsideClick(event) {
 
 /** Connect application controls and browser events to their handlers. */
 function registerEventListeners() {
+    window.addEventListener('scroll', updateBackToStatsButton, { passive: true });
+    window.addEventListener('resize', updateBackToStatsButton);
+    dom.dashboard.backToStatsButton.addEventListener('click', handleBackToStats);
     window.addEventListener('online', /** Retry queued submissions when connectivity returns. */ () => { void syncOfflineWork(); });
     dom.loading.retryButton.addEventListener('click', /** Retry application initialization. */ async () => {
         showLoadingSpinner();
