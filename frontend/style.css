@@ -1497,53 +1497,99 @@ button {
 
 
 #dashboard-feedback-form {
+    --feedback-size-unit: clamp(0.75px, 0.065104167vw, 1.5px);
     font-family: 'Outfit', sans-serif;
     z-index: 100;
     background: var(--color-surface);
-    padding: 16px;
+    padding: calc(16 * var(--feedback-size-unit));
     display: none;
     flex-direction: column;
-    border-radius: 8px;
-    border: 3px solid var(--color-border);
-    gap: 16px;
+    border-radius: calc(24 * var(--feedback-size-unit));
+    border: var(--feedback-size-unit) solid var(--color-border);
+    gap: calc(16 * var(--feedback-size-unit));
 
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: calc(24 * var(--feedback-size-unit));
+    right: calc(24 * var(--feedback-size-unit));
 
     box-sizing: border-box;
+    width: min(calc(388 * var(--feedback-size-unit)), calc(100vw - 48 * var(--feedback-size-unit)));
     max-height: 50dvh;
+    overflow-y: auto;
 }
 
 .dashboard-feedback-form-header {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+    align-items: center;
+    gap: calc(16 * var(--feedback-size-unit));
+    flex-shrink: 0;
+}
+
+.dashboard-feedback-form-header h2 {
+    font-size: calc(24 * var(--feedback-size-unit));
+    line-height: 1.25;
 }
 
 #dashboard-close-feedback-form-btn {
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 3px solid var(--color-border);
-    border-radius: 50%;
+    width: calc(32 * var(--feedback-size-unit));
+    height: calc(32 * var(--feedback-size-unit));
+    flex-shrink: 0;
+    border: var(--feedback-size-unit) solid var(--color-border);
+    border-radius: calc(12 * var(--feedback-size-unit));
     color: var(--color-text);
-    background-color: var(--color-surface);
+    background-color: var(--color-surface-selected);
     padding: 0;
+    cursor: pointer;
+}
+
+#dashboard-close-feedback-form-btn svg {
+    width: calc(24 * var(--feedback-size-unit));
+    height: calc(24 * var(--feedback-size-unit));
 }
 
 #dashboard-close-feedback-form-btn:hover {
     filter: brightness(1.1);
 }
 
+#dashboard-close-feedback-form-btn:focus-visible,
+#dashboard-send-feedback-btn:focus-visible {
+    outline: 2px solid var(--color-text);
+    outline-offset: 4px;
+}
+
 #dashboard-feedback-input {
     box-sizing: border-box;
-    min-height: 72px;
-    height: 72px;
+    width: 100%;
+    min-height: calc(72 * var(--feedback-size-unit));
+    height: calc(72 * var(--feedback-size-unit));
+    padding: calc(13 * var(--feedback-size-unit)) calc(16 * var(--feedback-size-unit));
+    border: var(--feedback-size-unit) solid var(--color-border);
+    border-radius: calc(12 * var(--feedback-size-unit));
     flex: 0 1 auto;
     resize: none;
     overflow-y: hidden;
-    font-size: var(--body);
+    font-size: calc(16 * var(--feedback-size-unit));
+    line-height: 1.5;
+}
+
+#dashboard-send-feedback-btn {
+    width: 100%;
+    flex-shrink: 0;
+    padding: calc(16 * var(--feedback-size-unit)) calc(32 * var(--feedback-size-unit));
+    border-radius: calc(12 * var(--feedback-size-unit));
+    font-family: inherit;
+    font-size: calc(22 * var(--feedback-size-unit));
+    line-height: 1.25;
+    cursor: pointer;
+}
+
+#dashboard-send-feedback-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
 }
 
 
@@ -1868,6 +1914,7 @@ button {
     #dashboard-streak-popup,
     #plan-user-menu,
     #dashboard-user-menu,
+    #dashboard-feedback-form,
     .dashboard-save-feedback {
         background-color: rgb(20 20 20 / 85%);
         -webkit-backdrop-filter: blur(16px);
