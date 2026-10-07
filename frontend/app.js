@@ -74,7 +74,7 @@ const sessionQueue = {
 
 const dashboardState = {
     period: 'week',
-    anchorDate: '',
+    anchorDates: { week: '', month: '', year: '', all_time: '' },
     metric: 'time',
     data: null,
     sessions: [],
@@ -643,10 +643,14 @@ function formatLocalDate(date) {
     return `${year}-${month}-${day}`;
 }
 
-/** Reset the Dashboard to its initial period and pagination state. */
+/** Initialize the selected period's date while preserving previous selections. */
 function initializeDashboardState() {
-    if (!dashboardState.anchorDate) {
-        dashboardState.anchorDate = formatLocalDate(new Date());
+    const period = dashboardState.period;
+    if (period === 'all_time' || !dashboardState.anchorDates[period]) {
+        dashboardState.anchorDates[period] = normalizePeriodAnchor(
+            period,
+            formatLocalDate(new Date())
+        );
     }
 }
 
@@ -1198,7 +1202,7 @@ function renderSelectedDashboardPeriod() {
         renderDashboardPeriod({});
         return;
     }
-    const start = normalizePeriodAnchor(dashboardState.period, dashboardState.anchorDate);
+    const start = normalizePeriodAnchor(dashboardState.period, dashboardState.anchorDates[dashboardState.period]);
     const end = parseLocalDate(start);
     if (dashboardState.period === 'week') end.setDate(end.getDate() + 6);
     else if (dashboardState.period === 'month') end.setMonth(end.getMonth() + 1, 0);
@@ -1542,7 +1546,7 @@ async function loadMoreSessions() {
     try {
         const result = await fetchSessionsPage(
             dashboardState.period,
-            dashboardState.anchorDate,
+            dashboardState.anchorDates[dashboardState.period],
             dashboardState.nextCursor
         );
 
@@ -1833,7 +1837,7 @@ async function handleFinishWork() {
 async function loadDashboard(feedbackStartedAt = null) {
     const generation = ++dashboardState.loadGeneration;
     const period = dashboardState.period;
-    const anchorDate = dashboardState.anchorDate;
+    const anchorDate = dashboardState.anchorDates[period];
     dashboardState.isLoading = true;
     dashboardState.isLoadingMore = false;
     dashboardState.paginationFailed = false;
@@ -1882,10 +1886,10 @@ async function loadDashboard(feedbackStartedAt = null) {
             sessionsResult.next_cursor;
 
         if (
-            dashboardState.period !== 'all_time'
+            period !== 'all_time'
             && dashboardResult.period.start_date
         ) {
-            dashboardState.anchorDate =
+            dashboardState.anchorDates[period] =
                 dashboardResult.period.start_date;
         }
 
@@ -2151,22 +2155,8 @@ async function handleDashboardPeriodChange(event) {
 
     const newPeriod = button.dataset.dashboardPeriod;
 
-    if (
-        dashboardState.period === 'all_time'
-        || newPeriod === 'all_time'
-    ) {
-        dashboardState.anchorDate =
-            formatLocalDate(new Date());
-    }
-
     dashboardState.period = newPeriod;
-
-    if (newPeriod !== 'all_time') {
-        dashboardState.anchorDate = normalizePeriodAnchor(
-            newPeriod,
-            dashboardState.anchorDate
-        );
-    }
+    initializeDashboardState();
 
     await loadDashboard();
 }
@@ -2175,9 +2165,9 @@ async function handleDashboardPeriodChange(event) {
 async function handleDashboardPeriodNavigation(direction) {
     if (dashboardState.period === 'all_time') return;
 
-    dashboardState.anchorDate = shiftPeriodAnchor(
+    dashboardState.anchorDates[dashboardState.period] = shiftPeriodAnchor(
         dashboardState.period,
-        dashboardState.anchorDate,
+        dashboardState.anchorDates[dashboardState.period],
         direction
     );
 
