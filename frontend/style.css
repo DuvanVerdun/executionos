@@ -745,16 +745,19 @@ button {
 }
 
 .plan-input-section {
+    --plan-size-unit: clamp(0.625px, 0.052083333vw, 1.25px);
+    --plan-control-font-size: calc(24 * var(--plan-size-unit));
     background-color: var(--color-surface);
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
     box-sizing: border-box;
-    width: clamp(540px, 41.4vw, 596px);
-    padding: clamp(24px, 4vh, 48px) clamp(32px, 3.33vw, 48px);
-    gap: clamp(24px, 4vh, 48px);
-    border-radius: 24px;
+    width: min(calc(596 * var(--plan-size-unit)), calc(100vw - 32px));
+    min-height: calc(534 * var(--plan-size-unit));
+    padding: calc(36 * var(--plan-size-unit)) calc(48 * var(--plan-size-unit));
+    gap: calc(36 * var(--plan-size-unit));
+    border-radius: calc(24 * var(--plan-size-unit));
 }
 
 .plan-mission-container,
@@ -763,7 +766,7 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: clamp(20px, 2.34vh, 24px);
+    gap: calc(21 * var(--plan-size-unit));
 }
 
 .plan-mission-container,
@@ -773,17 +776,17 @@ button {
 
 .plan-mission-container h3,
 .plan-time-container h3 {
-    font-size: clamp(28px, 2.5vw, 36px);
+    font-size: calc(36 * var(--plan-size-unit));
     line-height: 1.25;
     color: var(--color-text);
 }
 
 .plan-input-section .input {
     width: 100%;
-    padding: 14px 24px;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    font-size: clamp(20px, 1.67vw, 24px);
+    padding: calc(14 * var(--plan-size-unit)) calc(24 * var(--plan-size-unit));
+    border: var(--plan-size-unit) solid var(--color-border);
+    border-radius: calc(12 * var(--plan-size-unit));
+    font-size: var(--plan-control-font-size);
     line-height: 1.25;
 }
 
@@ -792,38 +795,39 @@ button {
 }
 
 .plan-input-section .input-placeholder {
-    top: 15px;
-    left: 25px;
-    font-size: clamp(20px, 1.67vw, 24px);
+    top: calc(15 * var(--plan-size-unit));
+    left: calc(25 * var(--plan-size-unit));
+    font-size: var(--plan-control-font-size);
     line-height: 1.25;
 }
 
 .plan-input-section .input:focus ~ .input-placeholder,
 .plan-input-section .input:not(:placeholder-shown) ~ .input-placeholder {
-    top: -15px;
-    left: 20px;
+    top: calc(-15 * var(--plan-size-unit));
+    left: calc(20 * var(--plan-size-unit));
+    padding: 0 calc(4 * var(--plan-size-unit));
 }
 
 #plan-target-time-input {
     text-align: center;
-    width: 128px;
+    width: calc(128 * var(--plan-size-unit));
 }
 
 #plan-target-time-input:focus ~ .input-placeholder,
 #plan-target-time-input:not(:placeholder-shown) ~ .input-placeholder {
-    left: 14px;
+    left: calc(14 * var(--plan-size-unit));
 }
 
 
 #plan-start-work-btn {
     width: 100%;
-    padding: 16px 24px;
+    padding: calc(16 * var(--plan-size-unit)) calc(24 * var(--plan-size-unit));
     border: none;
-    border-radius: 12px;
+    border-radius: calc(12 * var(--plan-size-unit));
     background-color: var(--color-cta);
     color: var(--color-white);
     font-family: inherit;
-    font-size: clamp(20px, 1.67vw, 24px);
+    font-size: var(--plan-control-font-size);
     line-height: 1.25;
     font-weight: bold;
     cursor: pointer;
