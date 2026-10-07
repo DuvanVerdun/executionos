@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, UTC
 from typing import Any, cast
+from uuid import UUID
 
 from flask import Flask, request, jsonify  # type: ignore[attr-defined]
 from flask_cors import CORS
 from flask_migrate import Migrate
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 from werkzeug.wrappers import Response
 from werkzeug.security import generate_password_hash, check_password_hash  # type: ignore[reportUnknownVariableType]
@@ -22,6 +24,7 @@ load_dotenv()
 
 
 def create_app() -> Flask:
+    """Create and configure the Flask application and its API routes."""
     app = Flask(__name__)
 
     turso_url = os.environ["TURSO_DATABASE_URL"]
@@ -40,13 +43,14 @@ def create_app() -> Flask:
     app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
     app.config["JWT_REFRESH_COOKIE_NAME"] = "refresh_token"
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = False  # Disable CSRF protection for cookies
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False
     jwt.init_app(app)
 
     from models import User  # noqa: F401
 
     @app.route("/api/register", methods=["POST"])
     def register() -> tuple[Any, int]:
+        """Create an account and issue access and refresh credentials."""
         try:
             data: dict[str, Any] = cast(dict[str, Any], request.get_json())  # type: ignore
 
@@ -151,6 +155,7 @@ def create_app() -> Flask:
 
     @app.route("/api/login", methods=["POST"])
     def login() -> tuple[Any, int]:
+        """Authenticate credentials and issue access and refresh credentials."""
         try:
             data: dict[str, Any] = cast(dict[str, Any], request.get_json())  # type: ignore
 
@@ -216,6 +221,7 @@ def create_app() -> Flask:
     @app.route("/api/refresh", methods=["POST"])
     @jwt_required(refresh=True)
     def refresh() -> tuple[Any, int]:
+        """Validate the refresh session and renew authentication credentials."""
         try:
             user_id = get_jwt_identity()
             claims: dict[str, Any] = cast(dict[str, Any], get_jwt())
@@ -273,6 +279,7 @@ def create_app() -> Flask:
     @app.route("/api/logout", methods=["POST"])
     @jwt_required()
     def logout() -> tuple[Any, int]:
+        """Invalidate refresh sessions and clear the refresh cookie."""
         try:
             user_id = get_jwt_identity()
             user = db.session.execute(select(User).filter_by(id=int(user_id))).scalar_one_or_none()
@@ -318,6 +325,7 @@ def create_app() -> Flask:
     @app.route("/api/streak", methods=["GET"])
     @jwt_required()
     def streak() -> tuple[Any, int]:
+        """Return the authenticated user's streak and consistency calendar."""
         try:
             user_id = int(get_jwt_identity())
 
@@ -354,6 +362,7 @@ def create_app() -> Flask:
     @app.route("/api/dashboard", methods=["GET"])
     @jwt_required()
     def dashboard() -> tuple[Any, int]:
+        """Return the authenticated user's period summary and trend data."""
         try:
             user_id = int(get_jwt_identity())
 
@@ -392,6 +401,7 @@ def create_app() -> Flask:
     @app.route("/api/get-sessions", methods=["GET"])
     @jwt_required()
     def get_sessions() -> tuple[Any, int]:
+        """Return a filtered session page and daily summaries for the authenticated user."""
         try:
             user_id = int(get_jwt_identity())
 
@@ -418,7 +428,7 @@ def create_app() -> Flask:
             cursor_date: datetime | None = None
             cursor_id: int | None = None
 
-            if raw_cursor_date is not None:
+            if raw_cursor_date is not None and raw_cursor_id is not None:
                 cursor_date = parse_cursor_datetime(
                     raw_cursor_date
                 )
@@ -454,10 +464,32 @@ def create_app() -> Flask:
     @jwt_required()
     def save_session() -> tuple[Any, int]:
         """Receive session data and save to the database."""
+        user_id = int(get_jwt_identity())
+        submission_id: str | None = None
         try:
-            data: dict[str, Any] = cast(dict[str, Any], request.json)  # type: ignore
-
-            user_id = int(get_jwt_identity())
+            raw_data: object = request.get_json(silent=True)  # type: ignore[reportUnknownMemberType]
+            if not isinstance(raw_data, dict):
+                raise ValueError("Session data is required")
+            data = cast(dict[str, Any], raw_data)
+            if data.get("submissionId") is not None:
+                if not isinstance(data["submissionId"], str):
+                    raise ValueError("Submission ID must be a UUID string")
+                submission_id = str(UUID(data["submissionId"]))
+                existing = db.session.execute(select(Session).filter_by(
+                    user_id=user_id, submission_id=submission_id
+                )).scalar_one_or_none()
+                if existing is not None:
+                    return jsonify({"success": True, "session_id": existing.id}), 200  # type: ignore
+            if not isinstance(data["mission"], str) or not data["mission"].strip() or len(data["mission"]) > 200:
+                raise ValueError("A mission of at most 200 characters is required")
+            for field in ("targetTimeSeconds", "actualTimeSeconds"):
+                value = data[field]
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise ValueError("Session times must be non-negative integers")
+            if data["targetTimeSeconds"] == 0:
+                raise ValueError("Target time must be greater than zero")
+            if not isinstance(data["date"], str):
+                raise ValueError("Session date must be an ISO string")
 
             new_session = Session(
                 user_id=user_id,
@@ -466,6 +498,7 @@ def create_app() -> Flask:
                 target_time_seconds=int(data["targetTimeSeconds"]),
                 actual_time_seconds=int(data["actualTimeSeconds"])
             )
+            new_session.submission_id = submission_id
 
             db.session.add(new_session)
             db.session.commit()
@@ -475,12 +508,24 @@ def create_app() -> Flask:
                 "message": "Session saved",
                 "session_id": new_session.id
             }), 201
-        except Exception as e:
+        except (ValueError, TypeError, KeyError):
             db.session.rollback()
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": str(e)
-            }), 400
+            return jsonify({"success": False, "error": "Invalid session data"}), 400  # type: ignore
+        except IntegrityError:
+            db.session.rollback()
+
+            if submission_id is not None:
+                existing = db.session.execute(select(Session).filter_by(
+                    user_id=user_id, submission_id=submission_id
+                )).scalar_one_or_none()
+                if existing is not None:
+                    return jsonify({"success": True, "session_id": existing.id}), 200  # type: ignore
+            app.logger.exception("Could not save session")
+            return jsonify({"success": False, "error": "Could not save session"}), 500  # type: ignore
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not save session")
+            return jsonify({"success": False, "error": "Could not save session"}), 500  # type: ignore
 
     @app.route("/api/delete-session/<int:session_id>", methods=["DELETE"])
     @jwt_required()

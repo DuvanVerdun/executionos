@@ -266,73 +266,225 @@ button {
 }
 
 
-/* register screen styles */
+/* auth screens styles */
 
-.register-card {
-    background-color: var(--color-surface);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: clamp(48px, 3.33vw, 64px);
-    padding: clamp(48px, 3.33vw, 64px);
-    border-radius: 8px;
-    border: 3px solid var(--color-border);
+.register-screen,
+.login-screen {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 100dvh;
+    padding: clamp(12px, 2.5vh, 32px) 24px;
+    grid-template-rows: auto auto;
+    align-content: center;
+    justify-items: center;
+    gap: clamp(12px, 2.5vh, 24px);
 }
 
-#register-form {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(24px, 1.67vw, 32px);
+.register-screen > .wordmark,
+.login-screen > .wordmark {
+    font-size: clamp(32px, 2.5vw, 36px);
+    line-height: 1.2;
 }
 
-.register-error-and-button-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    text-align: center;
-    gap: 8px;
-}
-
-#register-submit-btn {
-    width: clamp(350px, 20.83vw, 400px);
-}
-
-
-/* login screen styles */
-
+.register-card,
 .login-card {
+    box-sizing: border-box;
+    width: clamp(480px, 38vw, 540px);
+    padding: clamp(16px, 3vh, 40px) clamp(32px, 3.33vw, 48px);
     background-color: var(--color-surface);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: clamp(48px, 3.33vw, 64px);
-    padding: clamp(48px, 3.33vw, 64px);
-    border-radius: 8px;
-    border: 3px solid var(--color-border);
+    gap: clamp(16px, 3vh, 32px);
+    border-radius: 24px;
 }
 
+:is(.register-card, .login-card) .card-header {
+    width: 100%;
+    font-size: clamp(28px, 2.5vw, 36px);
+    line-height: 1.25;
+    color: var(--color-text);
+}
+
+#register-form,
 #login-form {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: clamp(24px, 1.67vw, 32px);
+    width: 100%;
+    gap: clamp(8px, 1.6vh, 16px);
 }
 
+:is(.register-card, .login-card) .input-container {
+    width: 100%;
+}
+
+:is(.register-card, .login-card) .input {
+    width: 100%;
+    padding: clamp(10px, 1.6vh, 14px) 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+}
+
+:is(.register-card, .login-card) .input:focus {
+    border-color: var(--color-text);
+}
+
+:is(.register-card, .login-card) .input-placeholder {
+    top: calc(clamp(10px, 1.6vh, 14px) + 1px);
+    left: 25px;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+}
+
+:is(.register-card, .login-card) .input:focus ~ .input-placeholder,
+:is(.register-card, .login-card) .input:not(:placeholder-shown) ~ .input-placeholder {
+    top: -9px;
+    left: 20px;
+    font-size: 14px;
+    line-height: 18px;
+}
+
+:is(.register-password-input-container, .login-password-input-container) .input {
+    padding-right: 60px;
+}
+
+.register-error-and-button-container,
 .login-error-and-button-container {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    width: 100%;
+    gap: clamp(8px, 1.6vh, 16px);
 }
 
+:is(.register-card, .login-card) .form-error-message {
+    width: 100%;
+    font-size: 16px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+:is(.register-card, .login-card) .form-error-message:empty {
+    display: block;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.auth-field-message {
+    min-height: 22.4px;
+}
+
+.auth-field:has(.auth-password-guidance) .auth-field-message {
+    min-height: 44.8px;
+}
+
+.auth-password-guidance {
+    color: var(--color-text);
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.auth-field-message:has(.form-error-message:not(:empty)) .auth-password-guidance {
+    display: none;
+}
+
+:is(.register-card, .login-card) .auth-general-error {
+    min-height: 22.4px;
+}
+
+.auth-switch-action {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+#register-submit-btn,
 #login-submit-btn {
-    width: clamp(350px, 20.83vw, 400px);
+    width: 100%;
+    padding: 16px 24px;
+    border: none;
+    border-radius: 12px;
+    background-color: var(--color-cta);
+    color: var(--color-white);
+    font-family: inherit;
+    font-size: clamp(20px, 1.67vw, 24px);
+    line-height: 1.25;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+:is(.register-card, .login-card) .switch-btn-container {
+    width: 100%;
+    justify-content: center;
+}
+
+:is(.register-card, .login-card) .switch-btn {
+    background: none;
+    font-family: inherit;
+    font-size: clamp(18px, 1.39vw, 20px);
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+
+:is(.register-card, .login-card) .input[aria-invalid="true"] {
+    border-color: var(--color-cta);
+}
+
+:is(.register-card, .login-card) .input[aria-invalid="true"]:focus ~ .input-placeholder {
+    color: var(--color-cta);
+}
+
+:is(.register-card, .login-card) .password-visibility-btn {
+    width: 40px;
+    height: 40px;
+    right: 12px;
+    filter: brightness(0.8);
+}
+
+:is(.register-card, .login-card) .password-visibility-btn:hover,
+:is(.register-card, .login-card) .password-visibility-btn:focus-visible {
+    filter: brightness(1);
+}
+
+:is(#register-submit-btn, #login-submit-btn):disabled {
+    cursor: wait;
+    filter: brightness(0.85);
+}
+
+
+@media (min-height: 900px) {
+    .register-screen,
+    .login-screen {
+        padding-block: 0;
+        grid-template-rows: minmax(72px, 1fr) auto minmax(72px, 1fr);
+        gap: 0;
+    }
+
+    .register-screen > .wordmark,
+    .login-screen > .wordmark {
+        align-self: center;
+    }
+
+    .register-card,
+    .login-card {
+        width: clamp(540px, 31vw, 596px);
+        padding-block: 40px;
+    }
+}
+
+
+.login-card {
+    padding-block: clamp(32px, 6.5vh, 72px);
+    gap: clamp(28px, 4.6vh, 48px);
+}
+
+.login-error-and-button-container {
+    gap: 12px;
 }
 
 
@@ -406,7 +558,7 @@ button {
 #dashboard-streak-popup {
     position: absolute;
     top: calc(100% + 16px);
-    /* Align with the streak control: header padding + avatar + control gap. */
+
     right: calc(clamp(24px, 2.22vw, 40px) + 48px + clamp(32px, 5.56vw, 80px));
     box-sizing: border-box;
     width: clamp(420px, 31.94vw, 460px);
@@ -679,6 +831,10 @@ button {
 /* Focus Screen Styles */
 
 .focus-screen {
+    box-sizing: border-box;
+    min-height: 100dvh;
+    height: auto;
+    padding: 24px;
     justify-content: center;
     align-items: center;
 }
@@ -690,8 +846,9 @@ button {
     justify-content: center;
     align-items: center;
     border-radius: 50%;
-    width: clamp(600px, 39.6vw, 760px);
-    height: clamp(600px, 39.6vw, 760px);
+    width: min(620px, 70dvh, calc(100vw - 48px));
+    aspect-ratio: 1;
+    flex-shrink: 0;
     --pct: 0%;
     background: conic-gradient(var(--color-white) 0%, var(--color-white) var(--pct), var(--color-border) var(--pct), var(--color-border) 100%);
     transform: scaleX(-1);
@@ -723,26 +880,28 @@ button {
     justify-content: end;
     align-items: center;
     height: 100%;
-    width: clamp(300px, 19.8vw, 380px);
+    width: 64%;
 
     flex: 1;
 }
 
 #focus-mission-display {
-    font-size: var(--header);
+    font-size: clamp(20px, 2.8vh, 28px);
+    line-height: 1.3;
     text-align: center;
     max-width: 100%;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 
 #focus-target-time-display {
-    font-size: var(--button);
+    font-size: clamp(18px, 2.3vh, 22px);
     text-align: center;
 }
 
 #focus-current-time-display {
     display: flex;
-    font-size: var(--timer);
+    font-size: clamp(48px, 9vh, 96px);
+    font-variant-numeric: tabular-nums;
     color: var(--color-white);
     font-weight: bold;
     text-align: center;
@@ -753,28 +912,98 @@ button {
 .focus-button-container {
     display: flex;
     flex-direction: row;
-    width: clamp(300px, 19.8vw, 380px);
+    width: 64%;
     height: 100%;
-    justify-content: space-between;
+    justify-content: center;
     align-items: start;
+    gap: 16px;
 
     flex: 1;
+}
+
+.focus-button-container .normal-button {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: clamp(18px, 2.3vh, 22px);
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.focus-button-container .normal-button:focus-visible {
+    outline: 2px solid var(--color-text);
+    outline-offset: 4px;
+}
+
+
+@media (max-height: 700px) {
+    .focus-display-container {
+        width: 58%;
+        bottom: 62%;
+        transform: translateX(-50%) scaleX(-1);
+    }
+
+    .focus-button-container {
+        top: 68%;
+        transform: translateX(-50%) scaleX(-1);
+    }
+
+    #focus-current-time-display {
+        top: 50%;
+        transform: translate(-50%, -50%) scaleX(-1);
+    }
+
+    .focus-display-container,
+    #focus-current-time-display,
+    .focus-button-container {
+        position: absolute;
+        left: 50%;
+        height: auto;
+        flex: 0 0 auto;
+    }
+
+    #focus-mission-display {
+        font-size: clamp(18px, 2.8vh, 20px);
+        line-height: 1.2;
+    }
 }
 
 
 
 /* Review Screen Styles */
 
+.review-screen {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 100dvh;
+    padding: 0 24px;
+    grid-template-rows: minmax(56px, 1fr) auto minmax(56px, 1fr);
+    align-content: stretch;
+    justify-items: center;
+    gap: 0;
+}
+
+.review-screen > .wordmark {
+    align-self: center;
+    font-size: clamp(24px, 4vh, 36px);
+    line-height: 1.2;
+}
+
 .review-container {
+    box-sizing: border-box;
+    width: min(596px, 68dvh, calc(100vw - 48px));
+    min-height: 60dvh;
     background-color: var(--color-surface);
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    gap: clamp(32px, 2.08vw, 40px);
-    padding: clamp(48px, 3.33vw, 64px);
-    border-radius: 8px;
-    border: 3px solid var(--color-border);
+    gap: clamp(16px, 4vh, 36px);
+    padding: clamp(24px, 5vh, 48px);
+    border-radius: 24px;
 }
 
 .review-display-container {
@@ -782,29 +1011,48 @@ button {
     flex-direction: column;
     justify-content: start;
     align-items: center;
-    width: 400px;
+    width: 100%;
+    gap: 8px;
 }
 
 #review-mission-display,
 #review-target-time-display {
     text-align: center;
     width: 100%;
-    color: var(--color-white);
+    color: var(--color-text);
 }
 
 #review-mission-display {
-    font-size: var(--header);
+    font-size: clamp(18px, calc(4vh - 8px), 30px);
+    font-weight: 600;
+    line-height: 1.3;
     max-width: 100%;
-    word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 
 #review-target-time-display {
-    font-size: var(--button);
+    font-size: clamp(18px, 2.8vh, 26px);
+    line-height: 1.3;
+}
+
+.review-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+}
+
+.review-summary > div {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: clamp(24px, 4vh, 36px) clamp(12px, 2vh, 20px);
+    background-color: var(--color-surface-selected);
+    border-radius: 16px;
 }
 
 .review-progress-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     gap: 16px;
@@ -831,7 +1079,7 @@ button {
     width: 80%;
     height: 80%;
     border-radius: 50%;
-    background-color: var(--color-surface);
+    background-color: var(--color-surface-selected);
 }
 
 #review-completion-percentage-display,
@@ -843,30 +1091,72 @@ button {
 }
 
 #review-completion-percentage-display {
-    font-size: var(--body);
-    width: 50px;
-    height: 50px;
+    font-size: clamp(14px, 1.8vh, 18px);
+    width: clamp(48px, 7vh, 64px);
+    aspect-ratio: 1;
     z-index: 1;
     transform: scaleX(-1);
 }
 
 #review-completion-status-display {
-    font-size: var(--title);
+    color: var(--color-text);
+    font-size: clamp(16px, 2.3vh, 22px);
+    line-height: 1.4;
+}
+
+.review-time-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+}
+
+.review-time-label {
+    font-size: clamp(16px, 2.3vh, 22px);
+    line-height: 1.4;
+    margin-bottom: 4px;
 }
 
 #review-actual-time-display {
     width: 100%;
     text-align: center;
     color: var(--color-white);
-    font-size: var(--title);
+    font-size: clamp(36px, 6vh, 56px);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
 }
 
 .review-button-container {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+    gap: 16px;
     align-items: center;
     width: 100%;
+}
+
+.review-button-container button {
+    padding: clamp(14px, 2vh, 20px) clamp(20px, 3.4vh, 32px);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: clamp(18px, 2.8vh, 26px);
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+#review-continue-btn {
+    border-width: 1px;
+}
+
+#review-finish-btn:hover {
+    filter: brightness(1.1);
+}
+
+.review-button-container button:focus-visible {
+    outline: 2px solid var(--color-text);
+    outline-offset: 4px;
 }
 
 
@@ -909,16 +1199,6 @@ button {
     background-color: var(--color-surface);
 }
 
-/* Keep an opaque surface when backdrop blur is unsupported. */
-@supports (backdrop-filter: blur(16px)) or (-webkit-backdrop-filter: blur(16px)) {
-    .plan-header,
-    .dashboard-header {
-        background-color: rgb(20 20 20 / 85%);
-        -webkit-backdrop-filter: blur(16px);
-        backdrop-filter: blur(16px);
-    }
-}
-
 .dashboard-content {
     width: 75vw;
     display: flex;
@@ -951,9 +1231,6 @@ button {
         transform: rotate(360deg);
     }
 }
-
-
-/* If there is at least a session this week */
 
 .dashboard-weekly-stats-container {
     container-type: inline-size;
@@ -1005,7 +1282,7 @@ button {
     line-height: 1.25;
 }
 
-/* Four 260px cards and three 12px gaps need 1076px. */
+
 @container (width < 1076px) {
     .dashboard-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1140,10 +1417,6 @@ button {
     filter: brightness(1.1);
 }
 
-
-
-/* Empty selected period */
-
 .empty-dashboard-cta-container {
     box-sizing: border-box;
     display: none;
@@ -1231,7 +1504,7 @@ button {
     font-size: var(--body);
 }
 
-/* Selected dashboard controls use the elevated surface color. */
+
 .dashboard-period-toggle button,
 .dashboard-metric-toggle button {
     background-color: var(--color-surface);
@@ -1310,7 +1583,7 @@ button {
     cursor: default;
 }
 
-/* Chart axes remain neutral; gridlines sit behind the plotted values. */
+
 .dashboard-trend-gridline {
     stroke: var(--color-border);
     stroke-width: 1;
@@ -1494,4 +1767,63 @@ button {
 
 #dashboard-pagination-retry-btn:hover {
     filter: brightness(1.1);
+}
+
+.session-save-message {
+    color: var(--color-text);
+    font-size: 18px;
+    line-height: 1.5;
+}
+
+#review-save-message {
+    color: var(--color-cta);
+    text-align: center;
+}
+
+#review-save-message:empty,
+#dashboard-save-message[hidden] {
+    display: none;
+}
+
+.dashboard-save-feedback {
+    position: fixed;
+    top: calc(112px + clamp(64px, 4.17vw, 80px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9;
+    width: max-content;
+    max-width: min(75vw, 800px);
+    box-sizing: border-box;
+    background: var(--color-surface);
+    border-radius: 16px;
+    padding: 16px 24px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 1s ease;
+}
+
+
+@supports (backdrop-filter: blur(16px)) or (-webkit-backdrop-filter: blur(16px)) {
+    .plan-header,
+    .dashboard-header,
+    .dashboard-save-feedback {
+        background-color: rgb(20 20 20 / 85%);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
+    }
+}
+
+.dashboard-save-feedback.is-fading {
+    opacity: 0;
+}
+
+.session-save-success {
+    color: var(--color-reward);
+}
+
+:is(#review-finish-btn, #review-continue-btn, #dashboard-retry-btn):disabled {
+    opacity: 0.65;
+    cursor: wait;
+    filter: none;
 }

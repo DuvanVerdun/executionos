@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, ForeignKey
+from sqlalchemy import String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from extensions import db
@@ -29,6 +29,7 @@ class User(db.Model):
 class Session(db.Model):
     """Session model for the application."""
     __tablename__ = "sessions"
+    __table_args__ = (UniqueConstraint("user_id", "submission_id", name="uq_sessions_user_submission"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -38,6 +39,7 @@ class Session(db.Model):
     mission: Mapped[str] = mapped_column(String(200), nullable=False)
     target_time_seconds: Mapped[int] = mapped_column(nullable=False)
     actual_time_seconds: Mapped[int] = mapped_column(nullable=False)
+    submission_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     def __init__(self, user_id: int, date: datetime, mission: str, target_time_seconds: int, actual_time_seconds: int) -> None:
         self.user_id = user_id

@@ -20,6 +20,12 @@ const ACTIVE_SESSION_STORAGE_KEY = 'executionOS_activeSession';
 // ========== STATE ==========
 
 let accessToken = null;
+let authenticatedUserId = null;
+let isFinishingSession = false;
+let isSyncingSessions = false;
+let pendingSubmission = null;
+let saveMessageFadeTimeout = null;
+let saveMessageHideTimeout = null;
 let isUserMenuOpened = false;
 let timerInterval = null;
 
@@ -36,26 +42,33 @@ const activeSessionState = {
 };
 
 const sessionQueue = {
-    items: [],
     cap: 15,
-    storageKey: 'executionOS_sessionQueue',
-
-    load() {
-        const stored = localStorage.getItem(this.storageKey);
-        this.items = stored ? JSON.parse(stored) : [];
+    /** Return the account-specific browser queue key. */
+    storageKey(userId) {
+        return `executionOS_sessionQueue:${userId}`;
     },
-    save() {
-        localStorage.setItem(this.storageKey, JSON.stringify(this.items));
+    /** Read and validate the account's queued submissions. */
+    load(userId) {
+        const stored = localStorage.getItem(this.storageKey(userId));
+        const items = stored ? JSON.parse(stored) : [];
+        if (!Array.isArray(items)) throw new Error('Invalid saved session queue');
+        return items;
     },
-    add(item) {
-        if (this.items.length >= this.cap) return false;
-        this.items.push(item);
-        this.save();
-        return true;
+    /** Queue a submission under a cross-tab storage lock. */
+    async add(userId, item) {
+        await navigator.locks.request(this.storageKey(userId), /** Add a submission while holding its account queue lock. */ () => {
+            const items = this.load(userId);
+            if (items.some(/** Match an already queued submission by its ID. */ (saved) => saved.submissionId === item.submissionId)) return;
+            if (items.length >= this.cap) throw new Error('Session queue is full');
+            localStorage.setItem(this.storageKey(userId), JSON.stringify([...items, item]));
+        });
     },
-    removeFirst() {
-        this.items.shift();
-        this.save();
+    /** Remove a confirmed submission under a cross-tab storage lock. */
+    async remove(userId, submissionId) {
+        await navigator.locks.request(this.storageKey(userId), /** Remove a submission while holding its account queue lock. */ () => {
+            const items = this.load(userId).filter(/** Retain submissions other than the confirmed one. */ (item) => item.submissionId !== submissionId);
+            localStorage.setItem(this.storageKey(userId), JSON.stringify(items));
+        });
     }
 };
 
@@ -101,6 +114,8 @@ const dom = {
         email: document.getElementById('register-email-input'),
         password: document.getElementById('register-password-input'),
         passwordError: document.getElementById('register-password-error-message'),
+        emailError: document.getElementById('register-email-error-message'),
+        usernameError: document.getElementById('register-username-error-message'),
         submitButton: document.getElementById('register-submit-btn'),
         error: document.getElementById('register-error-message'),
         switchToLoginButton: document.getElementById('register-switch-to-login-btn')
@@ -109,6 +124,8 @@ const dom = {
         screen: document.querySelector('.login-screen'),
         form: document.getElementById('login-form'),
         usernameOrEmail: document.getElementById('login-username-or-email-input'),
+        identifierError: document.getElementById('login-identifier-error-message'),
+        passwordError: document.getElementById('login-password-error-message'),
         password: document.getElementById('login-password-input'),
         submitButton: document.getElementById('login-submit-btn'),
         error: document.getElementById('login-error-message'),
@@ -146,7 +163,8 @@ const dom = {
         status: document.getElementById('review-completion-status-display'),
         actualTime: document.getElementById('review-actual-time-display'),
         continueButton: document.getElementById('review-continue-btn'),
-        finishButton: document.getElementById('review-finish-btn')
+        finishButton: document.getElementById('review-finish-btn'),
+        saveMessage: document.getElementById('review-save-message')
     },
     dashboard: {
         screen: document.querySelector('.dashboard-screen'),
@@ -159,6 +177,7 @@ const dom = {
         menuIcon: document.getElementById('dashboard-user-menu-icon'),
         logoutButton: document.getElementById('dashboard-user-menu-logout-btn'),
         content: document.getElementById('dashboard-content'),
+        saveMessage: document.getElementById('dashboard-save-message'),
         loading: document.getElementById('dashboard-loading'),
         error: document.getElementById('dashboard-error'),
         retryButton: document.getElementById('dashboard-retry-btn'),
@@ -194,11 +213,13 @@ const dom = {
 
 // ========== DURATION AND SESSION DOMAIN ==========
 
+/** Convert an HH:MM duration to seconds. */
 function parseHHMMToSeconds(timeString) {
     const [hours, minutes] = timeString.split(':');
     return parseInt(hours) * 3600 + parseInt(minutes) * 60;
 }
 
+/** Format elapsed seconds for the timer display. */
 function formatDuration(totalSeconds) {
     const hours = Math.floor(Number(totalSeconds) / 3600);
     const minutes = Math.floor((Number(totalSeconds) % 3600) / 60);
@@ -208,6 +229,7 @@ function formatDuration(totalSeconds) {
     return seconds;
 }
 
+/** Format a duration using hours and whole minutes. */
 function formatDurationHoursMinutes(totalSeconds) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -215,6 +237,7 @@ function formatDurationHoursMinutes(totalSeconds) {
     return `${minutes}m`;
 }
 
+/** Format a duration with unit labels and sub-minute seconds. */
 function formatDurationHoursMinutesSeconds(totalSeconds) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -231,6 +254,7 @@ function formatDurationHoursMinutesSeconds(totalSeconds) {
     return `${seconds} sec`;
 }
 
+/** Update elapsed time from timestamps and return exact completion percentage. */
 function updateElapsedSessionTime(session) {
     if (session.pauseStartTimestamp) {
         const elapsed = (Date.now() - new Date(session.pauseStartTimestamp).getTime()) / 1000;
@@ -245,11 +269,13 @@ function updateElapsedSessionTime(session) {
     return exactPercentage;
 }
 
+/** Start periodic display updates for a running session. */
 function startTimer(session) {
     session.isTimerRunning = true;
     timerInterval = setInterval(updateTimer, 1000);
 }
 
+/** Refresh and persist the running session's elapsed time. */
 function updateTimer() {
     if (!activeSessionState.isTimerRunning) return;
     const exactPercentage = updateElapsedSessionTime(activeSessionState);
@@ -257,12 +283,14 @@ function updateTimer() {
     saveActiveSession(activeSessionState);
 }
 
+/** Pause display updates and record when the pause began. */
 function pauseSession(session) {
     clearInterval(timerInterval);
     session.isTimerRunning = false;
     session.pauseStartTimestamp = new Date();
 }
 
+/** Account for paused time and restart display updates. */
 function resumeSession(session) {
     const elapsed = (Date.now() - new Date(session.pauseStartTimestamp).getTime()) / 1000;
     session.pausedTimeSeconds += elapsed;
@@ -270,6 +298,7 @@ function resumeSession(session) {
     startTimer(session);
 }
 
+/** Stop the timer and capture the session's final elapsed time. */
 function stopSession(session) {
     clearInterval(timerInterval);
     session.isTimerRunning = false;
@@ -283,6 +312,7 @@ function stopSession(session) {
     }
 }
 
+/** Clear the current mission and timing state. */
 function resetSessionState(session) {
     session.currentMission = '';
     session.targetTimeSeconds = 0;
@@ -295,16 +325,18 @@ function resetSessionState(session) {
     session.pausedTimeSeconds = 0;
 }
 
+/** Return the first unmet password requirement, or an empty string. */
 function getPasswordError(password) {
     if (password.length < 12) return 'At least 12 characters.';
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#\$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]).+$/;
-    if (!regex.test(password)) return 'Must contain uppercase, lowercase, symbol, and number.';
+    if (!regex.test(password)) return 'Add uppercase, lowercase, a number and a symbol.';
     return '';
 }
 
 
 // ========== LOCAL PERSISTENCE AND OFFLINE QUEUE ==========
 
+/** Persist active session state and its pending submission. */
 function saveActiveSession(session) {
     const activeSession = {
         mission: session.currentMission,
@@ -312,22 +344,29 @@ function saveActiveSession(session) {
         actualTimeSeconds: session.actualTimeSeconds,
         startTimestamp: session.startTimestamp,
         pauseStartTimestamp: session.pauseStartTimestamp,
-        pausedTimeSeconds: session.pausedTimeSeconds
+        pausedTimeSeconds: session.pausedTimeSeconds,
+        userId: authenticatedUserId,
+        pendingSubmission
     };
     localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, JSON.stringify(activeSession));
 }
 
+/** Restore an eligible active session in a paused state. */
 function loadActiveSession(session) {
     const stored = localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
     if (!stored) return false;
 
     const activeSession = JSON.parse(stored);
+    if (activeSession.userId != null && activeSession.userId !== authenticatedUserId) return false;
+    pendingSubmission = activeSession.pendingSubmission ?? null;
     session.currentMission = activeSession.mission;
     session.targetTimeSeconds = activeSession.targetTimeSeconds;
     session.actualTimeSeconds = activeSession.actualTimeSeconds;
     session.startTimestamp = activeSession.startTimestamp;
     session.pauseStartTimestamp = activeSession.pauseStartTimestamp;
     session.pausedTimeSeconds = activeSession.pausedTimeSeconds;
+    session.percentageCompleted = Math.floor(session.actualTimeSeconds / session.targetTimeSeconds * 100);
+    session.completionStatus = session.actualTimeSeconds >= session.targetTimeSeconds ? 'completed' : 'partial';
 
     if (!session.pauseStartTimestamp) {
         const startTime = new Date(session.startTimestamp).getTime();
@@ -338,34 +377,80 @@ function loadActiveSession(session) {
     return true;
 }
 
+/** Remove the persisted active session. */
 function clearActiveSession() {
     localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
 }
 
-async function retryQueue() {
-    while (sessionQueue.items.length > 0) {
-        try {
-            const sessionData = sessionQueue.items[0];
-            await postSession(sessionData);
-            sessionQueue.removeFirst();
-        } catch (error) {
-            console.error('Retry failed:', error);
-            break;
+/** Retry the signed-in account's queued submissions and refresh displayed totals. */
+async function syncOfflineWork() {
+    if (!accessToken || isSyncingSessions || isFinishingSession) return;
+    const userId = authenticatedUserId;
+    isSyncingSessions = true;
+    let synced = 0;
+    let queueLoaded = false;
+    try {
+        const items = sessionQueue.load(userId);
+        queueLoaded = true;
+        if (!items.length) return;
+        for (const item of items) {
+            if (authenticatedUserId !== userId) return;
+            await postSession(item, userId);
+            if (authenticatedUserId !== userId) return;
+            await sessionQueue.remove(userId, item.submissionId);
+            synced += 1;
+        }
+        setDashboardSaveMessage('Your saved sessions are synced. Nice work.', { saved: true });
+    } catch (error) {
+        console.error('Session sync failed:', error);
+        if (authenticatedUserId !== userId) return;
+        const needsSignIn = error.status === 401 || error.status === 403;
+        let message = 'Sessions saved on this browser are waiting to sync. Dashboard totals update after syncing.';
+        if (!queueLoaded) message = 'Couldn’t read browser saves. Please reload to try again.';
+        else if (needsSignIn) message = 'Sessions are saved on this browser. Sign in again to sync them.';
+        else if (error.status === 400 || error.status === 409) {
+            message = 'A saved session needs attention before it can sync. It is still on this browser.';
+        }
+        setDashboardSaveMessage(message);
+    } finally {
+        isSyncingSessions = false;
+        if (synced && authenticatedUserId === userId) {
+            if (dom.dashboard.screen.style.display !== 'none' && dom.dashboard.screen.style.display) {
+                await loadDashboard();
+            } else {
+                await loadStreak('plan');
+            }
         }
     }
 }
 
-async function syncOfflineWork() {
-    sessionQueue.load();
-    if (sessionQueue.items.length > 0) {
-        alert('Syncing offline work...');
-        await retryQueue();
-    }
+/** Show temporary save feedback with a five-second hold and one-second fade. */
+function setDashboardSaveMessage(message, { saved = false } = {}) {
+    clearTimeout(saveMessageFadeTimeout);
+    clearTimeout(saveMessageHideTimeout);
+    dom.dashboard.saveMessage.textContent = message;
+    dom.dashboard.saveMessage.classList.toggle('session-save-success', saved);
+    dom.dashboard.saveMessage.classList.remove('is-fading');
+    dom.dashboard.saveMessage.hidden = !message;
+    if (!message) return;
+    saveMessageFadeTimeout = setTimeout(/** Begin fading the save message after its display interval. */ () => {
+        dom.dashboard.saveMessage.classList.add('is-fading');
+        saveMessageHideTimeout = setTimeout(/** Hide the save message after its fade completes. */ () => {
+            dom.dashboard.saveMessage.hidden = true;
+        }, 1000);
+    }, 5000);
+}
+
+/** Wait until feedback has been visible for at least two seconds. */
+async function waitForMinimumFeedback(startedAt) {
+    const remaining = 2000 - (performance.now() - startedAt);
+    if (remaining > 0) await new Promise(/** Resolve when the remaining feedback interval expires. */ (resolve) => setTimeout(resolve, remaining));
 }
 
 
 // ========== API AND AUTHENTICATION TRANSPORT ==========
 
+/** Send a cookie-enabled unauthenticated JSON request and include its HTTP status. */
 async function unauthFetch(options) {
     if (!options.path || !options.method) {
         throw new Error('Missing required options: path and method');
@@ -381,19 +466,23 @@ async function unauthFetch(options) {
     return result;
 }
 
+/** Submit account registration details. */
 function register(username, email, password) {
     return unauthFetch({ path: 'register', method: 'POST', body: { username, email, password } });
 }
 
+/** Submit username or email and password credentials. */
 function login(usernameOrEmail, password) {
     return unauthFetch({ path: 'login', method: 'POST', body: { usernameOrEmail, password } });
 }
 
+/** Request fresh credentials using the refresh cookie. */
 async function refreshAccessToken() {
     const response = await fetch(`${BACKEND_URL}/api/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
+        credentials: 'include',
+        signal: AbortSignal.timeout(20000)
     });
     if (response.status === 401 || response.status === 403) return '';
 
@@ -402,6 +491,7 @@ async function refreshAccessToken() {
     return result;
 }
 
+/** Send a JSON request with the supplied access token. */
 function sendAuthenticatedRequest(options, token) {
     return fetch(`${BACKEND_URL}/api/${options.path}`, {
         method: options.method,
@@ -409,10 +499,12 @@ function sendAuthenticatedRequest(options, token) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(options.body)
+        body: JSON.stringify(options.body),
+        signal: options.signal
     });
 }
 
+/** Send an authenticated request and retry once after token refresh. */
 async function apiFetch(options) {
     if (!options.path || !options.method) {
         throw new Error('Missing required options: path and method');
@@ -420,10 +512,24 @@ async function apiFetch(options) {
     const response = await sendAuthenticatedRequest(options, accessToken);
     if (response.status === 401) {
         const result = await refreshAccessToken();
+        if (!result || (options.userId != null && result.user_id !== options.userId)) {
+            const error = new Error('Please sign in to the account that owns this session.');
+            error.status = 401;
+            if (!options.keepScreen) {
+                navigateTo('login', options.currentScreen);
+                dom.login.error.textContent = 'Please sign in again. Queued sessions remain on this browser.';
+            }
+            throw error;
+        }
         const retry = await sendAuthenticatedRequest(options, result.access_token);
         if (retry.status === 401) {
-            navigateTo('login', options.currentScreen);
-            throw new Error('Unauthorized: Please log in.');
+            if (!options.keepScreen) {
+                navigateTo('login', options.currentScreen);
+                dom.login.error.textContent = 'Please sign in again. Queued sessions remain on this browser.';
+            }
+            const error = new Error('Unauthorized: Please log in.');
+            error.status = 401;
+            throw error;
         }
         const retryResult = await retry.json();
         retryResult.status = retry.status;
@@ -435,18 +541,33 @@ async function apiFetch(options) {
     return result;
 }
 
+/** Request refresh-session invalidation on the server. */
 function logout() {
     return apiFetch({ path: 'logout', method: 'POST' });
 }
 
-function postSession(sessionData) {
-    return apiFetch({ path: 'save-session', method: 'POST', body: sessionData, currentScreen: 'review' });
+/** Submit a session for its owner and require confirmed server acceptance. */
+async function postSession(sessionData, userId) {
+    if (userId !== authenticatedUserId) throw new Error('Session account changed');
+    const result = await apiFetch({
+        path: 'save-session', method: 'POST', body: sessionData,
+        currentScreen: 'review', keepScreen: true, userId,
+        signal: AbortSignal.timeout(20000)
+    });
+    if (result.status < 200 || result.status >= 300 || result.success !== true) {
+        const error = new Error(result.error || 'The server did not save this session');
+        error.status = result.status;
+        throw error;
+    }
+    return result;
 }
 
+/** Return the browser's resolved time zone. */
 function getBrowserTimezone() {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+/** Request summary and trend data for the selected period. */
 function fetchDashboardData(period, anchorDate, currentScreen = 'dashboard') {
     const params = new URLSearchParams({
         period,
@@ -461,6 +582,7 @@ function fetchDashboardData(period, anchorDate, currentScreen = 'dashboard') {
     });
 }
 
+/** Request a filtered page of sessions and daily summaries. */
 function fetchSessionsPage(
     period,
     anchorDate,
@@ -485,6 +607,7 @@ function fetchSessionsPage(
     });
 }
 
+/** Request streak and calendar data for a month. */
 function fetchStreak(anchorDate, currentScreen) {
     const params = new URLSearchParams({
         anchor_date: anchorDate,
@@ -498,10 +621,12 @@ function fetchStreak(anchorDate, currentScreen) {
     });
 }
 
+/** Request deletion of an owned session. */
 function deleteSession(sessionId) {
     return apiFetch({ path: `delete-session/${sessionId}`, method: 'DELETE', currentScreen: 'dashboard' });
 }
 
+/** Submit a feedback message from the current screen. */
 function postFeedback(feedbackMessage, currentScreen) {
     return apiFetch({ path: 'feedback', method: 'POST', body: { message: feedbackMessage }, currentScreen });
 }
@@ -509,6 +634,7 @@ function postFeedback(feedbackMessage, currentScreen) {
 
 // ========== DASHBOARD DATA ==========
 
+/** Format a local calendar date as YYYY-MM-DD. */
 function formatLocalDate(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -516,23 +642,27 @@ function formatLocalDate(date) {
     return `${year}-${month}-${day}`;
 }
 
+/** Reset the Dashboard to its initial period and pagination state. */
 function initializeDashboardState() {
     if (!dashboardState.anchorDate) {
         dashboardState.anchorDate = formatLocalDate(new Date());
     }
 }
 
+/** Reset streak data and calendar navigation state. */
 function initializeStreakState() {
     if (!streakState.anchorDate) {
         streakState.anchorDate = formatLocalDate(new Date());
     }
 }
 
+/** Parse a YYYY-MM-DD string as a local calendar date. */
 function parseLocalDate(dateString) {
     const [year, month, day] = dateString.split('-').map(Number);
     return new Date(year, month - 1, day);
 }
 
+/** Normalize an anchor to the selected calendar period. */
 function normalizePeriodAnchor(period, anchorDate) {
     const date = parseLocalDate(anchorDate);
     if (period === 'week') {
@@ -546,6 +676,7 @@ function normalizePeriodAnchor(period, anchorDate) {
     return formatLocalDate(date);
 }
 
+/** Move an anchor backward or forward by one period. */
 function shiftPeriodAnchor(period, anchorDate, direction) {
     const date = parseLocalDate(
         normalizePeriodAnchor(period, anchorDate)
@@ -562,6 +693,7 @@ function shiftPeriodAnchor(period, anchorDate, direction) {
     return formatLocalDate(date);
 }
 
+/** Move an anchor backward or forward by one calendar month. */
 function shiftMonthAnchor(anchorDate, direction) {
     const date = parseLocalDate(anchorDate);
     date.setDate(1);
@@ -569,14 +701,17 @@ function shiftMonthAnchor(anchorDate, direction) {
     return formatLocalDate(date);
 }
 
+/** Convert a session timestamp to a local Date. */
 function getSessionLocalDate(session) {
     return new Date(`${session.date}Z`);
 }
 
+/** Return a session's local calendar date key. */
 function getSessionLocalDateKey(session) {
     return formatLocalDate(getSessionLocalDate(session));
 }
 
+/** Format a session date for a history card heading. */
 function formatSessionDateLabel(session) {
     return new Intl.DateTimeFormat('en-US', {
         weekday: 'long',
@@ -585,6 +720,7 @@ function formatSessionDateLabel(session) {
     }).format(getSessionLocalDate(session));
 }
 
+/** Format a calendar date for period navigation. */
 function formatPeriodDate(dateString) {
     if (!dateString) return '';
 
@@ -594,6 +730,7 @@ function formatPeriodDate(dateString) {
     }).format(parseLocalDate(dateString));
 }
 
+/** Format a trend bucket label for the selected period. */
 function formatTrendBucketLabel(bucketStart, period) {
     const date = parseLocalDate(bucketStart);
 
@@ -615,18 +752,28 @@ function formatTrendBucketLabel(bucketStart, period) {
 
 // ========== SHARED UI PRESENTATION ==========
 
+/** Store authenticated identity and update the displayed username. */
 function setAuthenticatedUser(result) {
+    if (authenticatedUserId !== (result.user_id ?? null)) {
+        pendingSubmission = null;
+        setDashboardSaveMessage('');
+    }
     accessToken = result.access_token;
+    authenticatedUserId = result.user_id ?? null;
     dom.plan.username.textContent = result.username;
     dom.dashboard.username.textContent = result.username;
 }
 
+/** Clear in-memory identity and displayed account feedback. */
 function clearAuthenticatedUser() {
     accessToken = null;
+    authenticatedUserId = null;
+    setDashboardSaveMessage('');
     dom.plan.username.textContent = '';
     dom.dashboard.username.textContent = '';
 }
 
+/** Render completion using the colors before and after the target. */
 function renderProgressRing(ring, percentage, beforeTargetColor, afterTargetColor) {
     if (percentage < 100) {
         ring.style.setProperty('--pct', `${percentage}%`);
@@ -639,20 +786,23 @@ function renderProgressRing(ring, percentage, beforeTargetColor, afterTargetColo
     }
 }
 
+/** Update the Focus timer value and progress ring. */
 function renderFocusTimer(session, exactPercentage) {
     dom.focus.currentTime.textContent = formatDuration(session.actualTimeSeconds);
     renderProgressRing(dom.focus.timerRing, exactPercentage, 'var(--color-white)', 'var(--color-reward)');
 }
 
+/** Render the current mission, target, and elapsed time. */
 function renderFocusSession(session) {
     dom.focus.mission.textContent = session.currentMission;
     dom.focus.targetTime.textContent = formatDuration(session.targetTimeSeconds);
     dom.focus.currentTime.textContent = formatDuration(session.actualTimeSeconds);
 }
 
+/** Render session results and the completion-dependent Continue button. */
 function renderReviewSession(session) {
     dom.review.mission.textContent = session.currentMission;
-    dom.review.targetTime.textContent = formatDuration(session.targetTimeSeconds);
+    dom.review.targetTime.textContent = `Target: ${formatDurationHoursMinutesSeconds(session.targetTimeSeconds)}`;
     dom.review.percentage.textContent = `${session.percentageCompleted}%`;
     dom.review.status.textContent =
         session.completionStatus.charAt(0).toUpperCase() + session.completionStatus.slice(1);
@@ -663,18 +813,21 @@ function renderReviewSession(session) {
     }
 }
 
+/** Replace the startup spinner with error feedback and Retry. */
 function showLoadingScreenError() {
     dom.loading.spinner.style.display = 'none';
     dom.loading.error.style.display = 'flex';
     dom.loading.retryButton.style.display = 'flex';
 }
 
+/** Show the startup spinner and hide previous error feedback. */
 function showLoadingSpinner() {
     dom.loading.spinner.style.display = 'flex';
     dom.loading.error.style.display = 'none';
     dom.loading.retryButton.style.display = 'none';
 }
 
+/** Set password visibility and the visibility button's accessible label. */
 function setPasswordVisibility(passwordInput, visibilityButton, visible) {
     const showIcon = visibilityButton.querySelector('.password-show-icon');
     const hideIcon = visibilityButton.querySelector('.password-hide-icon');
@@ -684,15 +837,18 @@ function setPasswordVisibility(passwordInput, visibilityButton, visible) {
     visibilityButton.ariaLabel = visible ? 'Hide password' : 'Show password';
 }
 
+/** Toggle a password field between concealed and visible text. */
 function togglePasswordVisibility(passwordInput, visibilityButton) {
     setPasswordVisibility(passwordInput, visibilityButton, passwordInput.type === 'password');
 }
 
+/** Conceal a password and reset its visibility control. */
 function hidePassword(passwordInput) {
     const visibilityButton = passwordInput.parentElement.querySelector('.password-visibility-btn');
     setPasswordVisibility(passwordInput, visibilityButton, false);
 }
 
+/** Toggle the account menu for the selected screen. */
 function toggleUserMenu(screen) {
     const menu = dom[screen].userMenu;
     if (isUserMenuOpened) {
@@ -704,6 +860,7 @@ function toggleUserMenu(screen) {
     isUserMenuOpened = true;
 }
 
+/** Close account menus when a click occurs outside their controls. */
 function closeUserMenusOnOutsideClick(event) {
     if (!isUserMenuOpened) return;
     const clickedInsidePlanMenu = dom.plan.userMenu.contains(event.target);
@@ -728,11 +885,12 @@ const ALLOWED_SCREEN_TRANSITIONS = {
     register: ['loading', 'login'],
     login: ['register', 'plan', 'focus', 'review', 'dashboard'],
     plan: ['loading', 'register', 'login', 'dashboard'],
-    focus: ['loading', 'plan', 'review'],
-    review: ['focus'],
+    focus: ['loading', 'login', 'register', 'plan', 'review'],
+    review: ['loading', 'login', 'register', 'focus'],
     dashboard: ['plan', 'review']
 };
 
+/** Apply an allowed screen transition and prepare its presentation. */
 function navigateTo(nextScreen, currentScreen) {
     if (!ALLOWED_SCREEN_TRANSITIONS[nextScreen]?.includes(currentScreen)) return;
     closeFeedbackForm();
@@ -761,6 +919,7 @@ function navigateTo(nextScreen, currentScreen) {
     dom[nextScreen].screen.style.display = SCREEN_DISPLAY[nextScreen];
 }
 
+/** Show Dashboard loading surfaces and hide results and errors. */
 function showDashboardLoading() {
     dom.dashboard.error.style.display = 'none';
     dom.dashboard.dataContainer.style.display = 'none';
@@ -768,11 +927,13 @@ function showDashboardLoading() {
     dom.dashboard.loading.style.display = 'flex';
 }
 
+/** Hide Dashboard loading surfaces. */
 function hideDashboardLoading() {
     dom.dashboard.loading.style.display = 'none';
 }
 
 
+/** Show Dashboard error feedback and hide loading and results. */
 function showDashboardError() {
     hideDashboardLoading();
     dom.dashboard.dataContainer.style.display = 'none';
@@ -782,6 +943,7 @@ function showDashboardError() {
 
 // ========== DASHBOARD UI ==========
 
+/** Create the session history heading. */
 function createSessionListTitle() {
     const title = document.createElement('h2');
     title.className = 'dashboard-content-title';
@@ -789,6 +951,7 @@ function createSessionListTitle() {
     return title;
 }
 
+/** Create a session's mission and deletion menu. */
 function createSessionMissionSection(session) {
     const container = document.createElement('div');
     const mission = document.createElement('p');
@@ -812,6 +975,7 @@ function createSessionMissionSection(session) {
     return container;
 }
 
+/** Create a session's target, focused time, and completion metrics. */
 function createSessionTimeSection(session) {
     const container = document.createElement('div');
     const targetTime = document.createElement('p');
@@ -831,6 +995,7 @@ function createSessionTimeSection(session) {
     return container;
 }
 
+/** Create aggregated metrics for a day of sessions. */
 function createDailySummarySection(summary) {
     const container = document.createElement('div');
     const title = document.createElement('p');
@@ -852,10 +1017,12 @@ function createDailySummarySection(summary) {
     return container;
 }
 
+/** Append mission and time sections to a session card. */
 function appendSessionToCard(session, card) {
     card.append(createSessionMissionSection(session), createSessionTimeSection(session));
 }
 
+/** Group sessions by local calendar date. */
 function groupSessionsByLocalDate(sessions) {
     const groups = new Map();
     for (const session of sessions) {
@@ -868,6 +1035,7 @@ function groupSessionsByLocalDate(sessions) {
     return groups;
 }
 
+/** Build a daily history card with an optional aggregate summary. */
 function createSessionDateCard(
     sessions,
     dailySummary
@@ -898,7 +1066,7 @@ function createSessionDateCard(
         );
     }
 
-    sessions.forEach((session, index) => {
+    sessions.forEach(/** Append a session and its separator to the daily card. */ (session, index) => {
         if (index > 0 || (dailySummary && dailySummary.total_sessions > 1)) {
             const divider =
                 document.createElement('span');
@@ -915,6 +1083,7 @@ function createSessionDateCard(
     return card;
 }
 
+/** Render session history grouped into daily cards. */
 function renderSessionsByDate(sessions) {
     dom.dashboard.sessionsList.innerHTML = '';
     dom.dashboard.sessionsList.appendChild(createSessionListTitle());
@@ -942,6 +1111,7 @@ function renderSessionsByDate(sessions) {
     );
 }
 
+/** Update the Dashboard's summary values. */
 function renderDashboardSummary(summary) {
     dom.dashboard.sessionCount.textContent = String(summary.total_sessions);
     dom.dashboard.totalTime.textContent = formatDurationHoursMinutes(summary.total_time_seconds);
@@ -957,8 +1127,9 @@ function renderDashboardSummary(summary) {
             )}`;
 }
 
+/** Update selected period controls and calendar navigation. */
 function renderDashboardPeriod(periodData) {
-    dom.dashboard.periodButtons.forEach((button) => {
+    dom.dashboard.periodButtons.forEach(/** Mark the button for the selected Dashboard period. */ (button) => {
         button.classList.toggle(
             'active',
             button.dataset.dashboardPeriod === dashboardState.period
@@ -993,6 +1164,7 @@ function renderDashboardPeriod(periodData) {
         || periodData.end_date >= today;
 }
 
+/** Render navigation from the current Dashboard selection. */
 function renderSelectedDashboardPeriod() {
     if (dashboardState.period === 'all_time') {
         renderDashboardPeriod({});
@@ -1006,6 +1178,7 @@ function renderSelectedDashboardPeriod() {
     renderDashboardPeriod({start_date: start, end_date: formatLocalDate(end)});
 }
 
+/** Select the numeric value for a trend metric. */
 function getTrendMetricValue(bucket, metric) {
     if (metric === 'time') {
         return bucket.total_time_seconds;
@@ -1016,6 +1189,7 @@ function getTrendMetricValue(bucket, metric) {
     return bucket.total_sessions;
 }
 
+/** Format a trend value for its metric. */
 function formatTrendMetricValue(value, metric) {
     if (metric === 'time') {
         return formatDurationHoursMinutes(value);
@@ -1026,8 +1200,9 @@ function formatTrendMetricValue(value, metric) {
     return String(value);
 }
 
+/** Mark the selected trend metric button. */
 function renderTrendMetricButtons() {
-    dom.dashboard.metricButtons.forEach((button) => {
+    dom.dashboard.metricButtons.forEach(/** Mark the button for the selected trend metric. */ (button) => {
         button.classList.toggle(
             'active',
             button.dataset.dashboardMetric === dashboardState.metric
@@ -1035,35 +1210,37 @@ function renderTrendMetricButtons() {
     });
 }
 
+/** Generate spaced axis ticks including the exact maximum. */
 function getTrendAxisTicks(maxValue, metric) {
-    // Time ticks use whole minutes; counts and percentages use whole numbers.
+
     const unit = metric === 'time' ? 60 : 1;
     const step = Math.max(unit, Math.floor(maxValue / 4 / unit) * unit);
     const ticks = [0];
     for (let value = step; value < maxValue; value += step) {
-        // Avoid crowding the final label when the exact maximum is nearby.
+
         if (maxValue - value >= step / 2) ticks.push(value);
     }
     ticks.push(maxValue);
     return ticks;
 }
 
+/** Build a cubic curve path with flat tangents at local extrema. */
 function createTrendCurvePath(points) {
     if (points.length < 2) return '';
-    const slopes = points.slice(1).map((point, index) =>
+    const slopes = points.slice(1).map(/** Calculate the slope between adjacent chart points. */ (point, index) =>
         (point.y - points[index].y) / (point.x - points[index].x)
     );
-    const tangents = points.map((point, index) => {
+    const tangents = points.map(/** Calculate the tangent at a chart point. */ (point, index) => {
         if (index === 0) return slopes[0];
         if (index === points.length - 1) return slopes[index - 1];
         const before = slopes[index - 1];
         const after = slopes[index];
-        // Flat tangents at peaks/valleys prevent invented overshooting values.
+
         if (before * after <= 0) return 0;
         return 2 * before * after / (before + after);
     });
     let path = `M ${points[0].x},${points[0].y}`;
-    points.slice(1).forEach((point, index) => {
+    points.slice(1).forEach(/** Append the cubic segment ending at this chart point. */ (point, index) => {
         const previous = points[index];
         const thirdWidth = (point.x - previous.x) / 3;
         path += ` C ${previous.x + thirdWidth},${previous.y + tangents[index] * thirdWidth}`
@@ -1073,14 +1250,15 @@ function createTrendCurvePath(points) {
     return path;
 }
 
+/** Render axes, gridlines, and available trend values as SVG. */
 function renderTrendChart() {
     const svg = dom.dashboard.trendChart;
     const today = formatLocalDate(new Date());
     const currentMonth = `${today.slice(0, 7)}-01`;
     const allBuckets = dashboardState.data?.trend ?? [];
-    // Week/Month retain their complete calendar axis; Year ends at this month.
+
     const trend = dashboardState.period === 'year'
-        ? allBuckets.filter((bucket) => bucket.bucket_start <= currentMonth)
+        ? allBuckets.filter(/** Retain calendar buckets through the current month. */ (bucket) => bucket.bucket_start <= currentMonth)
         : allBuckets;
 
     svg.innerHTML = '';
@@ -1099,8 +1277,8 @@ function renderTrendChart() {
     const chartWidth = width - left - right;
     const chartHeight = height - top - bottom;
 
-    const plottedBuckets = trend.filter((bucket) => bucket.bucket_start <= today);
-    const values = plottedBuckets.map((bucket) =>
+    const plottedBuckets = trend.filter(/** Retain buckets through the current local day. */ (bucket) => bucket.bucket_start <= today);
+    const values = plottedBuckets.map(/** Extract the selected metric from a plotted bucket. */ (bucket) =>
         getTrendMetricValue(bucket, dashboardState.metric)
     );
 
@@ -1109,13 +1287,14 @@ function renderTrendChart() {
         : dashboardState.metric === 'completion' ? 100 : 1;
     const maxValue = Math.max(...values, minimumMax);
 
+    /** Create an element in the SVG namespace. */
     const createSvgElement = (tag) =>
         document.createElementNS(
             'http://www.w3.org/2000/svg',
             tag
         );
 
-    getTrendAxisTicks(maxValue, dashboardState.metric).forEach((value) => {
+    getTrendAxisTicks(maxValue, dashboardState.metric).forEach(/** Append a horizontal gridline and its axis label. */ (value) => {
         const y = top + chartHeight - (value / maxValue) * chartHeight;
         const gridline = createSvgElement('line');
         gridline.setAttribute('x1', left);
@@ -1138,7 +1317,7 @@ function renderTrendChart() {
         svg.appendChild(label);
     });
 
-    const axisPoints = trend.map((bucket, index) => {
+    const axisPoints = trend.map(/** Calculate chart coordinates and metric data for a bucket. */ (bucket, index) => {
         const x = trend.length === 1
             ? left + chartWidth / 2
             : left + (index / (trend.length - 1)) * chartWidth;
@@ -1158,9 +1337,9 @@ function renderTrendChart() {
         };
     });
 
-    const points = axisPoints.filter((point) => point.bucket.bucket_start <= today);
+    const points = axisPoints.filter(/** Retain chart points through the current local day. */ (point) => point.bucket.bucket_start <= today);
     const labelInterval = Math.max(1, Math.ceil(axisPoints.length / 8));
-    axisPoints.forEach((point, index) => {
+    axisPoints.forEach(/** Append vertical gridlines at labeled bucket positions. */ (point, index) => {
         if (index % labelInterval !== 0 && index !== axisPoints.length - 1) return;
         const gridline = createSvgElement('line');
         gridline.setAttribute('x1', point.x);
@@ -1181,7 +1360,7 @@ function renderTrendChart() {
         gradient.setAttribute('x2', '0');
         gradient.setAttribute('y1', top);
         gradient.setAttribute('y2', top + chartHeight);
-        [0, 1].forEach((offset) => {
+        [0, 1].forEach(/** Append a color stop to the trend area gradient. */ (offset) => {
             const stop = createSvgElement('stop');
             stop.setAttribute('offset', offset);
             stop.setAttribute('stop-color', 'var(--color-reward)');
@@ -1203,7 +1382,7 @@ function renderTrendChart() {
         svg.appendChild(line);
     }
 
-    points.forEach((point) => {
+    points.forEach(/** Append a plotted point and its value tooltip. */ (point) => {
         const circle = createSvgElement('circle');
 
         circle.setAttribute('cx', point.x);
@@ -1227,7 +1406,7 @@ function renderTrendChart() {
 
     });
 
-    axisPoints.forEach((point, index) => {
+    axisPoints.forEach(/** Append a label at an eligible bucket position. */ (point, index) => {
         const shouldRenderLabel =
             index % labelInterval === 0
             || index === axisPoints.length - 1;
@@ -1250,6 +1429,7 @@ function renderTrendChart() {
     });
 }
 
+/** Render summary, chart, and history or the empty-period state. */
 function renderDashboardData() {
     if (!dashboardState.data) return;
 
@@ -1282,6 +1462,7 @@ function renderDashboardData() {
     setupSessionsPaginationObserver();
 }
 
+/** Observe the history sentinel to load more sessions. */
 function setupSessionsPaginationObserver() {
     if (dashboardState.sessionObserver) {
         dashboardState.sessionObserver.disconnect();
@@ -1296,6 +1477,7 @@ function setupSessionsPaginationObserver() {
     if (dashboardState.paginationFailed) return;
 
     dashboardState.sessionObserver = new IntersectionObserver(
+        /** Load another history page when the sentinel enters the viewport. */
         async (entries) => {
             if (!entries[0].isIntersecting) return;
 
@@ -1312,6 +1494,7 @@ function setupSessionsPaginationObserver() {
     );
 }
 
+/** Fetch and append the next session page for the current period. */
 async function loadMoreSessions() {
     if (
         dashboardState.isLoading
@@ -1368,35 +1551,40 @@ async function loadMoreSessions() {
     }
 }
 
+/** Toggle a history session's action menu. */
 function toggleSessionMenu(event) {
     const toggleIcon = event.target.closest('.dashboard-session-open-menu-icon');
     if (!toggleIcon) return;
     const menu = toggleIcon.parentElement.querySelector('.dashboard-session-menu');
     const wasOpen = menu.style.display === 'flex';
-    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach((otherMenu) => {
+    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach(/** Close other session menus before toggling the selected menu. */ (otherMenu) => {
         otherMenu.style.display = 'none';
     });
     menu.style.display = wasOpen ? 'none' : 'flex';
 }
 
+/** Close history menus when clicking outside their controls. */
 function closeSessionMenusOnOutsideClick(event) {
     if (event.target.closest('.dashboard-session-menu, .dashboard-session-open-menu-icon')) return;
-    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach((menu) => {
+    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach(/** Close a history session menu. */ (menu) => {
         menu.style.display = 'none';
     });
 }
 
+/** Open feedback entry and record its originating screen. */
 function openFeedbackForm(currentScreen) {
     feedbackState.currentScreen = currentScreen;
     if (isUserMenuOpened) toggleUserMenu(currentScreen);
     dom.dashboard.feedbackForm.style.display = 'flex';
 }
 
+/** Close feedback entry and clear its originating screen. */
 function closeFeedbackForm() {
     feedbackState.currentScreen = null;
     dom.dashboard.feedbackForm.style.display = 'none';
 }
 
+/** Close feedback entry when clicking outside the form and open controls. */
 function closeFeedbackFormOnOutsideClick(event) {
     if (dom.dashboard.feedbackForm.style.display !== 'flex') return;
     const clickedInsideForm = dom.dashboard.feedbackForm.contains(event.target);
@@ -1408,6 +1596,7 @@ function closeFeedbackFormOnOutsideClick(event) {
 
 // ========== APP WORKFLOWS ==========
 
+/** Restore authentication and route to the appropriate initial screen. */
 async function initializeApp() {
     try {
         const result = await refreshAccessToken();
@@ -1421,22 +1610,35 @@ async function initializeApp() {
     await routeToInitialScreen();
 }
 
-async function routeToInitialScreen() {
+/** Restore work or retry a pending Finish after authentication. */
+async function routeToInitialScreen(currentScreen = 'loading') {
     if (!accessToken) {
         navigateTo('register', 'loading');
         return;
     }
-    syncOfflineWork();
-    const restoredSession = loadActiveSession(activeSessionState);
+    let restoredSession = false;
+    try {
+        restoredSession = loadActiveSession(activeSessionState);
+    } catch (error) {
+        console.error('Could not restore the active session:', error);
+        setDashboardSaveMessage('Couldn’t restore browser saves. Please reload to try again.');
+    }
+    if (restoredSession && pendingSubmission) {
+        navigateTo('review', currentScreen);
+        await handleFinishWork();
+        return;
+    }
+    void syncOfflineWork();
     if (!restoredSession) {
-        navigateTo('plan', 'loading');
+        navigateTo('plan', currentScreen);
         await loadStreak('plan');
         return;
     }
-    alert('Returning to uncompleted session...');
-    navigateTo('focus', 'loading');
+    navigateTo('focus', currentScreen);
+    dom.focus.pauseButton.textContent = 'Resume';
 }
 
+/** Return a mission or duration validation error, or an empty string. */
 function validatePlan() {
     if (!dom.plan.mission.value) return 'Please enter a mission';
     if (dom.plan.mission.value.length > 50) return 'Mission must be 50 characters or less';
@@ -1449,6 +1651,7 @@ function validatePlan() {
     return '';
 }
 
+/** Validate the plan and start a timestamp-based work session. */
 function handleStartWork() {
     const error = validatePlan();
     if (error) {
@@ -1462,6 +1665,7 @@ function handleStartWork() {
     startTimer(activeSessionState);
 }
 
+/** Toggle the active session between paused and running states. */
 function handlePauseResume() {
     if (activeSessionState.isTimerRunning) {
         pauseSession(activeSessionState);
@@ -1473,52 +1677,131 @@ function handlePauseResume() {
     }
 }
 
+/** Stop the active session and open Review. */
 function handleStopWork() {
     stopSession(activeSessionState);
     navigateTo('review', 'focus');
 }
 
+/** Resume reviewed work when no submission is pending. */
 function handleContinueWork() {
+    if (isFinishingSession || pendingSubmission) return;
+    dom.review.saveMessage.textContent = '';
     navigateTo('focus', 'review');
     dom.focus.pauseButton.textContent = 'Pause';
     resumeSession(activeSessionState);
 }
 
+/** Clear completed work state and reset mission controls. */
 function resetApp() {
+    pendingSubmission = null;
     resetSessionState(activeSessionState);
     dom.plan.mission.value = '';
     dom.plan.targetTime.value = '00:00';
     dom.focus.currentTime.textContent = '00:00:00';
     dom.focus.timerRing.style.setProperty('--pct', '0%');
-    clearActiveSession();
+    try {
+        clearActiveSession();
+    } catch (error) {
+        console.error('Could not clear the saved active session:', error);
+    }
     dom.review.continueButton.classList.replace('normal-button', 'cta-button');
 }
 
+/** Save or queue the exact submission and show its outcome on Dashboard. */
 async function handleFinishWork() {
-    const sessionData = {
+    if (isFinishingSession) return;
+    const userId = authenticatedUserId;
+    if (userId == null) {
+        dom.review.saveMessage.textContent = 'Please sign in before saving this session.';
+        return;
+    }
+    isFinishingSession = true;
+    const feedbackStartedAt = performance.now();
+    dom.review.finishButton.disabled = true;
+    dom.review.continueButton.disabled = true;
+    dom.review.finishButton.textContent = pendingSubmission ? 'Retrying…' : 'Saving…';
+    dom.review.screen.setAttribute('aria-busy', 'true');
+    dom.review.saveMessage.textContent = '';
+    pendingSubmission ??= {
+        submissionId: crypto.randomUUID(),
         date: new Date().toISOString(),
         mission: activeSessionState.currentMission,
         targetTimeSeconds: activeSessionState.targetTimeSeconds,
         actualTimeSeconds: activeSessionState.actualTimeSeconds
     };
+    let queued = false;
+    let saved = false;
     try {
-        await postSession(sessionData);
-        alert('Session saved successfully!\nReady for next session.');
-    } catch (error) {
-        console.error('Save error:', error);
-        const addedToQueue = sessionQueue.add(sessionData);
-        if (!addedToQueue) {
-            alert('Queue full: connection issues persist. Cannot save more sessions.');
-        } else {
-            alert('Added to offline queue, will sync when online.');
+
+        try {
+            saveActiveSession(activeSessionState);
+        } catch (error) {
+            console.error('Could not persist the active session:', error);
         }
+        try {
+            await sessionQueue.add(userId, pendingSubmission);
+            queued = true;
+        } catch (error) {
+            console.error('Could not queue session:', error);
+        }
+        if (authenticatedUserId !== userId) return;
+        try {
+            await postSession(pendingSubmission, userId);
+            if (authenticatedUserId !== userId) return;
+            saved = true;
+        } catch (error) {
+            if (authenticatedUserId !== userId) return;
+            console.error('Save error:', error);
+            const rejected = error.status >= 400 && error.status < 500
+                && ![401, 403, 408, 429].includes(error.status);
+            if (rejected) {
+                if (queued) await sessionQueue.remove(userId, pendingSubmission.submissionId);
+                pendingSubmission = null;
+                try {
+                    saveActiveSession(activeSessionState);
+                } catch (storageError) {
+                    console.error('Could not update active session:', storageError);
+                }
+                dom.review.saveMessage.textContent = 'The server rejected this session. Your work is still here. Try again.';
+                return;
+            }
+            if (!queued) {
+                dom.review.saveMessage.textContent = 'Couldn’t save to the server or browser queue. Your work is still here. Try again.';
+                return;
+            }
+        }
+        if (saved && queued) {
+            try {
+                await sessionQueue.remove(userId, pendingSubmission.submissionId);
+            } catch (error) {
+
+                console.error('Could not remove synced session:', error);
+            }
+        }
+        await waitForMinimumFeedback(feedbackStartedAt);
+        if (authenticatedUserId !== userId) return;
+        resetApp();
+        navigateTo('dashboard', 'review');
+        setDashboardSaveMessage(saved
+            ? 'Session saved. Nice work.'
+            : 'Saved on this browser. Waiting to sync. Dashboard totals update after syncing.', { saved });
+        await loadDashboard();
+    } catch (error) {
+        console.error('Could not finish session:', error);
+        dom.review.saveMessage.textContent = 'Couldn’t finish saving. Your work is still here. Try again.';
+    } finally {
+        await waitForMinimumFeedback(feedbackStartedAt);
+        isFinishingSession = false;
+        dom.review.finishButton.disabled = false;
+        dom.review.continueButton.disabled = pendingSubmission !== null;
+        dom.review.finishButton.textContent = pendingSubmission ? 'Try again' : 'Finish';
+        dom.review.screen.removeAttribute('aria-busy');
     }
-    resetApp();
-    navigateTo('dashboard', 'review');
-    await loadDashboard();
 }
 
-async function loadDashboard() {
+/** Load period data and sessions while ignoring superseded results. */
+async function loadDashboard(feedbackStartedAt = null) {
     const generation = ++dashboardState.loadGeneration;
     const period = dashboardState.period;
     const anchorDate = dashboardState.anchorDate;
@@ -1530,7 +1813,7 @@ async function loadDashboard() {
     dashboardState.sessionObserver?.disconnect();
     dom.dashboard.sessionsLoadSentinel.style.display = 'none';
     renderSelectedDashboardPeriod();
-    showDashboardLoading();
+    if (feedbackStartedAt === null) showDashboardLoading();
 
     try {
         const [
@@ -1547,6 +1830,7 @@ async function loadDashboard() {
             )
         ]);
 
+        if (feedbackStartedAt !== null) await waitForMinimumFeedback(feedbackStartedAt);
         if (generation !== dashboardState.loadGeneration) return;
 
         if (!dashboardResult.success) {
@@ -1577,12 +1861,14 @@ async function loadDashboard() {
         }
 
         dashboardState.isLoading = false;
+        dom.dashboard.error.style.display = 'none';
         renderDashboardData();
         hideDashboardLoading();
 
         await loadStreak('dashboard');
 
     } catch (error) {
+        if (feedbackStartedAt !== null) await waitForMinimumFeedback(feedbackStartedAt);
         if (generation !== dashboardState.loadGeneration) return;
         console.error(
             'Dashboard loading error:',
@@ -1598,70 +1884,120 @@ async function loadDashboard() {
     }
 }
 
+/** Clear validation messages and invalid-field markers on both auth forms. */
+function clearAuthValidationFeedback() {
+    [dom.register.form, dom.login.form].forEach(/** Clear validation feedback for an authentication form. */ (form) => {
+        form.querySelectorAll('.form-error-message').forEach(/** Clear an authentication error message. */ (error) => {
+            error.textContent = '';
+        });
+        form.querySelectorAll('[aria-invalid]').forEach(/** Remove an authentication input invalid marker. */ (input) => {
+            input.removeAttribute('aria-invalid');
+        });
+    });
+}
+
+/** Display a field error and mark its input invalid. */
+function showAuthFieldError(input, errorElement, message) {
+    errorElement.textContent = message;
+    input.setAttribute('aria-invalid', 'true');
+}
+
+/** Validate registration fields and submit account creation with loading feedback. */
 async function handleRegister(event) {
     event.preventDefault();
+    if (dom.register.submitButton.disabled) return;
     dom.register.error.textContent = '';
-    dom.register.passwordError.textContent = '';
-    if (!dom.register.email.value || !dom.register.username.value) {
-        dom.register.error.textContent = 'Email and Username are needed to register';
-        return;
-    }
-    if (!dom.register.email.value.includes('@')) {
-        dom.register.error.textContent = 'Email must contain @';
-        return;
-    }
+    [dom.register.emailError, dom.register.usernameError, dom.register.passwordError].forEach(/** Clear a registration field error. */ (error) => {
+        error.textContent = '';
+    });
+    [dom.register.email, dom.register.username, dom.register.password].forEach(/** Remove a registration input invalid marker. */ (input) => {
+        input.removeAttribute('aria-invalid');
+    });
+    let firstInvalid = null;
+    /** Record a registration field error and preserve the first invalid input. */
+    const invalid = (input, error, message) => {
+        showAuthFieldError(input, error, message);
+        firstInvalid ??= input;
+    };
+    const email = dom.register.email.value;
+    if (!email) invalid(dom.register.email, dom.register.emailError, 'Enter your email.');
+    else if (!email.includes('@')) invalid(dom.register.email, dom.register.emailError, 'Include @ in your email.');
+    else if (!email.split('@')[1]) invalid(dom.register.email, dom.register.emailError, 'Add the address after @.');
+    else if (dom.register.email.validity.typeMismatch) invalid(dom.register.email, dom.register.emailError, 'Enter a valid email, like name@example.com.');
+    if (!dom.register.username.value) invalid(dom.register.username, dom.register.usernameError, 'Enter your username.');
     const passwordError = getPasswordError(dom.register.password.value);
-    if (passwordError) {
-        dom.register.passwordError.textContent = passwordError;
+    if (passwordError) invalid(dom.register.password, dom.register.passwordError, passwordError);
+    if (firstInvalid) {
+        firstInvalid.focus();
         return;
     }
-    let result;
+    dom.register.submitButton.disabled = true;
+    dom.register.submitButton.textContent = 'Creating account...';
+    dom.register.form.setAttribute('aria-busy', 'true');
     try {
-        result = await register(dom.register.username.value, dom.register.email.value, dom.register.password.value);
+        const result = await register(dom.register.username.value, email, dom.register.password.value);
+        if (result.success === true) {
+            setAuthenticatedUser(result);
+            await routeToInitialScreen('register');
+        } else if (result.status === 409) {
+            dom.register.error.textContent = 'Email or username is already in use.';
+        } else {
+            dom.register.error.textContent = "Couldn't create your account. Please try again.";
+        }
     } catch (error) {
-        dom.register.error.textContent = 'Network/Server connection failed. Please try again';
-        return;
-    }
-    if (result.status === 409) {
-        dom.register.error.textContent = 'Username or Email already taken.';
-        return;
-    } else if (result.status === 400) {
-        dom.register.error.textContent = 'Something went wrong. Please try again';
-        return;
-    } else if (result.success === true) {
-        setAuthenticatedUser(result);
-        navigateTo('plan', 'register');
-        await loadStreak('plan');
+        dom.register.error.textContent = "Couldn't reach the server. Try again.";
+    } finally {
+        dom.register.submitButton.disabled = false;
+        dom.register.submitButton.textContent = 'Register';
+        dom.register.form.removeAttribute('aria-busy');
     }
 }
 
+/** Validate login fields and submit credentials with loading feedback. */
 async function handleLogin(event) {
     event.preventDefault();
+    if (dom.login.submitButton.disabled) return;
     dom.login.error.textContent = '';
+    dom.login.identifierError.textContent = '';
+    dom.login.passwordError.textContent = '';
+    dom.login.usernameOrEmail.removeAttribute('aria-invalid');
+    dom.login.password.removeAttribute('aria-invalid');
+    let firstInvalid = null;
     if (!dom.login.usernameOrEmail.value) {
-        dom.login.error.textContent = 'Email or Username is needed to log in';
+        showAuthFieldError(dom.login.usernameOrEmail, dom.login.identifierError, 'Enter your username or email.');
+        firstInvalid = dom.login.usernameOrEmail;
+    }
+    if (!dom.login.password.value) {
+        showAuthFieldError(dom.login.password, dom.login.passwordError, 'Enter your password.');
+        firstInvalid ??= dom.login.password;
+    }
+    if (firstInvalid) {
+        firstInvalid.focus();
         return;
     }
-    let result;
+    dom.login.submitButton.disabled = true;
+    dom.login.submitButton.textContent = 'Logging in...';
+    dom.login.form.setAttribute('aria-busy', 'true');
     try {
-        result = await login(dom.login.usernameOrEmail.value, dom.login.password.value);
+        const result = await login(dom.login.usernameOrEmail.value, dom.login.password.value);
+        if (result.success === true) {
+            setAuthenticatedUser(result);
+            await routeToInitialScreen('login');
+        } else if (result.status === 401) {
+            dom.login.error.textContent = 'Username, email or password is incorrect.';
+        } else {
+            dom.login.error.textContent = "Couldn't log in. Please try again.";
+        }
     } catch (error) {
-        dom.login.error.textContent = 'Network/Server connection failed. Please try again';
-        return;
-    }
-    if (result.status === 401) {
-        dom.login.error.textContent = 'Email, username or password is incorrect';
-        return;
-    } else if (result.status === 400) {
-        dom.login.error.textContent = 'Something went wrong. Please try again';
-        return;
-    } else if (result.success === true) {
-        setAuthenticatedUser(result);
-        navigateTo('plan', 'login');
-        await loadStreak('plan');
+        dom.login.error.textContent = "Couldn't reach the server. Try again.";
+    } finally {
+        dom.login.submitButton.disabled = false;
+        dom.login.submitButton.textContent = 'Login';
+        dom.login.form.removeAttribute('aria-busy');
     }
 }
 
+/** End the authenticated session and return to registration. */
 async function handleLogout(currentScreen) {
     if (!confirm('Are you sure you want to log out?')) return;
     try {
@@ -1673,6 +2009,7 @@ async function handleLogout(currentScreen) {
     }
 }
 
+/** Apply the target-duration input's keyboard behavior. */
 function handleTargetTimeKeydown(event) {
     const allowedKeys = /^\d$/.test(event.key) || event.key === 'Backspace';
     if (!allowedKeys) return;
@@ -1688,6 +2025,7 @@ function handleTargetTimeKeydown(event) {
     dom.plan.targetTime.setSelectionRange(caretPosition, caretPosition);
 }
 
+/** Delete the selected history session and reload Dashboard data. */
 async function handleDeleteSession(event) {
     const deleteButton = event.target.closest('.dashboard-delete-session-btn');
     if (!deleteButton) return;
@@ -1700,11 +2038,13 @@ async function handleDeleteSession(event) {
     }
 }
 
+/** Open Dashboard from Plan and load its data. */
 async function handleOpenDashboard() {
     navigateTo('dashboard', 'plan');
     await loadDashboard();
 }
 
+/** Validate and submit feedback with request-state controls. */
 async function handleSubmitFeedback(event) {
     event.preventDefault();
 
@@ -1754,6 +2094,7 @@ async function handleSubmitFeedback(event) {
     closeFeedbackForm();
 }
 
+/** Resize feedback input to fit its content. */
 function handleFeedbackInput() {
     const input = dom.dashboard.feedbackInput;
     input.style.overflowY = 'hidden';
@@ -1765,11 +2106,13 @@ function handleFeedbackInput() {
     }
 }
 
+/** Return from Dashboard to mission planning. */
 function handleDashboardToPlan() {
     navigateTo('plan', 'dashboard');
     if (dom.dashboard.feedbackForm.style.display === 'flex') closeFeedbackForm();
 }
 
+/** Select a Dashboard period and reload its data. */
 async function handleDashboardPeriodChange(event) {
     const button = event.target.closest(
         '[data-dashboard-period]'
@@ -1799,6 +2142,7 @@ async function handleDashboardPeriodChange(event) {
     await loadDashboard();
 }
 
+/** Move to the adjacent Dashboard period and reload its data. */
 async function handleDashboardPeriodNavigation(direction) {
     if (dashboardState.period === 'all_time') return;
 
@@ -1811,6 +2155,7 @@ async function handleDashboardPeriodNavigation(direction) {
     await loadDashboard();
 }
 
+/** Select a trend metric and redraw the chart. */
 function handleDashboardMetricChange(event) {
     const button = event.target.closest(
         '[data-dashboard-metric]'
@@ -1825,6 +2170,7 @@ function handleDashboardMetricChange(event) {
     renderTrendChart();
 }
 
+/** Build the consistency calendar and its month navigation controls. */
 function renderStreakPopup(screen, data) {
     const popup = dom[screen].streakPopup;
 
@@ -1864,6 +2210,7 @@ function renderStreakPopup(screen, data) {
     calendar.className = 'streak-calendar';
 
     ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(
+        /** Append a weekday heading to the consistency calendar. */
         (weekday) => {
             const label = document.createElement('span');
             label.textContent = weekday;
@@ -1888,7 +2235,7 @@ function renderStreakPopup(screen, data) {
         );
     }
 
-    data.calendar.days.forEach((day) => {
+    data.calendar.days.forEach(/** Append a day with its work, rest, or neutral state. */ (day) => {
         const dayElement = document.createElement('span');
         const visualState = day.state === 'work' || day.state === 'rest'
             ? day.state
@@ -1930,7 +2277,7 @@ function renderStreakPopup(screen, data) {
 
     popup.appendChild(restDays);
 
-    previousButton.addEventListener('click', async () => {
+    previousButton.addEventListener('click', /** Show the previous calendar month. */ async () => {
         streakState.anchorDate = shiftMonthAnchor(
             streakState.anchorDate,
             -1
@@ -1939,7 +2286,7 @@ function renderStreakPopup(screen, data) {
         await loadStreak(screen);
     });
 
-    nextButton.addEventListener('click', async () => {
+    nextButton.addEventListener('click', /** Show the next calendar month. */ async () => {
         streakState.anchorDate = shiftMonthAnchor(
             streakState.anchorDate,
             1
@@ -1949,6 +2296,7 @@ function renderStreakPopup(screen, data) {
     });
 }
 
+/** Update streak values and calendars on Plan and Dashboard. */
 function renderStreak(data) {
     for (const screen of ['plan', 'dashboard']) {
         dom[screen].streakButton.textContent =
@@ -1958,6 +2306,7 @@ function renderStreak(data) {
     }
 }
 
+/** Fetch and render streak information for the current calendar selection. */
 async function loadStreak(currentScreen) {
     try {
         const result = await fetchStreak(
@@ -1977,6 +2326,7 @@ async function loadStreak(currentScreen) {
     }
 }
 
+/** Toggle the selected screen's consistency calendar. */
 function toggleStreakPopup(screen) {
     const isOpen =
         streakState.openScreen === screen;
@@ -1993,6 +2343,7 @@ function toggleStreakPopup(screen) {
     streakState.openScreen = screen;
 }
 
+/** Close the consistency calendar on outside clicks. */
 function closeStreakPopupsOnOutsideClick(event) {
     if (!streakState.openScreen) return;
 
@@ -2012,34 +2363,54 @@ function closeStreakPopupsOnOutsideClick(event) {
 
 // ========== EVENT WIRING ==========
 
+/** Connect application controls and browser events to their handlers. */
 function registerEventListeners() {
-    dom.loading.retryButton.addEventListener('click', async () => {
+    window.addEventListener('online', /** Retry queued submissions when connectivity returns. */ () => { void syncOfflineWork(); });
+    dom.loading.retryButton.addEventListener('click', /** Retry application initialization. */ async () => {
         showLoadingSpinner();
         await initializeApp();
     });
 
-    dom.passwordButtons.forEach((button) => {
-        button.addEventListener('click', () => {
+    dom.passwordButtons.forEach(/** Attach a password visibility handler. */ (button) => {
+        button.addEventListener('click', /** Toggle the associated password field visibility. */ () => {
             const passwordInput = button.parentElement.querySelector('.input');
             togglePasswordVisibility(passwordInput, button);
         });
     });
 
-    dom.register.switchToLoginButton.addEventListener('click', () => {
+    dom.register.switchToLoginButton.addEventListener('click', /** Clear auth feedback and switch to Login. */ () => {
+        clearAuthValidationFeedback();
         hidePassword(dom.register.password);
         navigateTo('login', 'register');
     });
-    dom.login.switchToRegisterButton.addEventListener('click', () => {
+    dom.login.switchToRegisterButton.addEventListener('click', /** Clear auth feedback and switch to Register. */ () => {
+        clearAuthValidationFeedback();
         hidePassword(dom.login.password);
         navigateTo('register', 'login');
+    });
+    [[dom.register.email, dom.register.emailError],
+        [dom.register.username, dom.register.usernameError],
+        [dom.register.password, dom.register.passwordError],
+        [dom.login.usernameOrEmail, dom.login.identifierError],
+        [dom.login.password, dom.login.passwordError]].forEach(/** Attach an input handler to clear a field validation error. */ ([input, error]) => {
+        input.addEventListener('input', /** Clear the edited field error and invalid marker. */ () => {
+            error.textContent = '';
+            input.removeAttribute('aria-invalid');
+        });
+    });
+    [dom.register.email, dom.register.username, dom.register.password].forEach(/** Attach a handler to clear registration request errors. */ (input) => {
+        input.addEventListener('input', /** Clear the registration request error after editing. */ () => { dom.register.error.textContent = ''; });
+    });
+    [dom.login.usernameOrEmail, dom.login.password].forEach(/** Attach a handler to clear login request errors. */ (input) => {
+        input.addEventListener('input', /** Clear the login request error after editing. */ () => { dom.login.error.textContent = ''; });
     });
     dom.register.form.addEventListener('submit', handleRegister);
     dom.login.form.addEventListener('submit', handleLogin);
 
-    dom.plan.userIcon.addEventListener('click', () => toggleUserMenu('plan'));
-    dom.dashboard.userIcon.addEventListener('click', () => toggleUserMenu('dashboard'));
-    dom.plan.logoutButton.addEventListener('click', () => handleLogout('plan'));
-    dom.dashboard.logoutButton.addEventListener('click', () => handleLogout('dashboard'));
+    dom.plan.userIcon.addEventListener('click', /** Toggle the Plan account menu. */ () => toggleUserMenu('plan'));
+    dom.dashboard.userIcon.addEventListener('click', /** Toggle the Dashboard account menu. */ () => toggleUserMenu('dashboard'));
+    dom.plan.logoutButton.addEventListener('click', /** Log out from Plan. */ () => handleLogout('plan'));
+    dom.dashboard.logoutButton.addEventListener('click', /** Log out from Dashboard. */ () => handleLogout('dashboard'));
     document.addEventListener('click', closeUserMenusOnOutsideClick);
 
     dom.plan.targetTime.addEventListener('keydown', handleTargetTimeKeydown);
@@ -2050,25 +2421,35 @@ function registerEventListeners() {
     dom.review.continueButton.addEventListener('click', handleContinueWork);
     dom.review.finishButton.addEventListener('click', handleFinishWork);
 
-    dom.dashboard.periodButtons.forEach((button) => {
+    dom.dashboard.periodButtons.forEach(/** Attach a period selection handler. */ (button) => {
         button.addEventListener('click', handleDashboardPeriodChange);
     });
-    dom.dashboard.previousPeriodButton.addEventListener('click', () => handleDashboardPeriodNavigation(-1));
-    dom.dashboard.nextPeriodButton.addEventListener('click', () => handleDashboardPeriodNavigation(1));
-    dom.dashboard.metricButtons.forEach((button) => {
+    dom.dashboard.previousPeriodButton.addEventListener('click', /** Show the previous Dashboard period. */ () => handleDashboardPeriodNavigation(-1));
+    dom.dashboard.nextPeriodButton.addEventListener('click', /** Show the next Dashboard period. */ () => handleDashboardPeriodNavigation(1));
+    dom.dashboard.metricButtons.forEach(/** Attach a trend metric selection handler. */ (button) => {
         button.addEventListener('click', handleDashboardMetricChange);
     });
-    dom.plan.streakButton.addEventListener('click', () => toggleStreakPopup('plan'));
-    dom.dashboard.streakButton.addEventListener('click', () => toggleStreakPopup('dashboard'));
+    dom.plan.streakButton.addEventListener('click', /** Toggle the Plan consistency calendar. */ () => toggleStreakPopup('plan'));
+    dom.dashboard.streakButton.addEventListener('click', /** Toggle the Dashboard consistency calendar. */ () => toggleStreakPopup('dashboard'));
     document.addEventListener('click', closeStreakPopupsOnOutsideClick);
 
-    dom.dashboard.paginationRetryButton.addEventListener('click', () => {
+    dom.dashboard.paginationRetryButton.addEventListener('click', /** Retry the failed history page request. */ () => {
         if (dashboardState.isLoading || dashboardState.isLoadingMore) return;
         dashboardState.paginationFailed = false;
         loadMoreSessions();
     });
-    dom.dashboard.retryButton.addEventListener('click', () => {
-        if (!dashboardState.isLoading) loadDashboard();
+    dom.dashboard.retryButton.addEventListener('click', /** Retry queued saves and Dashboard loading with minimum feedback duration. */ async () => {
+        if (dashboardState.isLoading || dom.dashboard.retryButton.disabled) return;
+        const feedbackStartedAt = performance.now();
+        dom.dashboard.retryButton.disabled = true;
+        dom.dashboard.retryButton.textContent = 'Retrying…';
+        try {
+            await Promise.all([syncOfflineWork(), loadDashboard(feedbackStartedAt)]);
+        } finally {
+            await waitForMinimumFeedback(feedbackStartedAt);
+            dom.dashboard.retryButton.disabled = false;
+            dom.dashboard.retryButton.textContent = 'Retry';
+        }
     });
     dom.dashboard.newMissionButton.addEventListener('click', handleDashboardToPlan);
     dom.dashboard.emptyStartButton.addEventListener('click', handleDashboardToPlan);
@@ -2076,8 +2457,8 @@ function registerEventListeners() {
     document.addEventListener('click', closeSessionMenusOnOutsideClick);
     dom.dashboard.sessionsList.addEventListener('click', handleDeleteSession);
 
-    document.querySelectorAll('[data-feedback-screen]').forEach((button) => {
-        button.addEventListener('click', () => {
+    document.querySelectorAll('[data-feedback-screen]').forEach(/** Attach a feedback-opening handler. */ (button) => {
+        button.addEventListener('click', /** Open feedback from the selected screen. */ () => {
             openFeedbackForm(button.dataset.feedbackScreen);
         });
     });
@@ -2091,6 +2472,6 @@ function registerEventListeners() {
 // ========== INITIALIZATION ==========
 
 registerEventListeners();
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', /** Initialize the application after the document is ready. */ async () => {
     await initializeApp();
 });
