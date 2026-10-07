@@ -504,8 +504,9 @@ button {
     --header-padding: clamp(16px, 2.083333vw, 48px);
     --header-gap: clamp(24px, 4.166667vw, 96px);
     --header-avatar-size: clamp(28px, 2.5vw, 64px);
+    --header-height: clamp(48px, 4.166667vw, 96px);
     top: var(--header-offset);
-    height: clamp(48px, 4.166667vw, 96px);
+    height: var(--header-height);
     padding: 0 var(--header-padding);
     gap: var(--header-gap);
 }
@@ -564,17 +565,18 @@ button {
 
 #plan-streak-popup,
 #dashboard-streak-popup {
+    --calendar-size-unit: clamp(0.625px, 0.052083333vw, 1.25px);
     position: absolute;
-    top: calc(100% + 16px);
+    top: calc(100% + 16 * var(--calendar-size-unit));
 
     right: calc(var(--header-padding) + var(--header-avatar-size) + var(--header-gap));
     box-sizing: border-box;
-    width: clamp(420px, 31.94vw, 460px);
-    max-height: calc(100dvh - 160px);
+    width: min(calc(460 * var(--calendar-size-unit)), calc(100vw - 32px));
+    max-height: calc(100dvh - var(--header-offset) - var(--header-height) - 48 * var(--calendar-size-unit));
     overflow-y: auto;
-    padding: clamp(24px, 2.5vw, 36px);
-    border: 1px solid var(--color-border);
-    border-radius: 24px;
+    padding: calc(36 * var(--calendar-size-unit));
+    border: var(--calendar-size-unit) solid var(--color-border);
+    border-radius: calc(24 * var(--calendar-size-unit));
     background-color: var(--color-surface);
 }
 
@@ -582,10 +584,10 @@ button {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 32px;
+    gap: calc(12 * var(--calendar-size-unit));
+    margin-bottom: calc(32 * var(--calendar-size-unit));
     color: var(--color-white);
-    font-size: clamp(24px, 2.22vw, 32px);
+    font-size: calc(32 * var(--calendar-size-unit));
     line-height: 1.25;
 }
 
@@ -606,11 +608,11 @@ button {
 .streak-calendar {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 6px;
+    gap: calc(6 * var(--calendar-size-unit));
     align-items: center;
     justify-items: center;
     color: var(--color-white);
-    font-size: clamp(18px, 1.67vw, 24px);
+    font-size: calc(24 * var(--calendar-size-unit));
     line-height: 1.25;
 }
 
@@ -630,36 +632,36 @@ button {
 }
 
 .streak-calendar-day-rest {
-    border: 3px solid var(--color-reward);
+    border: calc(3 * var(--calendar-size-unit)) solid var(--color-reward);
 }
 
 .streak-calendar-legend {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 24px;
+    gap: calc(8 * var(--calendar-size-unit));
+    margin-top: calc(24 * var(--calendar-size-unit));
     color: var(--color-white);
-    font-size: clamp(18px, 1.67vw, 24px);
+    font-size: calc(24 * var(--calendar-size-unit));
     line-height: 1.25;
 }
 
 .streak-calendar-legend > div {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: calc(12 * var(--calendar-size-unit));
 }
 
 .streak-calendar-legend-marker {
     box-sizing: border-box;
-    width: 22px;
-    height: 22px;
+    width: calc(22 * var(--calendar-size-unit));
+    height: calc(22 * var(--calendar-size-unit));
     border-radius: 50%;
 }
 
 .streak-calendar-rest-days {
-    margin-top: 16px;
+    margin-top: calc(16 * var(--calendar-size-unit));
     color: var(--color-text);
-    font-size: clamp(18px, 1.67vw, 24px);
+    font-size: calc(24 * var(--calendar-size-unit));
     line-height: 1.25;
 }
 
@@ -672,18 +674,19 @@ button {
 
 #plan-user-menu,
 #dashboard-user-menu {
+    --menu-size-unit: clamp(0.625px, 0.052083333vw, 1.25px);
     display: none;
     flex-direction: column;
     align-items: center;
     box-sizing: border-box;
-    width: 230px;
-    gap: 8px;
-    padding: 8px;
-    border-radius: 24px;
-    border: 1px solid var(--color-border);
+    width: min(calc(230 * var(--menu-size-unit)), calc(100vw - 32px));
+    gap: calc(8 * var(--menu-size-unit));
+    padding: calc(8 * var(--menu-size-unit));
+    border-radius: calc(24 * var(--menu-size-unit));
+    border: var(--menu-size-unit) solid var(--color-border);
     background-color: var(--color-surface);
     position: absolute;
-    top: calc(100% + 16px);
+    top: calc(100% + 16 * var(--menu-size-unit));
     right: 0;
     z-index: 20;
 }
@@ -694,12 +697,12 @@ button {
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: 64px;
+    min-height: calc(64 * var(--menu-size-unit));
 }
 
 #plan-user-menu-username,
 #dashboard-user-menu-username {
-    font-size: clamp(20px, 1.67vw, 24px);
+    font-size: calc(24 * var(--menu-size-unit));
     line-height: 1.25;
     color: var(--color-text);
     text-align: center;
@@ -715,13 +718,13 @@ button {
     justify-content: center;
     align-items: center;
     width: 100%;
-    padding: 16px 8px;
+    padding: calc(16 * var(--menu-size-unit)) calc(8 * var(--menu-size-unit));
     border: none;
-    border-radius: 12px;
+    border-radius: calc(12 * var(--menu-size-unit));
     background-color: var(--color-page);
     color: var(--color-text);
     font-family: inherit;
-    font-size: clamp(20px, 1.67vw, 24px);
+    font-size: calc(24 * var(--menu-size-unit));
     line-height: 1.25;
     font-weight: normal;
     cursor: pointer;
@@ -1845,7 +1848,26 @@ button {
 
 @supports (backdrop-filter: blur(16px)) or (-webkit-backdrop-filter: blur(16px)) {
     .plan-header,
-    .dashboard-header,
+    .dashboard-header {
+        background-color: transparent;
+    }
+
+    .plan-header::before,
+    .dashboard-header::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        pointer-events: none;
+    }
+
+    .plan-header::before,
+    .dashboard-header::before,
+    #plan-streak-popup,
+    #dashboard-streak-popup,
+    #plan-user-menu,
+    #dashboard-user-menu,
     .dashboard-save-feedback {
         background-color: rgb(20 20 20 / 85%);
         -webkit-backdrop-filter: blur(16px);
