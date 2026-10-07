@@ -251,9 +251,15 @@ button {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    width: 50%;
-    
+    width: min(560px, calc(100vw - 48px));
+    box-sizing: border-box;
     gap: clamp(24px, 1.67vw, 32px);
+}
+
+.loading-screen.has-loading-error .loading-retry-container {
+    padding: 32px;
+    border-radius: 24px;
+    background-color: var(--color-surface);
 }
 
 #loading-error-message, #loading-retry-btn {
@@ -261,8 +267,19 @@ button {
 }
 
 #loading-error-message {
-    font-size: var(--header);
+    font-size: var(--button);
     text-align: center;
+}
+
+#loading-retry-btn {
+    border-width: 1px;
+    border-radius: 12px;
+    font-family: inherit;
+}
+
+#loading-retry-btn:disabled {
+    cursor: wait;
+    opacity: .7;
 }
 
 
@@ -816,9 +833,51 @@ button {
     width: calc(128 * var(--plan-size-unit));
 }
 
+#plan-target-time-input ~ .input-placeholder,
 #plan-target-time-input:focus ~ .input-placeholder,
 #plan-target-time-input:not(:placeholder-shown) ~ .input-placeholder {
-    left: calc(14 * var(--plan-size-unit));
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.plan-input-section .plan-field-error {
+    width: 100%;
+    margin-top: calc(-13 * var(--plan-size-unit));
+    font-size: calc(24 * var(--plan-size-unit));
+    text-align: left;
+}
+
+.plan-input-section #plan-time-error {
+    text-align: center;
+}
+
+.plan-field-error:empty,
+#feedback-message:empty {
+    display: none;
+}
+
+.plan-input-section .input[aria-invalid="true"],
+#dashboard-feedback-input[aria-invalid="true"] {
+    border-color: var(--color-cta);
+}
+
+.plan-input-section .input[aria-invalid="true"] ~ .input-placeholder {
+    color: var(--color-cta);
+}
+
+#feedback-message {
+    width: 100%;
+    font-size: calc(16 * var(--feedback-size-unit));
+    flex-shrink: 0;
+}
+
+#feedback-message.feedback-success {
+    color: var(--color-reward);
+}
+
+#dashboard-send-feedback-btn:disabled {
+    cursor: wait;
+    opacity: .7;
 }
 
 
@@ -1192,7 +1251,7 @@ button {
     min-width: 600px;
     justify-content: space-between;
     align-items: center;
-    gap: clamp(64px, 4.17vw, 80px);
+    gap: clamp(32px, 2.5vw, 48px);
 
     position: relative;
 }
@@ -1247,7 +1306,7 @@ button {
     flex-direction: column;
     justify-content: start;
     align-items: center;
-    gap: clamp(64px, 4.17vw, 80px);
+    gap: clamp(32px, 2.5vw, 48px);
     min-height: 70vh;
 }
 
@@ -1286,7 +1345,7 @@ button {
     width: clamp(450px, 27.8vw, 534px);
     height: fit-content;
     font-size: var(--header);
-    color: var(--color-white);
+    color: var(--color-text);
 }
 
 .dashboard-weekly-stats-container .dashboard-content-title {
@@ -1457,6 +1516,50 @@ button {
 .dashboard-delete-session-btn:hover {
     cursor: pointer;
     filter: brightness(1.1);
+}
+
+.dashboard-delete-session-btn:disabled {
+    cursor: wait;
+    opacity: .7;
+}
+
+.dashboard-session-menu .form-error-message {
+    width: auto;
+    max-width: 240px;
+    padding: 8px;
+    font-size: var(--body);
+}
+
+.streak-calendar[aria-busy="true"] .streak-calendar-day {
+    color: transparent;
+    background-color: var(--color-surface-selected);
+    animation: dashboard-skeleton-brightness 1.8s ease-in-out infinite;
+}
+
+.streak-calendar-error {
+    display: flex;
+    flex-direction: column;
+    gap: calc(16 * var(--calendar-size-unit));
+    padding: calc(24 * var(--calendar-size-unit)) 0;
+    font-size: calc(20 * var(--calendar-size-unit));
+}
+
+.streak-calendar-loading-footer {
+    height: calc(110 * var(--calendar-size-unit));
+    margin-top: calc(24 * var(--calendar-size-unit));
+}
+
+.streak-calendar-error button {
+    border-width: 1px;
+    border-radius: calc(12 * var(--calendar-size-unit));
+    padding: calc(12 * var(--calendar-size-unit));
+    font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .streak-calendar[aria-busy="true"] .streak-calendar-day {
+        animation: none;
+    }
 }
 
 .empty-dashboard-cta-container {

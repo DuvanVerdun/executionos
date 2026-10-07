@@ -88,13 +88,15 @@ const dashboardState = {
 };
 
 const feedbackState = {
-    currentScreen: null
+    currentScreen: null,
+    isSending: false
 };
 
 const streakState = {
     anchorDate: '',
     data: null,
-    openScreen: null
+    openScreen: null,
+    loadGeneration: 0
 };
 
 
@@ -141,7 +143,9 @@ const dom = {
         menuIcon: document.getElementById('plan-user-menu-icon'),
         logoutButton: document.getElementById('plan-user-menu-logout-btn'),
         mission: document.getElementById('plan-mission-input'),
+        missionError: document.getElementById('plan-mission-error'),
         targetTime: document.getElementById('plan-target-time-input'),
+        timeError: document.getElementById('plan-time-error'),
         dashboardButton: document.getElementById('plan-dashboard-btn'),
         startButton: document.getElementById('plan-start-work-btn')
     },
@@ -206,6 +210,7 @@ const dom = {
         feedbackForm: document.getElementById('dashboard-feedback-form'),
         closeFeedbackButton: document.getElementById('dashboard-close-feedback-form-btn'),
         feedbackInput: document.getElementById('dashboard-feedback-input'),
+        feedbackMessage: document.getElementById('feedback-message'),
         sendFeedbackButton: document.getElementById('dashboard-send-feedback-btn')
     },
     passwordButtons: document.querySelectorAll('.password-visibility-btn')
@@ -820,6 +825,7 @@ function renderReviewSession(session) {
 
 /** Replace the startup spinner with error feedback and Retry. */
 function showLoadingScreenError() {
+    dom.loading.screen.classList.add('has-loading-error');
     dom.loading.spinner.style.display = 'none';
     dom.loading.error.style.display = 'flex';
     dom.loading.retryButton.style.display = 'flex';
@@ -827,9 +833,10 @@ function showLoadingScreenError() {
 
 /** Show the startup spinner and hide previous error feedback. */
 function showLoadingSpinner() {
+    dom.loading.screen.classList.remove('has-loading-error');
     dom.loading.spinner.style.display = 'flex';
     dom.loading.error.style.display = 'none';
-    dom.loading.retryButton.style.display = 'none';
+    dom.loading.retryButton.style.display = dom.loading.retryButton.disabled ? 'flex' : 'none';
 }
 
 /** Set password visibility and the visibility button's accessible label. */
@@ -1019,7 +1026,7 @@ function createSessionTimeSection(session) {
 
     targetTime.textContent = `${formatDurationHoursMinutes(session.target_time_seconds)} target`;
     actualTime.textContent = `${formatDurationHoursMinutes(session.actual_time_seconds)} focused`;
-    percentage.textContent = `${session.percentage_completed}% completion`;
+    percentage.textContent = `${Math.floor(session.percentage_completed)}% completion`;
 
     container.append(targetTime, actualTime, percentage);
     return container;
@@ -1040,9 +1047,9 @@ function createDailySummarySection(summary) {
     title.textContent = 'Daily Summary';
     totalTime.textContent = `${formatDurationHoursMinutes(summary.total_time_seconds)} focused`;
     sessions.textContent = `${summary.total_sessions} sessions`;
-    completion.textContent = `${summary.average_completion_percentage}% avg. completion`;
+    completion.textContent = `${Math.round(summary.average_completion_percentage)}% avg. completion`;
 
-    metrics.append(totalTime, sessions, completion);
+    metrics.append(sessions, totalTime, completion);
     container.append(title, metrics);
     return container;
 }
@@ -1150,7 +1157,7 @@ function renderDashboardSummary(summary) {
     dom.dashboard.averagePercentage.textContent =
         summary.average_completion_percentage === null
             ? '—'
-            : `${summary.average_completion_percentage}%`;
+            : `${Math.round(summary.average_completion_percentage)}%`;
     dom.dashboard.averageSessionTime.textContent =
         summary.average_session_time_seconds === null
             ? '—'
@@ -1606,6 +1613,11 @@ function closeSessionMenusOnOutsideClick(event) {
 
 /** Open feedback entry and record its originating screen. */
 function openFeedbackForm(currentScreen) {
+    if (!feedbackState.isSending) {
+        dom.dashboard.feedbackMessage.textContent = '';
+        dom.dashboard.feedbackMessage.classList.remove('feedback-success');
+        dom.dashboard.feedbackInput.removeAttribute('aria-invalid');
+    }
     feedbackState.currentScreen = currentScreen;
     if (isUserMenuOpened) toggleUserMenu(currentScreen);
     dom.dashboard.feedbackForm.style.display = 'flex';
@@ -1673,22 +1685,31 @@ async function routeToInitialScreen(currentScreen = 'loading') {
 
 /** Return a mission or duration validation error, or an empty string. */
 function validatePlan() {
-    if (!dom.plan.mission.value) return 'Please enter a mission';
-    if (dom.plan.mission.value.length > 50) return 'Mission must be 50 characters or less';
+    if (!dom.plan.mission.value.trim()) return 'Enter your mission.';
+    if (dom.plan.mission.value.length > 50) return 'Keep your mission to 50 characters or fewer.';
     if (!dom.plan.targetTime.value || !/^\d{2}:\d{2}$/.test(dom.plan.targetTime.value)) {
-        return 'Please enter a target time in HH:MM format';
+        return 'Enter a focus time as HH:MM, for example 00:25.';
     }
     const [hours, minutes] = dom.plan.targetTime.value.split(':').map(Number);
-    if (minutes > 59) return 'Minutes must be between 00 and 59';
-    if (hours === 0 && minutes === 0) return 'Target time must be greater than 00:00';
+    if (minutes > 59) return 'Enter minutes between 00 and 59.';
+    if (hours === 0 && minutes === 0) return 'Choose a focus time greater than zero.';
     return '';
 }
 
 /** Validate the plan and start a timestamp-based work session. */
 function handleStartWork() {
+    dom.plan.missionError.textContent = '';
+    dom.plan.timeError.textContent = '';
+    dom.plan.mission.removeAttribute('aria-invalid');
+    dom.plan.targetTime.removeAttribute('aria-invalid');
     const error = validatePlan();
     if (error) {
-        alert(error);
+        const isMissionError = !dom.plan.mission.value.trim() || dom.plan.mission.value.length > 50;
+        const input = isMissionError ? dom.plan.mission : dom.plan.targetTime;
+        const message = isMissionError ? dom.plan.missionError : dom.plan.timeError;
+        message.textContent = error;
+        input.setAttribute('aria-invalid', 'true');
+        input.focus();
         return;
     }
     activeSessionState.currentMission = dom.plan.mission.value;
@@ -2052,22 +2073,38 @@ function handleTargetTimeKeydown(event) {
     if (caretPosition === 3) caretPosition = 2;
     const digitPosition = caretPosition - 1;
     const replacement = event.key === 'Backspace' ? '0' : event.key;
+    const previousValue = dom.plan.targetTime.value;
     const characters = dom.plan.targetTime.value.split('');
     characters[digitPosition] = replacement;
     dom.plan.targetTime.value = characters.join('');
     dom.plan.targetTime.setSelectionRange(caretPosition, caretPosition);
+    if (dom.plan.targetTime.value !== previousValue) {
+        dom.plan.targetTime.dispatchEvent(new Event('input', { bubbles: true }));
+    }
 }
 
 /** Delete the selected history session and reload Dashboard data. */
 async function handleDeleteSession(event) {
     const deleteButton = event.target.closest('.dashboard-delete-session-btn');
-    if (!deleteButton) return;
+    if (!deleteButton || deleteButton.disabled) return;
     if (!confirm('Delete this session?')) return;
+    const menu = deleteButton.closest('.dashboard-session-menu');
+    menu.querySelector('.form-error-message')?.remove();
+    deleteButton.disabled = true;
+    deleteButton.textContent = 'Deleting…';
     try {
-        await deleteSession(deleteButton.dataset.sessionId);
+        const result = await deleteSession(deleteButton.dataset.sessionId);
+        if (!result.success) throw new Error('Deletion failed');
         await loadDashboard();
     } catch (error) {
-        alert('An unexpected network/server connection error occurred');
+        const message = document.createElement('p');
+        message.className = 'form-error-message';
+        message.setAttribute('role', 'alert');
+        message.textContent = 'Couldn’t delete this session. Try again.';
+        menu.appendChild(message);
+    } finally {
+        deleteButton.disabled = false;
+        deleteButton.textContent = 'Delete Session';
     }
 }
 
@@ -2080,56 +2117,58 @@ async function handleOpenDashboard() {
 /** Validate and submit feedback with request-state controls. */
 async function handleSubmitFeedback(event) {
     event.preventDefault();
+    if (feedbackState.isSending) return;
 
     const feedbackInput = dom.dashboard.feedbackInput;
     const sendButton = dom.dashboard.sendFeedbackButton;
+    const message = dom.dashboard.feedbackMessage;
+    message.classList.remove('feedback-success');
+    feedbackInput.removeAttribute('aria-invalid');
+    message.textContent = '';
 
+    if (!feedbackInput.value.trim() || feedbackInput.value.length > 2000) {
+        message.textContent = !feedbackInput.value.trim()
+            ? 'Write a message before sending.'
+            : 'Keep your message to 2,000 characters or fewer.';
+        feedbackInput.setAttribute('aria-invalid', 'true');
+        feedbackInput.focus();
+        return;
+    }
+
+    feedbackState.isSending = true;
     sendButton.disabled = true;
-
-    if (!feedbackInput.value) {
-        alert('Message is empty');
-        sendButton.disabled = false;
-        return;
-    }
-    if (feedbackInput.value.trim().length === 0) {
-        alert('Message is only whitespace');
-        sendButton.disabled = false;
-        return;
-    }
-    if (feedbackInput.value.length > 2000) {
-        alert('Message exceeds 2000 characters');
-        sendButton.disabled = false;
-        return;
-    }
-
-    let result;
+    sendButton.textContent = 'Sending…';
+    feedbackInput.readOnly = true;
+    dom.dashboard.feedbackForm.setAttribute('aria-busy', 'true');
     try {
-        result = await postFeedback(feedbackInput.value, feedbackState.currentScreen);
+        const result = await postFeedback(feedbackInput.value, feedbackState.currentScreen);
+        if (result.success !== true) {
+            message.textContent = result.status === 400
+                ? 'Check your message and try sending it again.'
+                : 'Couldn’t send your feedback. Please try again.';
+            return;
+        }
+        message.textContent = 'Feedback sent. Thank you!';
+        message.classList.add('feedback-success');
+        feedbackInput.value = '';
+        feedbackInput.style.height = '';
     } catch (error) {
-        alert('Network/Server connection failed. Please try again');
-        return;
+        message.textContent = 'Couldn’t reach the server. Your message is still here—try again.';
     } finally {
+        feedbackState.isSending = false;
         sendButton.disabled = false;
+        sendButton.textContent = 'Send Feedback';
+        feedbackInput.readOnly = false;
+        dom.dashboard.feedbackForm.removeAttribute('aria-busy');
     }
-    if (result.status === 400) {
-        alert('Message is invalid. Please check and try again');
-        return;
-    }
-    if (result.success !== true) {
-        alert('Something went wrong. Please try again');
-        return;
-    }
-
-    alert('Feedback message was sent. Thank you');
-
-    feedbackInput.value = '';
-    feedbackInput.style.height = '';
-    closeFeedbackForm();
 }
 
 /** Resize feedback input to fit its content. */
 function handleFeedbackInput() {
     const input = dom.dashboard.feedbackInput;
+    input.removeAttribute('aria-invalid');
+    dom.dashboard.feedbackMessage.textContent = '';
+    dom.dashboard.feedbackMessage.classList.remove('feedback-success');
     input.style.overflowY = 'hidden';
     input.style.height = 'auto';
     const borderHeight = input.offsetHeight - input.clientHeight;
@@ -2190,7 +2229,7 @@ function handleDashboardMetricChange(event) {
 }
 
 /** Build the consistency calendar and its month navigation controls. */
-function renderStreakPopup(screen, data) {
+function renderStreakPopup(screen, data, { isLoading = false, failed = false } = {}) {
     const popup = dom[screen].streakPopup;
 
     popup.innerHTML = '';
@@ -2225,8 +2264,37 @@ function renderStreakPopup(screen, data) {
 
     popup.appendChild(header);
 
+    previousButton.addEventListener('click', /** Show the previous calendar month. */ () => {
+        streakState.anchorDate = shiftMonthAnchor(streakState.anchorDate, -1);
+        void loadStreak(screen);
+    });
+    nextButton.addEventListener('click', /** Show the next calendar month. */ () => {
+        streakState.anchorDate = shiftMonthAnchor(streakState.anchorDate, 1);
+        void loadStreak(screen);
+    });
+
+    if (failed) {
+        const error = document.createElement('div');
+        error.className = 'streak-calendar-error';
+        const message = document.createElement('p');
+        message.setAttribute('role', 'alert');
+        message.textContent = 'Couldn’t load this month. Try again.';
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'normal-button';
+        retry.textContent = 'Retry';
+        retry.addEventListener('click', /** Retry the selected calendar month. */ () => {
+            void loadStreak(screen);
+        });
+        error.append(message, retry);
+        popup.appendChild(error);
+        return;
+    }
+
     const calendar = document.createElement('div');
     calendar.className = 'streak-calendar';
+    calendar.setAttribute('aria-busy', String(isLoading));
+    if (isLoading) calendar.setAttribute('aria-label', 'Loading calendar');
 
     ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(
         /** Append a weekday heading to the consistency calendar. */
@@ -2266,12 +2334,20 @@ function renderStreakPopup(screen, data) {
         dayElement.textContent =
             String(parseLocalDate(day.date).getDate());
 
-        dayElement.title = visualState;
+        if (isLoading) dayElement.setAttribute('aria-hidden', 'true');
+        else dayElement.title = visualState;
 
         calendar.appendChild(dayElement);
     });
 
     popup.appendChild(calendar);
+    if (isLoading) {
+        const footer = document.createElement('div');
+        footer.className = 'dashboard-skeleton streak-calendar-loading-footer';
+        footer.setAttribute('aria-hidden', 'true');
+        popup.appendChild(footer);
+        return;
+    }
 
     const legend = document.createElement('div');
     legend.className = 'streak-calendar-legend';
@@ -2295,24 +2371,6 @@ function renderStreakPopup(screen, data) {
         `${remaining} rest ${remaining === 1 ? 'day' : 'days'} remaining this week.`;
 
     popup.appendChild(restDays);
-
-    previousButton.addEventListener('click', /** Show the previous calendar month. */ async () => {
-        streakState.anchorDate = shiftMonthAnchor(
-            streakState.anchorDate,
-            -1
-        );
-
-        await loadStreak(screen);
-    });
-
-    nextButton.addEventListener('click', /** Show the next calendar month. */ async () => {
-        streakState.anchorDate = shiftMonthAnchor(
-            streakState.anchorDate,
-            1
-        );
-
-        await loadStreak(screen);
-    });
 }
 
 /** Update streak values and calendars on Plan and Dashboard. */
@@ -2327,11 +2385,28 @@ function renderStreak(data) {
 
 /** Fetch and render streak information for the current calendar selection. */
 async function loadStreak(currentScreen) {
+    const generation = ++streakState.loadGeneration;
+    const anchorDate = streakState.anchorDate;
+    const month = parseLocalDate(anchorDate);
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const pendingData = {
+        calendar: {
+            month: anchorDate.slice(0, 7),
+            days: Array.from({ length: daysInMonth }, /** Create a neutral placeholder for each calendar day. */ (_, index) => ({
+                date: `${anchorDate.slice(0, 7)}-${String(index + 1).padStart(2, '0')}`,
+                state: 'neutral'
+            }))
+        }
+    };
+    for (const screen of ['plan', 'dashboard']) {
+        renderStreakPopup(screen, pendingData, { isLoading: true });
+    }
     try {
         const result = await fetchStreak(
-            streakState.anchorDate,
+            anchorDate,
             currentScreen
         );
+        if (generation !== streakState.loadGeneration) return;
 
         if (!result.success) {
             throw new Error(result.error);
@@ -2341,7 +2416,11 @@ async function loadStreak(currentScreen) {
         renderStreak(result);
 
     } catch (error) {
+        if (generation !== streakState.loadGeneration) return;
         console.error('Streak loading error:', error);
+        for (const screen of ['plan', 'dashboard']) {
+            renderStreakPopup(screen, pendingData, { failed: true });
+        }
     }
 }
 
@@ -2367,10 +2446,11 @@ function closeStreakPopupsOnOutsideClick(event) {
     if (!streakState.openScreen) return;
 
     const screen = streakState.openScreen;
+    const clickPath = event.composedPath();
 
     if (
-        dom[screen].streakPopup.contains(event.target)
-        || dom[screen].streakButton.contains(event.target)
+        clickPath.includes(dom[screen].streakPopup)
+        || clickPath.includes(dom[screen].streakButton)
     ) {
         return;
     }
@@ -2389,9 +2469,24 @@ function registerEventListeners() {
     dom.dashboard.backToStatsButton.addEventListener('click', handleBackToStats);
     window.addEventListener('online', /** Retry queued submissions when connectivity returns. */ () => { void syncOfflineWork(); });
     dom.loading.retryButton.addEventListener('click', /** Retry application initialization. */ async () => {
+        if (dom.loading.retryButton.disabled) return;
+        dom.loading.retryButton.disabled = true;
+        dom.loading.retryButton.textContent = 'Retrying…';
         showLoadingSpinner();
-        await initializeApp();
+        try {
+            await initializeApp();
+        } finally {
+            dom.loading.retryButton.disabled = false;
+            dom.loading.retryButton.textContent = 'Retry';
+        }
     });
+
+    for (const [input, message] of [[dom.plan.mission, dom.plan.missionError], [dom.plan.targetTime, dom.plan.timeError]]) {
+        input.addEventListener('input', /** Clear a plan field error when its value changes. */ () => {
+            message.textContent = '';
+            input.removeAttribute('aria-invalid');
+        });
+    }
 
     dom.passwordButtons.forEach(/** Attach a password visibility handler. */ (button) => {
         button.addEventListener('click', /** Toggle the associated password field visibility. */ () => {

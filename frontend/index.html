@@ -170,7 +170,7 @@
                         class="streak-btn"
                         aria-label="Open consistency calendar"
                     >
-                        🔥 0
+                        🔥 —
                     </button>
 
                     <div
@@ -208,16 +208,18 @@
                     <div class="plan-mission-container">
                         <h3>What matters today?</h3>
                         <div class="input-container plan-mission-input-container">
-                            <input type="text" class="input" id="plan-mission-input" placeholder=" " maxlength="50">
+                            <input type="text" class="input" id="plan-mission-input" placeholder=" " maxlength="50" aria-describedby="plan-mission-error">
                             <p class="input-placeholder">Today's Mission</p>
                         </div>
+                        <p id="plan-mission-error" class="form-error-message plan-field-error" role="alert"></p>
                     </div>
                     <div class="plan-time-container">
                         <h3>How long will you focus?</h3>
                         <div class="input-container plan-time-input-container">
-                            <input inputmode="numeric" class="input" id="plan-target-time-input" placeholder=" " maxlength="5" value="00:00">
+                            <input inputmode="numeric" class="input" id="plan-target-time-input" placeholder=" " maxlength="5" value="00:00" aria-describedby="plan-time-error">
                             <p class="input-placeholder">HH:MM</p>
                         </div>
+                        <p id="plan-time-error" class="form-error-message plan-field-error" role="alert"></p>
                     </div>
                     <button type="button" id="plan-start-work-btn" class="cta-button">Start Work</button>
                 </section>
@@ -305,7 +307,7 @@
                         class="streak-btn"
                         aria-label="Open consistency calendar"
                     >
-                        🔥 0
+                        🔥 —
                     </button>
 
                     <div
@@ -541,7 +543,8 @@
             </button>
         </div>
 
-        <textarea name="send-feedback-input" class="input" id="dashboard-feedback-input" maxlength="2000" aria-label="Your feedback"></textarea>
+        <textarea name="send-feedback-input" class="input" id="dashboard-feedback-input" maxlength="2000" aria-label="Your feedback" aria-describedby="feedback-message"></textarea>
+        <p id="feedback-message" class="form-error-message" role="status" aria-live="polite"></p>
         <button type="submit" class="white-filled-button" id="dashboard-send-feedback-btn">Send Feedback</button>
     </form>
 
