@@ -498,17 +498,25 @@ button {
     justify-content: center;
 }
 
+.plan-header,
+.dashboard-header {
+    --header-offset: clamp(16px, 1.666667vw, 40px);
+    --header-padding: clamp(16px, 2.083333vw, 48px);
+    --header-gap: clamp(24px, 4.166667vw, 96px);
+    --header-avatar-size: clamp(28px, 2.5vw, 64px);
+    top: var(--header-offset);
+    height: clamp(48px, 4.166667vw, 96px);
+    padding: 0 var(--header-padding);
+    gap: var(--header-gap);
+}
+
 .plan-header {
     position: fixed;
-    top: 32px;
     left: 10%;
     z-index: 10;
     display: flex;
     width: 80%;
-    height: 80px;
     box-sizing: border-box;
-    padding: 0 clamp(24px, 2.22vw, 40px);
-    gap: clamp(32px, 5.56vw, 80px);
     align-items: center;
     border-radius: 999px;
     background-color: var(--color-surface);
@@ -517,7 +525,7 @@ button {
 .plan-header .wordmark,
 .dashboard-header .wordmark {
     margin-right: auto;
-    font-size: clamp(32px, 2.5vw, 36px);
+    font-size: clamp(20px, 1.875vw, 44px);
 }
 
 #plan-dashboard-btn,
@@ -527,7 +535,7 @@ button {
     background: none;
     color: var(--color-text);
     font-family: inherit;
-    font-size: clamp(20px, 1.67vw, 24px);
+    font-size: clamp(14px, 1.25vw, 30px);
     cursor: pointer;
 }
 
@@ -543,7 +551,7 @@ button {
     background: none;
     color: var(--color-white);
     font-family: inherit;
-    font-size: clamp(20px, 1.67vw, 24px);
+    font-size: clamp(14px, 1.25vw, 30px);
     font-weight: bold;
     white-space: nowrap;
     cursor: pointer;
@@ -559,7 +567,7 @@ button {
     position: absolute;
     top: calc(100% + 16px);
 
-    right: calc(clamp(24px, 2.22vw, 40px) + 48px + clamp(32px, 5.56vw, 80px));
+    right: calc(var(--header-padding) + var(--header-avatar-size) + var(--header-gap));
     box-sizing: border-box;
     width: clamp(420px, 31.94vw, 460px);
     max-height: calc(100dvh - 160px);
@@ -657,8 +665,8 @@ button {
 
 #plan-user-icon,
 #dashboard-user-icon {
-    width: 48px;
-    height: 48px;
+    width: var(--header-avatar-size);
+    height: var(--header-avatar-size);
     flex-shrink: 0;
 }
 
@@ -1184,16 +1192,12 @@ button {
 
 .dashboard-header {
     position: sticky;
-    top: 32px;
     z-index: 10;
     display: flex;
     width: 80vw;
-    height: 80px;
     flex-shrink: 0;
     box-sizing: border-box;
-    margin-top: 32px;
-    padding: 0 clamp(24px, 2.22vw, 40px);
-    gap: clamp(32px, 5.56vw, 80px);
+    margin-top: var(--header-offset);
     align-items: center;
     border-radius: 999px;
     background-color: var(--color-surface);
