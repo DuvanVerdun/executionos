@@ -142,6 +142,9 @@ Use repository documentation as persistent context.
 - `docs/current-roadmap.md`
   Current product state, active sprint, scope, and temporary decisions.
 
+- `docs/changelog.md`
+  Version history of what each shipped version delivered.
+
 Read only the documents relevant to the current task.
 
 ## Communication

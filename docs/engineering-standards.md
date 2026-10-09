@@ -183,6 +183,10 @@ Do not refactor merely because a different abstraction appears theoretically cle
 
 Separate refactoring from unrelated feature work when combining them would make verification harder.
 
+## Git Workflow
+
+- Hotfixes use short-lived branches merged into `main`.
+
 ## Communication
 
 If a technical or product decision cannot be explained simply, the understanding is probably incomplete.
