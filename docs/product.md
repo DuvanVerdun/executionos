@@ -143,7 +143,12 @@ Polish should improve comprehension, continuity, trust, or motivation rather tha
 
 ## Product Boundaries
 
-ExecutionOS is currently centered on personal execution.
+ExecutionOS is centered on personal execution.
+
+Co-DeepWork rooms (v0.6) are a deliberate social opportunity to acquire users:
+small groups doing deep work together for a shared challenge. Rooms are a layer
+on top of the personal execution loop, not a replacement for it. Every session
+still belongs to the user's personal history, dashboard, and streak.
 
 It is not trying to become:
 
@@ -151,7 +156,7 @@ It is not trying to become:
 - A team collaboration suite.
 - A calendar replacement.
 - A complete task-management system.
-- A social network.
+- A general social network (friends and profiles are not part of v0.6).
 - A gamification system detached from real execution.
 
 These boundaries may change if real user evidence creates a reason to change them.
