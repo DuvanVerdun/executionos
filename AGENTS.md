@@ -147,6 +147,9 @@ Use repository documentation as persistent context.
 
 Read only the documents relevant to the current task.
 
+Local working context: if `docs/organization/` exists (gitignored), read its
+`README.md` first. Never commit it or reference it from committed docs.
+
 ## Communication
 
 Be direct, concise, and technically precise.

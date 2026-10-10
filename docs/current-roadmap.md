@@ -17,8 +17,6 @@ Success test: 5 users, each returning on at least 3 days.
 Why now: rooms are the social opportunity to acquire users, and building them
 first gives more leverage when users arrive. Getting users comes after v0.6.
 
-Status: scope defined, technical planning pending. No v0.6 code yet.
-
 ### In scope (single v0.6 release)
 
 - **Rooms list screen:** create, open, and delete rooms. Only the creator can
@@ -29,12 +27,11 @@ Status: scope defined, technical planning pending. No v0.6 code yet.
 - **Room screen:**
   - Summary cards: total time, total sessions, people in the room, average
     session time across everyone. A CTA encourages users to beat that average.
-  - Live time of sessions of other users in the room. Updates with server may
-    happen each 15 seconds. If someone finishes a session, other users notice
-    on their next server update (to be defined. If changes later, update this.)
+  - Live time of other users' sessions in the room, synced every 15 seconds
+    (see Live updates).
   - Ranking by total time (hours), with the viewer's position highlighted.
-  - Start session flow identical to the personal one, maybe review adapted to
-  room screen.
+  - Start session flow identical to the personal one. Review adapted to room
+    screen.
 - **Sessions:** saved to each user's personal history. Each user can delete
   their own sessions. Deleting a room never deletes sessions.
 - **Leaving a room:** user intentionally should click to leave, and confirm.
@@ -43,9 +40,9 @@ Status: scope defined, technical planning pending. No v0.6 code yet.
 - **Visibility:** members see username, target time, and actual time.
 - **Hourly check in:** a popup each hour during a room session. "Are you
   still there?" The user has 5 minutes to confirm. If they do not, the
-  session ends at the last confirmed check in. Evaluate making a click on
-  pause or stop also behave as a check in, if on the next check in user
-  doesn't show presence, the session ends on that last interaction.
+  session ends at the last confirmed check in. A click on pause or stop also
+  counts as a check in. If the user misses the next one, the session ends at
+  that last interaction.
 
 ### Live updates
 
