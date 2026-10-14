@@ -143,12 +143,7 @@ Polish should improve comprehension, continuity, trust, or motivation rather tha
 
 ## Product Boundaries
 
-ExecutionOS is centered on personal execution.
-
-Co-DeepWork rooms (v0.6) are a deliberate social opportunity to acquire users:
-small groups doing deep work together for a shared challenge. Rooms are a layer
-on top of the personal execution loop, not a replacement for it. Every session
-still belongs to the user's personal history, dashboard, and streak.
+ExecutionOS is centered on personal execution. Every session belongs to the user's personal history, dashboard, and streak.
 
 It is not trying to become:
 
@@ -156,10 +151,21 @@ It is not trying to become:
 - A team collaboration suite.
 - A calendar replacement.
 - A complete task-management system.
-- A general social network (friends and profiles are not part of v0.6).
+- A general social network.
 - A gamification system detached from real execution.
 
 These boundaries may change if real user evidence creates a reason to change them.
+
+## Platform
+
+Desktop only. Design canvas: 1440×1024, for Figma prototypes. The built app is responsive, see `docs/architecture.md`.
+
+## Glossary
+
+- **Session:** one timed run on a mission.
+- **Mission:** what you plan to work on.
+- **Target time:** the time you set as your goal for the session.
+- **Actual time:** time the timer really ran. Paused time never counts.
 
 ## Product Decision Test
 
