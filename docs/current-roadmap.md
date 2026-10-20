@@ -391,8 +391,10 @@ Three ideas run through everything:
 
 #### 3. Constants
 
-One block on the backend, at the top of `room_session_service.py`. One block on
-the client, in the `CONFIGURATION` section of `app.js`. No magic numbers
+One block on the backend, at the top of `room_session_service.py`, except
+`ROOM_NAME_MAX_LENGTH` and `LINK_TOKEN_BYTES`, which live at the top of
+`room_service.py` (mission 4 needs them before `room_session_service.py` exists).
+One block on the client, in the `CONFIGURATION` section of `app.js`. No magic numbers
 elsewhere.
 
 | Name | Value | Where |

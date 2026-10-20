@@ -619,6 +619,134 @@ def create_app() -> Flask:
                 "error": str(e)
             }), 500
 
+    from room_service import (
+        RoomForbiddenError,
+        RoomNotAvailableError,
+        create_room_for_user,
+        delete_room_for_user,
+        get_room_link_for_user,
+        join_room_for_user,
+        leave_room_for_user,
+        list_rooms_for_user,
+        refresh_room_link_for_user,
+        set_show_missions_for_user,
+    )
+
+    def read_json_object() -> dict[str, Any]:
+        raw_data: object = request.get_json(silent=True)  # type: ignore[reportUnknownMemberType]
+        if not isinstance(raw_data, dict):
+            raise ValueError("A JSON object is required")
+        return cast(dict[str, Any], raw_data)
+
+    def room_error_response(error: Exception) -> tuple[Any, int]:
+        """Map a room error to a generic response. Never expose str(error)."""
+        db.session.rollback()
+
+        if isinstance(error, RoomNotAvailableError):
+            return jsonify({"success": False, "error": "Room not available"}), 404  # type: ignore
+        if isinstance(error, RoomForbiddenError):
+            return jsonify({"success": False, "error": "Not allowed"}), 403  # type: ignore
+        if isinstance(error, ValueError):
+            return jsonify({"success": False, "error": "Invalid room data"}), 400  # type: ignore
+
+        app.logger.error("Room request failed", exc_info=error)
+        return jsonify({"success": False, "error": "Room request failed"}), 500  # type: ignore
+
+    @app.route("/api/rooms", methods=["GET"])
+    @jwt_required()
+    def get_rooms() -> tuple[Any, int]:
+        """Return the rooms the authenticated user belongs to."""
+        user_id = int(get_jwt_identity())
+        try:
+            return jsonify({"success": True, "rooms": list_rooms_for_user(user_id)}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms", methods=["POST"])
+    @jwt_required()
+    def create_room() -> tuple[Any, int]:
+        """Create a room owned by the authenticated user."""
+        user_id = int(get_jwt_identity())
+        try:
+            data = read_json_object()
+            room = create_room_for_user(user_id, data.get("name"))
+            return jsonify({"success": True, "room": room}), 201  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/join", methods=["POST"])
+    @jwt_required()
+    def join_room() -> tuple[Any, int]:
+        """Join a room with its link token."""
+        user_id = int(get_jwt_identity())
+        try:
+            data = read_json_object()
+            room = join_room_for_user(user_id, data.get("linkToken"))
+            already_member = room.pop("already_member")
+            return jsonify({  # type: ignore
+                "success": True,
+                "room": room,
+                "already_member": already_member,
+            }), 200
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>/leave", methods=["POST"])
+    @jwt_required()
+    def leave_room(room_id: int) -> tuple[Any, int]:
+        """Leave a room. The room is deleted if nobody is left."""
+        user_id = int(get_jwt_identity())
+        try:
+            result = leave_room_for_user(user_id, room_id)
+            return jsonify({"success": True, **result}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>", methods=["DELETE"])
+    @jwt_required()
+    def delete_room(room_id: int) -> tuple[Any, int]:
+        """Delete a room. Owner only."""
+        user_id = int(get_jwt_identity())
+        try:
+            delete_room_for_user(user_id, room_id)
+            return jsonify({"success": True}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>/link", methods=["GET"])
+    @jwt_required()
+    def get_room_link(room_id: int) -> tuple[Any, int]:
+        """Return the room link token. Owner only."""
+        user_id = int(get_jwt_identity())
+        try:
+            token = get_room_link_for_user(user_id, room_id)
+            return jsonify({"success": True, "link_token": token}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>/link/refresh", methods=["POST"])
+    @jwt_required()
+    def refresh_room_link(room_id: int) -> tuple[Any, int]:
+        """Replace the room link token. Owner only."""
+        user_id = int(get_jwt_identity())
+        try:
+            token = refresh_room_link_for_user(user_id, room_id)
+            return jsonify({"success": True, "link_token": token}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>/membership", methods=["PATCH"])
+    @jwt_required()
+    def update_membership(room_id: int) -> tuple[Any, int]:
+        """Set whether the user's missions are shown in this room."""
+        user_id = int(get_jwt_identity())
+        try:
+            data = read_json_object()
+            value = set_show_missions_for_user(user_id, room_id, data.get("showMissions"))
+            return jsonify({"success": True, "show_missions": value}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
     return app
 
 
