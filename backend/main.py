@@ -627,6 +627,9 @@ def create_app() -> Flask:
         get_room_link_for_user,
         join_room_for_user,
         leave_room_for_user,
+        get_room_sessions_for_user,
+        get_room_snapshot_for_user,
+        get_room_summary_for_user,
         list_rooms_for_user,
         refresh_room_link_for_user,
         set_show_missions_for_user,
@@ -744,6 +747,56 @@ def create_app() -> Flask:
             data = read_json_object()
             value = set_show_missions_for_user(user_id, room_id, data.get("showMissions"))
             return jsonify({"success": True, "show_missions": value}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>", methods=["GET"])
+    @jwt_required()
+    def get_room(room_id: int) -> tuple[Any, int]:
+        """Return the room snapshot: room, summary and ranking."""
+        user_id = int(get_jwt_identity())
+        try:
+            snapshot = get_room_snapshot_for_user(user_id, room_id)
+            return jsonify({"success": True, **snapshot}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>/summary", methods=["GET"])
+    @jwt_required()
+    def get_room_summary(room_id: int) -> tuple[Any, int]:
+        """Return the room summary numbers."""
+        user_id = int(get_jwt_identity())
+        try:
+            summary = get_room_summary_for_user(user_id, room_id)
+            return jsonify({"success": True, "summary": summary}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/rooms/<int:room_id>/sessions", methods=["GET"])
+    @jwt_required()
+    def get_room_sessions(room_id: int) -> tuple[Any, int]:
+        """Return a page of room history and daily summaries."""
+        user_id = int(get_jwt_identity())
+        try:
+            timezone = parse_timezone(request.args.get("timezone"))
+
+            raw_cursor_date = request.args.get("cursor_date")
+            raw_cursor_id = request.args.get("cursor_id")
+
+            if (raw_cursor_date is None) != (raw_cursor_id is None):
+                raise ValueError("cursor_date and cursor_id must be provided together")
+
+            cursor_date: datetime | None = None
+            cursor_id: int | None = None
+
+            if raw_cursor_date is not None and raw_cursor_id is not None:
+                cursor_date = parse_cursor_datetime(raw_cursor_date)
+                cursor_id = int(raw_cursor_id)
+
+            result = get_room_sessions_for_user(
+                user_id, room_id, timezone, cursor_date, cursor_id
+            )
+            return jsonify({"success": True, **result}), 200  # type: ignore
         except Exception as error:
             return room_error_response(error)
 

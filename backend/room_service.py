@@ -1,18 +1,28 @@
 import re
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
+from dashboard_service import (
+    SessionSummaryAccumulator,
+    _as_utc_aware,  # pyright: ignore[reportPrivateUsage]
+    _local_day_start_as_utc_naive,  # pyright: ignore[reportPrivateUsage]
+    _serialize_session,  # pyright: ignore[reportPrivateUsage]
+    _session_completion_percentage,  # pyright: ignore[reportPrivateUsage]
+    _session_local_date,  # pyright: ignore[reportPrivateUsage]
+)
 from extensions import db
-from models import Room, RoomMembership, Session
+from models import Room, RoomMembership, Session, User
 
 
 ROOM_NAME_MAX_LENGTH = 50
 LINK_TOKEN_BYTES = 16
 LINK_TOKEN_MAX_LENGTH = 64
+HISTORY_PAGE_SIZE = 20
 
 _LINK_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
@@ -284,3 +294,221 @@ def set_show_missions_for_user(user_id: int, room_id: int, raw_value: object) ->
     membership.show_missions = raw_value
     db.session.commit()
     return raw_value
+
+
+def _load_user_totals(room_id: int) -> dict[int, tuple[int, int]]:
+    """Per user in this room: (sessions count, total seconds). Includes former members."""
+    rows = db.session.execute(
+        select(Session.user_id, func.count(), func.sum(Session.actual_time_seconds))
+        .where(Session.room_id == room_id)
+        .group_by(Session.user_id)
+    ).tuples().all()
+
+    return {uid: (int(count), int(seconds or 0)) for uid, count, seconds in rows}
+
+
+def _build_summary(
+    members_count: int,
+    totals: dict[int, tuple[int, int]],
+) -> dict[str, Any]:
+    total_sessions = sum(count for count, _ in totals.values())
+    total_time_seconds = sum(seconds for _, seconds in totals.values())
+
+    return {
+        "total_time_seconds": total_time_seconds,
+        "total_sessions": total_sessions,
+        "members_count": members_count,
+        "average_session_time_seconds": (
+            round(total_time_seconds / total_sessions) if total_sessions > 0 else None
+        ),
+    }
+
+
+def get_room_snapshot_for_user(user_id: int, room_id: int) -> dict[str, Any]:
+    membership = get_active_membership(room_id, user_id)
+
+    room = db.session.execute(
+        select(Room).where(Room.id == room_id)
+    ).scalar_one()
+
+    member_rows = db.session.execute(
+        select(RoomMembership.user_id, User.username)
+        .join(User, User.id == RoomMembership.user_id)
+        .where(
+            RoomMembership.room_id == room_id,
+            RoomMembership.left_at.is_(None),
+        )
+        .order_by(RoomMembership.joined_at.asc(), RoomMembership.id.asc())
+    ).tuples().all()
+
+    totals = _load_user_totals(room_id)
+    owner_user_id = member_rows[0][0]
+
+    # sorted() is stable, so ties keep the join order from the query above.
+    ranked = sorted(member_rows, key=lambda row: -totals.get(row[0], (0, 0))[1])
+
+    ranking: list[dict[str, Any]] = []
+
+    for position, (member_user_id, username) in enumerate(ranked, start=1):
+        sessions_count, total_time_seconds = totals.get(member_user_id, (0, 0))
+
+        ranking.append({
+            "position": position,
+            "username": username,
+            "is_you": member_user_id == user_id,
+            "is_owner": member_user_id == owner_user_id,
+            "state": "not_working",
+            "ring_percentage": None,
+            "total_time_seconds": total_time_seconds,
+            "sessions_count": sessions_count,
+        })
+
+    return {
+        "room": {
+            "id": room.id,
+            "name": room.name,
+            "is_owner": owner_user_id == user_id,
+            "show_missions": membership.show_missions,
+        },
+        "summary": _build_summary(len(member_rows), totals),
+        "ranking": ranking,
+    }
+
+
+def get_room_summary_for_user(user_id: int, room_id: int) -> dict[str, Any]:
+    get_active_membership(room_id, user_id)
+
+    members_count = db.session.execute(
+        select(func.count())
+        .select_from(RoomMembership)
+        .where(
+            RoomMembership.room_id == room_id,
+            RoomMembership.left_at.is_(None),
+        )
+    ).scalar_one()
+
+    return _build_summary(members_count, _load_user_totals(room_id))
+
+
+def _build_room_daily_summaries(
+    room_id: int,
+    page: list[Session],
+    timezone: ZoneInfo,
+) -> dict[str, dict[str, Any]]:
+    """Daily summaries over the whole room's sessions on the days shown."""
+    if not page:
+        return {}
+
+    represented_dates = {_session_local_date(session, timezone) for session in page}
+
+    start_utc = _local_day_start_as_utc_naive(min(represented_dates), timezone)
+    end_utc = _local_day_start_as_utc_naive(
+        max(represented_dates) + timedelta(days=1), timezone
+    )
+
+    sessions = db.session.execute(
+        select(Session).where(
+            Session.room_id == room_id,
+            Session.date >= start_utc,
+            Session.date < end_utc,
+        )
+    ).scalars().all()
+
+    accumulators = {day: SessionSummaryAccumulator() for day in represented_dates}
+
+    for session in sessions:
+        accumulator = accumulators.get(_session_local_date(session, timezone))
+
+        if accumulator is None:
+            continue
+
+        accumulator.total_sessions += 1
+        accumulator.total_time_seconds += session.actual_time_seconds
+        accumulator.completion_sum += _session_completion_percentage(session)
+
+    return {
+        day.isoformat(): {
+            "total_sessions": accumulator.total_sessions,
+            "total_time_seconds": accumulator.total_time_seconds,
+            "average_completion_percentage": round(
+                accumulator.completion_sum / accumulator.total_sessions, 1
+            ),
+            "average_session_time_seconds": round(
+                accumulator.total_time_seconds / accumulator.total_sessions
+            ),
+        }
+        for day, accumulator in accumulators.items()
+        if accumulator.total_sessions > 0
+    }
+
+
+def get_room_sessions_for_user(
+    user_id: int,
+    room_id: int,
+    timezone: ZoneInfo,
+    cursor_date: datetime | None,
+    cursor_id: int | None,
+) -> dict[str, Any]:
+    get_active_membership(room_id, user_id)
+
+    statement = (
+        select(Session, User.username, RoomMembership.show_missions, RoomMembership.left_at)
+        .join(User, User.id == Session.user_id)
+        .join(
+            RoomMembership,
+            and_(
+                RoomMembership.room_id == Session.room_id,
+                RoomMembership.user_id == Session.user_id,
+            ),
+        )
+        .where(Session.room_id == room_id)
+    )
+
+    if cursor_date is not None and cursor_id is not None:
+        statement = statement.where(
+            or_(
+                Session.date < cursor_date,
+                and_(Session.date == cursor_date, Session.id < cursor_id),
+            )
+        )
+
+    rows = db.session.execute(
+        statement.order_by(Session.date.desc(), Session.id.desc())
+        .limit(HISTORY_PAGE_SIZE + 1)
+    ).tuples().all()
+
+    has_more = len(rows) > HISTORY_PAGE_SIZE
+    page = rows[:HISTORY_PAGE_SIZE]
+
+    next_cursor: dict[str, Any] | None = None
+
+    if has_more and page:
+        last_session = page[-1][0]
+        next_cursor = {
+            "date": _as_utc_aware(last_session.date).replace(tzinfo=None).isoformat(),
+            "id": last_session.id,
+        }
+
+    sessions: list[dict[str, Any]] = []
+
+    for session, username, show_missions, left_at in page:
+        is_mine = session.user_id == user_id
+        mission_hidden = not is_mine and not show_missions
+
+        item = _serialize_session(session)
+        item.update({
+            "mission": None if mission_hidden else session.mission,
+            "mission_hidden": mission_hidden,
+            "username": username,
+            "is_mine": is_mine,
+            "is_former_member": left_at is not None,
+        })
+        sessions.append(item)
+
+    return {
+        "sessions": sessions,
+        "daily_summaries": _build_room_daily_summaries(
+            room_id, [row[0] for row in page], timezone
+        ),
+        "next_cursor": next_cursor,
+    }
