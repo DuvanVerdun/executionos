@@ -391,9 +391,9 @@ Three ideas run through everything:
 
 #### 3. Constants
 
-One block on the backend, at the top of `room_session_service.py`, except
-`ROOM_NAME_MAX_LENGTH` and `LINK_TOKEN_BYTES`, which live at the top of
-`room_service.py` (mission 4 needs them before `room_session_service.py` exists).
+The four time-rule constants are one block at the top of `room_session_rules.py`
+(the pure-rules module, so both services can import them). `ROOM_NAME_MAX_LENGTH`,
+`LINK_TOKEN_BYTES`, and `HISTORY_PAGE_SIZE` live at the top of `room_service.py`.
 One block on the client, in the `CONFIGURATION` section of `app.js`. No magic numbers
 elsewhere.
 
@@ -589,7 +589,8 @@ the user's own event paths, return the generic 500.
   create the room, generate `secrets.token_urlsafe(16)` (retry on a unique
   collision), and add the creator's membership. Returns 201 with the card and
   `link_token`.
-- `POST /rooms/join` with `{linkToken}`: an unknown token gives 404.
+- `POST /rooms/join` with `{linkToken}`: a malformed token (not a string, bad
+  characters, or too long) gives 400, and an unknown token gives 404.
   - No membership: create one.
   - A former member: set `left_at = null` and `joined_at = now`, only if `left_at`
     was set. `show_missions` is kept.
@@ -614,13 +615,26 @@ the user's own event paths, return the generic 500.
 - `POST /rooms/<id>/leave`: sets `left_at = now`. If no active members remain, run
   the deletion procedure. 409 if the user's own running session is in this room.
   Returns `room_deleted`.
-- `DELETE /rooms/<id>`: owner only. 409 if **any** running row exists in the room,
-  after finalizing.
+- `DELETE /rooms/<id>`: owner only. 409 if **any** row (running or paused) exists
+  in the room, after finalizing.
 - `GET /rooms/<id>/link` (owner): returns `link_token`.
 - `POST /rooms/<id>/link/refresh` (owner): replaces the token. The old one is
   invalid immediately.
 - `PATCH /rooms/<id>/membership` with `{showMissions: bool}`: the **desired value,
   never a flip**.
+
+**Response shapes** (implemented; keys are snake_case):
+- `GET /rooms`: `{success, rooms}`. Each card also has `working_now_count`.
+- `POST /rooms`: `{success, room}` (201, with `link_token`). `POST /rooms/join`:
+  `{success, room, already_member}`.
+- `POST /rooms/<id>/leave`: `{success, room_deleted}`. `DELETE /rooms/<id>`:
+  `{success}`.
+- Link endpoints: `{success, link_token}`. `PATCH .../membership`:
+  `{success, show_missions}`.
+- `GET /rooms/<id>`: `{success, room, summary, ranking}`. `.../summary`:
+  `{success, summary}`. `.../sessions`: `{success, sessions, daily_summaries,
+  next_cursor}`.
+- A 409 on leave or delete is `{success: false, error}`.
 
 **Room deletion procedure** (shared by the owner's delete and last-member-leaves),
 in one transaction:
@@ -628,8 +642,8 @@ in one transaction:
 2. `DELETE FROM room_memberships WHERE room_id = :id`.
 3. `DELETE FROM rooms WHERE id = :id`.
 
-Do not rely on `ON DELETE SET NULL`, because foreign-key enforcement is unverified
-(section 11).
+Do not rely on `ON DELETE SET NULL`. Turso enforces foreign keys (verified Oct 2026),
+so the order above matters.
 
 **Authorization helpers.** Every room route uses
 `get_active_membership(room_id, user_id)` (none gives 404) and
@@ -641,9 +655,12 @@ Do not rely on `ON DELETE SET NULL`, because foreign-key enforcement is unverifi
   - `session`: `submission_id`, `room_id`, `room_name`, `mission`,
     `target_time_seconds`, `started_at`, `paused_at`, `paused_seconds`,
     `actual_time_seconds`, `state` (`running` or `paused`), and `checkin`
-    (`mark`, `due_at`, `deadline_at`, `outstanding`).
+    (`mark`, `due_at`, `deadline_at`, `outstanding`). `mark` is the number of the
+    next check-in (1 for the 1-hour one). While paused, `due_at` and `deadline_at`
+    are null and `outstanding` is false.
   - `notice`: `{reason, saved, actual_time_seconds}` or null. It is **read and
     deleted in the same request**.
+  - A 409 is the envelope with `success: false` and an `error` key.
 - Every endpoint first finalizes the user's row if it is overdue, then applies its
   rule, then refreshes `last_heartbeat_at`. When the user's row is missing, the
   response is 200 with `active: false` and any pending notice.
@@ -668,6 +685,8 @@ Do not rely on `ON DELETE SET NULL`, because foreign-key enforcement is unverifi
   the envelope**. Valid only when paused. It claims the row, saves the `Session`
   with `date = now` and the derived actual time, and returns
   `{saved: true, session_id}`. A repeat follows the idempotent path in section 6.
+  When there is nothing to save (the session already ended on its own without a
+  save), it returns 200 with `saved: false`.
 
 #### 8. Client behavior
 
@@ -856,8 +875,10 @@ production data.
 Cheap checks, to run before relying on the assumption. The owner runs them, and
 the agent writes the steps.
 1. Does `DELETE ... RETURNING` or `rowcount` work through the libsql driver?
-2. Does Turso enforce foreign keys?
-3. Does `batch_alter_table` add a column to `sessions` on libsql?
+   Yes, `RETURNING` works (the mission 6 smoke test: Finish claimed the row).
+2. Does Turso enforce foreign keys? **Yes** (a bad `room_id` insert was rejected).
+3. Does `batch_alter_table` add a column to `sessions` on libsql? **Yes**
+   (migration 1 ran).
 4. Is audio blocked after a reload?
 5. Does a hidden tab really stretch heartbeats to about a minute?
 6. Does the CORS preflight for `PATCH` pass from the Netlify and
@@ -900,7 +921,8 @@ Work only on the current mission's items and files. Anything else needs approval
   endpoints. State is `not_working` for everyone until mission 6. Done when the
   numbers match a manual count.
 - **Mission 6 (presence and check-in).** Migration 2, `ActiveRoomSession`,
-  `SessionEndNotice`, new `backend/room_session_service.py`, the room-session
+  `SessionEndNotice`, new `backend/room_session_rules.py` and
+  `backend/room_session_service.py`, the room-session
   endpoints, finalize and its call sites (including one call in each of
   `dashboard`, `streak`, and `get-sessions`), the leave and delete guards,
   `working_now_count`, live ranking states, and `include_my_running_session`. Done
@@ -982,6 +1004,20 @@ ask first.
   loading error screen when `GET /room-session` fails at load; the sound deferred;
   floating messages get a home on Plan, Rooms, and Room; an ended session found
   with the tab open lands on the Room screen, like Finish.
+
+- **Missions 4 to 6 (backend):** three modules, `room_service.py`,
+  `room_session_rules.py` (constants and pure rules) and `room_session_service.py`,
+  imported one way (`room_session_service` → `room_service` → `room_session_rules`);
+  finalize calls live in the routes in `main.py`, except inside the room-session
+  operations; service functions are named `*_for_user`, so routes keep clean names;
+  four small exception classes and one `room_error_response` helper map errors to
+  generic responses; the claim uses `DELETE ... RETURNING` only, with no `rowcount`
+  fallback; the one-transaction guarantee of claim, save, and notice on Turso stays
+  unverified; link tokens are checked for uniqueness before use instead of retried
+  on collision; `active_room_sessions.mission` and `target_time_seconds` are not
+  null; the room daily summaries duplicate the dashboard logic with a room filter
+  (to revisit with the tests after v0.6); the owner skipped the time-based
+  scenarios of section 12 for mission 6, so only the happy path was smoke-tested.
 
 #### 17. At ship: where each part moves
 
