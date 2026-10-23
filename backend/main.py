@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, UTC
+from collections.abc import Callable
 from typing import Any, cast
 from uuid import UUID
 
@@ -322,12 +323,35 @@ def create_app() -> Flask:
         parse_timezone
     )
 
+    from room_session_service import (
+        RoomSessionConflictError,
+        checkin_room_session_for_user,
+        finalize_overdue_for_rooms,
+        finalize_overdue_for_user_rooms,
+        finalize_overdue_for_users,
+        finish_room_session_for_user,
+        get_room_session_for_user,
+        heartbeat_room_session_for_user,
+        pause_room_session_for_user,
+        resume_room_session_for_user,
+        start_room_session_for_user,
+    )
+
+    def finalize_quietly(finalize: Callable[[], None]) -> None:
+        """Finalize overdue room sessions on a read path. A failure is logged, never raised."""
+        try:
+            finalize()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not finalize overdue room sessions")
+
     @app.route("/api/streak", methods=["GET"])
     @jwt_required()
     def streak() -> tuple[Any, int]:
         """Return the authenticated user's streak and consistency calendar."""
         try:
             user_id = int(get_jwt_identity())
+            finalize_quietly(lambda: finalize_overdue_for_users([user_id]))
 
             anchor_date = parse_anchor_date(
                 request.args.get("anchor_date")
@@ -365,6 +389,7 @@ def create_app() -> Flask:
         """Return the authenticated user's period summary and trend data."""
         try:
             user_id = int(get_jwt_identity())
+            finalize_quietly(lambda: finalize_overdue_for_users([user_id]))
 
             period = parse_period(request.args.get("period"))
             anchor_date = parse_anchor_date(
@@ -404,6 +429,7 @@ def create_app() -> Flask:
         """Return a filtered session page and daily summaries for the authenticated user."""
         try:
             user_id = int(get_jwt_identity())
+            finalize_quietly(lambda: finalize_overdue_for_users([user_id]))
 
             period = parse_period(request.args.get("period"))
             anchor_date = parse_anchor_date(
@@ -620,6 +646,7 @@ def create_app() -> Flask:
             }), 500
 
     from room_service import (
+        RoomConflictError,
         RoomForbiddenError,
         RoomNotAvailableError,
         create_room_for_user,
@@ -649,6 +676,10 @@ def create_app() -> Flask:
             return jsonify({"success": False, "error": "Room not available"}), 404  # type: ignore
         if isinstance(error, RoomForbiddenError):
             return jsonify({"success": False, "error": "Not allowed"}), 403  # type: ignore
+        if isinstance(error, RoomSessionConflictError):
+            return jsonify({**error.envelope, "success": False, "error": "Session conflict"}), 409  # type: ignore
+        if isinstance(error, RoomConflictError):
+            return jsonify({"success": False, "error": "A session is running"}), 409  # type: ignore
         if isinstance(error, ValueError):
             return jsonify({"success": False, "error": "Invalid room data"}), 400  # type: ignore
 
@@ -661,6 +692,7 @@ def create_app() -> Flask:
         """Return the rooms the authenticated user belongs to."""
         user_id = int(get_jwt_identity())
         try:
+            finalize_quietly(lambda: finalize_overdue_for_user_rooms(user_id))
             return jsonify({"success": True, "rooms": list_rooms_for_user(user_id)}), 200  # type: ignore
         except Exception as error:
             return room_error_response(error)
@@ -700,6 +732,7 @@ def create_app() -> Flask:
         """Leave a room. The room is deleted if nobody is left."""
         user_id = int(get_jwt_identity())
         try:
+            finalize_overdue_for_rooms([room_id])
             result = leave_room_for_user(user_id, room_id)
             return jsonify({"success": True, **result}), 200  # type: ignore
         except Exception as error:
@@ -711,6 +744,7 @@ def create_app() -> Flask:
         """Delete a room. Owner only."""
         user_id = int(get_jwt_identity())
         try:
+            finalize_overdue_for_rooms([room_id])
             delete_room_for_user(user_id, room_id)
             return jsonify({"success": True}), 200  # type: ignore
         except Exception as error:
@@ -756,6 +790,7 @@ def create_app() -> Flask:
         """Return the room snapshot: room, summary and ranking."""
         user_id = int(get_jwt_identity())
         try:
+            finalize_quietly(lambda: finalize_overdue_for_rooms([room_id]))
             snapshot = get_room_snapshot_for_user(user_id, room_id)
             return jsonify({"success": True, **snapshot}), 200  # type: ignore
         except Exception as error:
@@ -767,7 +802,13 @@ def create_app() -> Flask:
         """Return the room summary numbers."""
         user_id = int(get_jwt_identity())
         try:
-            summary = get_room_summary_for_user(user_id, room_id)
+            raw_include = request.args.get("include_my_running_session")
+
+            if raw_include not in (None, "true", "false"):
+                raise ValueError("include_my_running_session must be true or false")
+
+            finalize_quietly(lambda: finalize_overdue_for_rooms([room_id]))
+            summary = get_room_summary_for_user(user_id, room_id, raw_include == "true")
             return jsonify({"success": True, "summary": summary}), 200  # type: ignore
         except Exception as error:
             return room_error_response(error)
@@ -786,6 +827,8 @@ def create_app() -> Flask:
             if (raw_cursor_date is None) != (raw_cursor_id is None):
                 raise ValueError("cursor_date and cursor_id must be provided together")
 
+            finalize_quietly(lambda: finalize_overdue_for_rooms([room_id]))
+
             cursor_date: datetime | None = None
             cursor_id: int | None = None
 
@@ -797,6 +840,84 @@ def create_app() -> Flask:
                 user_id, room_id, timezone, cursor_date, cursor_id
             )
             return jsonify({"success": True, **result}), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session", methods=["GET"])
+    @jwt_required()
+    def get_room_session() -> tuple[Any, int]:
+        """Return the authenticated user's running room session, if any."""
+        user_id = int(get_jwt_identity())
+        try:
+            return jsonify(get_room_session_for_user(user_id)), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session", methods=["POST"])
+    @jwt_required()
+    def start_room_session() -> tuple[Any, int]:
+        """Start a room session for the authenticated user."""
+        user_id = int(get_jwt_identity())
+        try:
+            data = read_json_object()
+            envelope = start_room_session_for_user(
+                user_id,
+                data.get("roomId"),
+                data.get("mission"),
+                data.get("targetTimeSeconds"),
+            )
+            return jsonify(envelope), 201  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session/pause", methods=["POST"])
+    @jwt_required()
+    def pause_room_session() -> tuple[Any, int]:
+        """Pause the running room session. Stop uses the same transition."""
+        user_id = int(get_jwt_identity())
+        try:
+            return jsonify(pause_room_session_for_user(user_id)), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session/resume", methods=["POST"])
+    @jwt_required()
+    def resume_room_session() -> tuple[Any, int]:
+        """Resume the paused room session. Continue uses the same transition."""
+        user_id = int(get_jwt_identity())
+        try:
+            return jsonify(resume_room_session_for_user(user_id)), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session/checkin", methods=["POST"])
+    @jwt_required()
+    def checkin_room_session() -> tuple[Any, int]:
+        """Confirm presence for the outstanding check-in."""
+        user_id = int(get_jwt_identity())
+        try:
+            return jsonify(checkin_room_session_for_user(user_id)), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session/heartbeat", methods=["POST"])
+    @jwt_required()
+    def heartbeat_room_session() -> tuple[Any, int]:
+        """Tell the server the client is alive."""
+        user_id = int(get_jwt_identity())
+        try:
+            return jsonify(heartbeat_room_session_for_user(user_id)), 200  # type: ignore
+        except Exception as error:
+            return room_error_response(error)
+
+    @app.route("/api/room-session/finish", methods=["POST"])
+    @jwt_required()
+    def finish_room_session() -> tuple[Any, int]:
+        """Save the paused room session and end it."""
+        user_id = int(get_jwt_identity())
+        try:
+            data = read_json_object()
+            return jsonify(finish_room_session_for_user(user_id, data.get("submissionId"))), 200  # type: ignore
         except Exception as error:
             return room_error_response(error)
 

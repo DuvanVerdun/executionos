@@ -16,7 +16,14 @@ from dashboard_service import (
     _session_local_date,  # pyright: ignore[reportPrivateUsage]
 )
 from extensions import db
-from models import Room, RoomMembership, Session, User
+from models import ActiveRoomSession, Room, RoomMembership, Session, User
+from room_session_rules import (
+    RunningSessionFacts,
+    actual_time_seconds,
+    member_state,
+    overdue_reason,
+    ring_percentage,
+)
 
 
 ROOM_NAME_MAX_LENGTH = 50
@@ -33,6 +40,10 @@ class RoomNotAvailableError(Exception):
 
 class RoomForbiddenError(Exception):
     """An active member tried an owner-only action."""
+
+
+class RoomConflictError(Exception):
+    """The action is not possible while a room session is running."""
 
 
 def _validate_room_name(raw_name: object) -> str:
@@ -104,6 +115,55 @@ def _require_owner(room_id: int, user_id: int) -> None:
         raise RoomForbiddenError()
 
 
+def running_session_facts(row: ActiveRoomSession) -> RunningSessionFacts:
+    """Copy a running-session row into plain values, with timezone-aware UTC datetimes."""
+    return RunningSessionFacts(
+        id=row.id,
+        user_id=row.user_id,
+        room_id=row.room_id,
+        submission_id=row.submission_id,
+        mission=row.mission,
+        target_time_seconds=row.target_time_seconds,
+        started_at=_as_utc_aware(row.started_at),
+        paused_at=_as_utc_aware(row.paused_at) if row.paused_at is not None else None,
+        paused_seconds=row.paused_seconds,
+        last_checkin_mark=row.last_checkin_mark,
+        last_interaction_at=(
+            _as_utc_aware(row.last_interaction_at)
+            if row.last_interaction_at is not None
+            else None
+        ),
+        last_interaction_actual_seconds=row.last_interaction_actual_seconds,
+        last_heartbeat_at=_as_utc_aware(row.last_heartbeat_at),
+    )
+
+
+def _load_live_facts(
+    room_ids: list[int],
+    now: datetime,
+    user_id: int | None = None,
+) -> list[RunningSessionFacts]:
+    """Running sessions in these rooms. An overdue session is never shown as live."""
+    statement = select(ActiveRoomSession).where(ActiveRoomSession.room_id.in_(room_ids))
+
+    if user_id is not None:
+        statement = statement.where(ActiveRoomSession.user_id == user_id)
+
+    rows = db.session.execute(statement).scalars().all()
+    facts = [running_session_facts(row) for row in rows]
+
+    return [item for item in facts if overdue_reason(item, now) is None]
+
+
+def _has_running_session(room_id: int, user_id: int | None = None) -> bool:
+    statement = select(ActiveRoomSession.id).where(ActiveRoomSession.room_id == room_id)
+
+    if user_id is not None:
+        statement = statement.where(ActiveRoomSession.user_id == user_id)
+
+    return db.session.execute(statement.limit(1)).first() is not None
+
+
 def _build_cards(
     user_id: int,
     rows: list[tuple[RoomMembership, Room]],
@@ -145,12 +205,19 @@ def _build_cards(
         if total_room_id is not None:
             my_totals[total_room_id] = int(total_seconds or 0)
 
+    working_now_counts: dict[int, int] = {}
+
+    for facts in _load_live_facts(room_ids, datetime.now(UTC)):
+        if facts.paused_at is None:
+            working_now_counts[facts.room_id] = working_now_counts.get(facts.room_id, 0) + 1
+
     return [
         {
             "id": room.id,
             "name": room.name,
             "members_count": members_count.get(room.id, 0),
             "my_total_time_seconds": my_totals.get(room.id, 0),
+            "working_now_count": working_now_counts.get(room.id, 0),
             "is_owner": owner_user_ids.get(room.id) == user_id,
             "show_missions": membership.show_missions,
         }
@@ -241,6 +308,10 @@ def _delete_room_records(room_id: int) -> None:
 
 def leave_room_for_user(user_id: int, room_id: int) -> dict[str, Any]:
     membership = get_active_membership(room_id, user_id)
+
+    if _has_running_session(room_id, user_id):
+        raise RoomConflictError()
+
     membership.left_at = datetime.now(UTC)
     db.session.flush()
 
@@ -263,6 +334,10 @@ def leave_room_for_user(user_id: int, room_id: int) -> dict[str, Any]:
 
 def delete_room_for_user(user_id: int, room_id: int) -> None:
     _require_owner(room_id, user_id)
+
+    if _has_running_session(room_id):
+        raise RoomConflictError()
+
     _delete_room_records(room_id)
     db.session.commit()
 
@@ -310,9 +385,14 @@ def _load_user_totals(room_id: int) -> dict[int, tuple[int, int]]:
 def _build_summary(
     members_count: int,
     totals: dict[int, tuple[int, int]],
+    running_seconds: int | None = None,
 ) -> dict[str, Any]:
     total_sessions = sum(count for count, _ in totals.values())
     total_time_seconds = sum(seconds for _, seconds in totals.values())
+
+    if running_seconds is not None:
+        total_sessions += 1
+        total_time_seconds += running_seconds
 
     return {
         "total_time_seconds": total_time_seconds,
@@ -344,6 +424,9 @@ def get_room_snapshot_for_user(user_id: int, room_id: int) -> dict[str, Any]:
     totals = _load_user_totals(room_id)
     owner_user_id = member_rows[0][0]
 
+    now = datetime.now(UTC)
+    live = {item.user_id: item for item in _load_live_facts([room_id], now)}
+
     # sorted() is stable, so ties keep the join order from the query above.
     ranked = sorted(member_rows, key=lambda row: -totals.get(row[0], (0, 0))[1])
 
@@ -351,14 +434,20 @@ def get_room_snapshot_for_user(user_id: int, room_id: int) -> dict[str, Any]:
 
     for position, (member_user_id, username) in enumerate(ranked, start=1):
         sessions_count, total_time_seconds = totals.get(member_user_id, (0, 0))
+        facts = live.get(member_user_id)
+        state = member_state(facts)
 
         ranking.append({
             "position": position,
             "username": username,
             "is_you": member_user_id == user_id,
             "is_owner": member_user_id == owner_user_id,
-            "state": "not_working",
-            "ring_percentage": None,
+            "state": state,
+            "ring_percentage": (
+                ring_percentage(facts, now)
+                if facts is not None and state == "working"
+                else None
+            ),
             "total_time_seconds": total_time_seconds,
             "sessions_count": sessions_count,
         })
@@ -375,8 +464,21 @@ def get_room_snapshot_for_user(user_id: int, room_id: int) -> dict[str, Any]:
     }
 
 
-def get_room_summary_for_user(user_id: int, room_id: int) -> dict[str, Any]:
+def get_room_summary_for_user(
+    user_id: int,
+    room_id: int,
+    include_my_running_session: bool = False,
+) -> dict[str, Any]:
     get_active_membership(room_id, user_id)
+
+    running_seconds: int | None = None
+
+    if include_my_running_session:
+        now = datetime.now(UTC)
+        mine = _load_live_facts([room_id], now, user_id)
+
+        if mine:
+            running_seconds = actual_time_seconds(mine[0], now)
 
     members_count = db.session.execute(
         select(func.count())
@@ -387,7 +489,7 @@ def get_room_summary_for_user(user_id: int, room_id: int) -> dict[str, Any]:
         )
     ).scalar_one()
 
-    return _build_summary(members_count, _load_user_totals(room_id))
+    return _build_summary(members_count, _load_user_totals(room_id), running_seconds)
 
 
 def _build_room_daily_summaries(

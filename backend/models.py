@@ -98,6 +98,85 @@ class RoomMembership(db.Model):
         return f"<RoomMembership {self.id} room={self.room_id} user={self.user_id}>"
 
 
+class ActiveRoomSession(db.Model):
+    """A room session in progress. At most one per user."""
+    __tablename__ = "active_room_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, unique=True
+    )
+    room_id: Mapped[int] = mapped_column(
+        ForeignKey("rooms.id"), nullable=False, index=True
+    )
+    submission_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    mission: Mapped[str] = mapped_column(String(200), nullable=False)
+    target_time_seconds: Mapped[int] = mapped_column(nullable=False)
+    started_at: Mapped[datetime] = mapped_column(nullable=False)
+    paused_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    paused_seconds: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    last_checkin_mark: Mapped[int] = mapped_column(default=0, nullable=False)
+    last_interaction_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    last_interaction_actual_seconds: Mapped[int | None] = mapped_column(nullable=True)
+    last_heartbeat_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    def __init__(
+        self,
+        user_id: int,
+        room_id: int,
+        submission_id: str,
+        mission: str,
+        target_time_seconds: int,
+        started_at: datetime,
+    ) -> None:
+        self.user_id = user_id
+        self.room_id = room_id
+        self.submission_id = submission_id
+        self.mission = mission
+        self.target_time_seconds = target_time_seconds
+        self.started_at = started_at
+        self.paused_at = None
+        self.paused_seconds = 0.0
+        self.last_checkin_mark = 0
+        self.last_interaction_at = None
+        self.last_interaction_actual_seconds = None
+        self.last_heartbeat_at = started_at
+
+    def __repr__(self) -> str:
+        return f"<ActiveRoomSession {self.id} user={self.user_id} room={self.room_id}>"
+
+
+class SessionEndNotice(db.Model):
+    """A one-time note telling a user how a session ended without them."""
+    __tablename__ = "session_end_notices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, unique=True
+    )
+    reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    saved: Mapped[bool] = mapped_column(nullable=False)
+    actual_time_seconds: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    def __init__(
+        self,
+        user_id: int,
+        reason: str,
+        saved: bool,
+        actual_time_seconds: int | None,
+        created_at: datetime,
+    ) -> None:
+        self.user_id = user_id
+        self.reason = reason
+        self.saved = saved
+        self.actual_time_seconds = actual_time_seconds
+        self.created_at = created_at
+
+    def __repr__(self) -> str:
+        return f"<SessionEndNotice {self.id} user={self.user_id} reason={self.reason}>"
+
+
 class Feedback(db.Model):
     """Feedback model for the application."""
     __tablename__ = "feedback"
