@@ -231,7 +231,7 @@ colors, and interactions.
 
 ## Responsive Layout
 
-Do not design around one exact viewport.
+Do not design around one exact viewport. The 1440×1024 Figma canvas is a prototyping tool, not a build limit.
 
 Use fluid sizing where appropriate and verify the intended desktop range.
 

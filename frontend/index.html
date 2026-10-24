@@ -163,6 +163,7 @@
             <header class="plan-header">
                 <h1 class="wordmark">ExecutionOS</h1>
                 <button type="button" id="plan-dashboard-btn">Dashboard</button>
+                <button type="button" id="plan-rooms-btn">Focus Rooms</button>
                 <div class="streak-container">
                     <button
                         type="button"
@@ -238,6 +239,8 @@
         <div id="focus-timer-ring-container">
         
             <div class="focus-timer-ring-mask"></div>
+
+            <p id="focus-room-name-display" class="focus-room-name" hidden></p>
             
             <div class="focus-display-container">
                 <p id="focus-mission-display"></p>
@@ -261,6 +264,31 @@
     <div class="screen wordmark-centered-layout review-screen">
 
         <h1 class="wordmark">ExecutionOS</h1>
+
+        <h1 id="review-room-name" class="wordmark" hidden></h1>
+
+        <div class="review-body">
+
+        <div id="review-room-summary" class="review-room-summary" hidden>
+            <div class="dashboard-summary-grid">
+                <div class="dashboard-summary-card">
+                    <p id="review-room-total-time" class="dashboard-summary-value"></p>
+                    <p class="dashboard-summary-label">Focused</p>
+                </div>
+                <div class="dashboard-summary-card">
+                    <p id="review-room-session-count" class="dashboard-summary-value"></p>
+                    <p class="dashboard-summary-label">Sessions</p>
+                </div>
+                <div class="dashboard-summary-card">
+                    <p id="review-room-people-count" class="dashboard-summary-value"></p>
+                    <p class="dashboard-summary-label">People</p>
+                </div>
+                <div class="dashboard-summary-card">
+                    <p id="review-room-average-time" class="dashboard-summary-value"></p>
+                    <p class="dashboard-summary-label">Avg. Session Time</p>
+                </div>
+            </div>
+        </div>
 
         <div class="review-container">
             <div class="review-display-container">
@@ -287,6 +315,8 @@
             </div>
             <p id="review-save-message" class="session-save-message" role="status" aria-live="polite"></p>
         </div>
+
+        </div>
     
     </div>
 
@@ -300,6 +330,7 @@
             <header class="dashboard-header">
                 <h1 class="wordmark">ExecutionOS</h1>
                 <button type="button" id="dashboard-new-mission-btn">New Mission</button>
+                <button type="button" id="dashboard-rooms-btn">Focus Rooms</button>
                 <div class="streak-container">
                     <button
                         type="button"
@@ -338,8 +369,6 @@
                     <button id="dashboard-user-menu-logout-btn">Logout</button>
                 </div>
             </header>
-
-            <p id="dashboard-save-message" class="session-save-message dashboard-save-feedback" role="status" aria-live="polite" hidden></p>
 
             <section id="dashboard-content" class="dashboard-content">
 
@@ -515,6 +544,201 @@
     
     </div>
 
+    <!-- Rooms Screen Section -->
+
+    <div class="screen rooms-screen">
+
+        <header class="plan-header rooms-header">
+            <h1 class="wordmark">ExecutionOS</h1>
+            <button type="button" id="rooms-new-mission-btn">New Mission</button>
+            <button type="button" id="rooms-dashboard-btn">Dashboard</button>
+            <div class="streak-container">
+                <button
+                    type="button"
+                    id="rooms-streak-btn"
+                    class="streak-btn"
+                    aria-label="Open consistency calendar"
+                >
+                    🔥 —
+                </button>
+
+                <div
+                    id="rooms-streak-popup"
+                    class="streak-popup"
+                    style="display: none;"
+                ></div>
+            </div>
+            <svg id="rooms-user-icon" class="user-icon" viewBox="0 0 48 48" aria-label="Open user menu">
+                <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/>
+
+                <circle cx="24" cy="17" r="7" fill="currentColor" />
+
+                <path
+                    d="M9.5 38
+                    C11.5 29.5 17 25.5 24 25.5
+                    C31 25.5 36.5 29.5 38.5 38
+                    C34.7 42.3 29.7 44.5 24 44.5
+                    C18.3 44.5 13.3 42.3 9.5 38Z"
+                    fill="currentColor"
+                />
+            </svg>
+            <div id="rooms-user-menu">
+                <div id="rooms-user-menu-information">
+                    <p id="rooms-user-menu-username"></p>
+                </div>
+                <button type="button" id="rooms-user-menu-feedback-btn" data-feedback-screen="rooms">Send Feedback</button>
+                <button id="rooms-user-menu-logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <section class="rooms-content">
+
+            <div class="rooms-title-row">
+                <h1 class="rooms-title">Rooms</h1>
+                <div class="rooms-actions">
+                    <button type="button" id="rooms-create-btn" class="white-filled-button">Create</button>
+                    <button type="button" id="rooms-join-btn" class="normal-button">Join</button>
+                </div>
+            </div>
+
+            <div id="rooms-loading" class="rooms-grid" role="status" aria-label="Loading rooms">
+                <div class="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                <div class="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                <div class="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                <div class="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                <div class="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+            </div>
+
+            <div id="rooms-grid" class="rooms-grid"></div>
+
+            <div id="rooms-empty" class="empty-dashboard-cta-container">
+                <h2 class="empty-dashboard-cta-title">No rooms yet</h2>
+                <p class="empty-dashboard-cta-paragraph">Create a room with friends or coworkers, or join one and work together.</p>
+                <button type="button" id="rooms-empty-create-btn" class="empty-dashboard-start-mission-btn white-filled-button">Create Room</button>
+            </div>
+
+            <div id="rooms-error" class="dashboard-error" role="alert">
+                <p class="dashboard-error-message">Couldn't reach the server.<br>Please try again in a moment.</p>
+                <button type="button" id="rooms-retry-btn">Retry</button>
+            </div>
+
+        </section>
+
+    </div>
+
+    <!-- Room Screen Section -->
+
+    <div class="screen room-screen">
+
+        <div class="room-container">
+
+            <div class="room-topbar">
+                <button type="button" id="room-back-btn" class="room-icon-btn" aria-label="Back to rooms">
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+                </button>
+                <h1 id="room-title" class="room-title" hidden></h1>
+                <div id="room-title-skeleton" class="dashboard-skeleton room-title-skeleton" aria-hidden="true"></div>
+                <div id="room-menu-wrapper" class="room-menu-wrapper">
+                    <button type="button" id="room-menu-btn" class="room-icon-btn" aria-label="Open room menu" aria-haspopup="menu" aria-expanded="false">
+                        <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                    </button>
+                    <div id="room-menu" class="room-menu" role="menu" hidden></div>
+                </div>
+            </div>
+
+            <div id="room-loading" class="room-loading" role="status" aria-label="Loading room">
+                <div class="dashboard-skeleton room-skeleton-summary" aria-hidden="true"></div>
+                <div class="dashboard-skeleton room-skeleton-mission" aria-hidden="true"></div>
+                <section class="room-section" aria-hidden="true">
+                    <h2 class="dashboard-content-title">Ranking</h2>
+                    <div class="dashboard-skeleton room-skeleton-ranking"></div>
+                </section>
+                <section class="room-section" aria-hidden="true">
+                    <h2 class="dashboard-content-title">Room history</h2>
+                    <div class="dashboard-skeleton room-skeleton-history"></div>
+                </section>
+            </div>
+
+            <div id="room-data" class="room-data">
+
+                <div class="room-summary-container">
+                    <div class="dashboard-summary-grid">
+                        <div class="dashboard-summary-card">
+                            <p id="room-total-time" class="dashboard-summary-value"></p>
+                            <p class="dashboard-summary-label">Focused</p>
+                        </div>
+                        <div class="dashboard-summary-card">
+                            <p id="room-session-count" class="dashboard-summary-value"></p>
+                            <p class="dashboard-summary-label">Sessions</p>
+                        </div>
+                        <div class="dashboard-summary-card">
+                            <p id="room-people-count" class="dashboard-summary-value"></p>
+                            <p class="dashboard-summary-label">People</p>
+                        </div>
+                        <div class="dashboard-summary-card">
+                            <p id="room-average-time" class="dashboard-summary-value"></p>
+                            <p class="dashboard-summary-label">Avg. Session Time</p>
+                            <button type="button" id="room-beat-btn" class="room-beat-btn">Can you beat it?</button>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="plan-input-section room-mission-card">
+                    <div class="plan-mission-container">
+                        <h3>What matters today?</h3>
+                        <div class="input-container plan-mission-input-container">
+                            <input type="text" class="input" id="room-mission-input" placeholder=" " maxlength="50" aria-describedby="room-mission-error">
+                            <p class="input-placeholder">Today's Mission</p>
+                        </div>
+                        <p id="room-mission-error" class="form-error-message plan-field-error" role="alert"></p>
+                    </div>
+                    <div class="plan-time-container">
+                        <h3>How long will you focus?</h3>
+                        <div class="input-container plan-time-input-container">
+                            <input inputmode="numeric" class="input" id="room-target-time-input" placeholder=" " maxlength="5" value="00:00" aria-describedby="room-time-error">
+                            <p class="input-placeholder">HH:MM</p>
+                        </div>
+                        <p id="room-time-error" class="form-error-message plan-field-error" role="alert"></p>
+                    </div>
+                    <button type="button" id="room-start-work-btn" class="cta-button">Start Work</button>
+                    <p id="room-start-error" class="form-error-message plan-field-error" role="alert"></p>
+                </section>
+
+                <section class="room-section">
+                    <h2 id="room-ranking-title" class="dashboard-content-title"></h2>
+                    <div id="room-ranking" class="room-ranking"></div>
+                </section>
+
+                <section class="room-section">
+                    <h2 class="dashboard-content-title">Room history</h2>
+                    <div id="room-history" class="room-history"></div>
+                    <div id="room-history-empty" class="room-history-empty">
+                        <h3 class="room-history-empty-title">No sessions in this room yet</h3>
+                        <p class="room-history-empty-text">Start a mission and set the pace.</p>
+                    </div>
+                    <div id="room-history-sentinel" class="room-history-sentinel">
+                        <p id="room-history-message" role="status" aria-live="polite"></p>
+                        <button type="button" id="room-history-retry-btn" hidden>Retry</button>
+                    </div>
+                </section>
+
+            </div>
+
+            <div id="room-error" class="dashboard-error" role="alert">
+                <p class="dashboard-error-message">Couldn't reach the server.<br>Please try again in a moment.</p>
+                <button type="button" id="room-retry-btn">Retry</button>
+            </div>
+
+            <div id="room-unavailable" class="empty-dashboard-cta-container">
+                <h2 class="empty-dashboard-cta-title">This room isn't available</h2>
+                <p class="empty-dashboard-cta-paragraph">It may have been deleted, or the link may no longer be valid.</p>
+                <button type="button" id="room-unavailable-back-btn" class="empty-dashboard-start-mission-btn white-filled-button">Back to rooms</button>
+            </div>
+
+        </div>
+
+    </div>
+
     <button type="button" id="dashboard-back-to-stats-btn" class="normal-button dashboard-back-to-stats" aria-label="Back to stats" title="Back to stats" aria-hidden="true" disabled>
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
             <path d="m6 12 6-6 6 6M12 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -547,6 +771,70 @@
         <p id="feedback-message" class="form-error-message" role="status" aria-live="polite"></p>
         <button type="submit" class="white-filled-button" id="dashboard-send-feedback-btn">Send Feedback</button>
     </form>
+
+    <!-- Room Modals -->
+
+    <div id="create-room-overlay" class="modal-overlay" hidden>
+        <form id="create-room-form" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-room-title" novalidate>
+            <button type="button" id="create-room-close-btn" class="modal-close-btn" aria-label="Close create room form">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+            </button>
+            <h2 id="create-room-title" class="modal-title">Create Room</h2>
+            <div class="modal-field">
+                <div class="input-container">
+                    <input type="text" class="input" id="create-room-input" placeholder=" " maxlength="50" autocomplete="off" aria-describedby="create-room-error">
+                    <label class="input-placeholder" for="create-room-input">Room name</label>
+                </div>
+                <p id="create-room-error" class="form-error-message modal-field-error" role="alert"></p>
+            </div>
+            <button type="submit" id="create-room-submit-btn" class="modal-submit-btn">Create Room</button>
+        </form>
+    </div>
+
+    <div id="room-created-overlay" class="modal-overlay" hidden>
+        <div id="room-created-modal" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="room-created-title">
+            <button type="button" id="room-created-close-btn" class="modal-close-btn" aria-label="Close room created message">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+            </button>
+            <h2 id="room-created-title" class="modal-title">Room Created</h2>
+            <input type="text" class="input modal-link-display" id="room-created-link" readonly aria-label="Room link">
+            <button type="button" id="room-created-copy-btn" class="modal-submit-btn">Copy link</button>
+        </div>
+    </div>
+
+    <div id="join-room-overlay" class="modal-overlay" hidden>
+        <form id="join-room-form" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="join-room-title" novalidate>
+            <button type="button" id="join-room-close-btn" class="modal-close-btn" aria-label="Close join room form">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+            </button>
+            <h2 id="join-room-title" class="modal-title">Join Room</h2>
+            <div class="modal-field">
+                <div class="input-container">
+                    <input type="text" class="input" id="join-room-input" placeholder=" " autocomplete="off" aria-describedby="join-room-error">
+                    <label class="input-placeholder" for="join-room-input">Room link</label>
+                </div>
+                <p id="join-room-error" class="form-error-message modal-field-error" role="alert"></p>
+            </div>
+            <button type="submit" id="join-room-submit-btn" class="modal-submit-btn">Join Room</button>
+        </form>
+    </div>
+
+    <div id="checkin-overlay" class="modal-overlay checkin-overlay" hidden>
+        <div class="modal-card checkin-card" role="alertdialog" aria-modal="true" aria-labelledby="checkin-title" aria-describedby="checkin-countdown">
+            <h2 id="checkin-title" class="checkin-title">Are you still there?</h2>
+            <p id="checkin-countdown" class="checkin-countdown" role="timer"></p>
+            <button type="button" id="checkin-confirm-btn" class="modal-submit-btn">Still here</button>
+            <p id="checkin-error" class="form-error-message modal-field-error" role="alert"></p>
+        </div>
+    </div>
+
+    <p id="floating-message" class="session-save-message floating-message" role="status" aria-live="polite" hidden></p>
 
 </body>
 <script src="app.js"></script>

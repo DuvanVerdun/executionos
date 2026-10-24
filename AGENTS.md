@@ -150,6 +150,29 @@ Read only the documents relevant to the current task.
 Local working context: if `docs/organization/` exists (gitignored), read its
 `README.md` first. Never commit it or reference it from committed docs.
 
+## Documentation Rules
+
+- Most docs change at version ship, not during work. Do not update `architecture.md`, `product.md`, `README.md`, or `changelog.md` until then.
+- During a version, only `docs/current-roadmap.md` and the private workboard change often.
+- `docs/current-roadmap.md` holds everything about the version in progress, including its vocabulary.
+- `docs/product.md` holds only what is already in production: purpose, boundaries, and existing vocabulary. Never put unbuilt features there.
+- `README.md` is usually stale on purpose. It is updated at version ship. Don't use it as a source of truth.
+- Keep each fact in one place. Before adding a fact, check whether it already exists.
+
+When a version ships, the product docs catch up. `product.md`, `architecture.md`, `README.md`, and `changelog.md` are updated, `current-roadmap.md` is reset for the next version, and the shipped idea is removed from `docs/organization/ideas.md`. Plans written in the roadmap during the version move to the file that owns them: architecture plans to `architecture.md`, design plans to the Figma file and `style.css`, product rules to `product.md`.
+
+## Design and Figma
+
+- Visual truth: `frontend/style.css`. Read it fully before any UI work. Don't copy its values into docs.
+- Copy truth: `frontend/index.html` and the Figma file. Don't copy text into docs.
+- Figma file: "ExecutionOS", key `B7vEWYtHv9pK4eK2V5ug6K`. Pages:
+  - **Screens:** v0.5 live reference and current work.
+  - **Foundations:** current tokens and components. Until it is rebuilt for v0.6, `style.css` wins.
+  - **Archive:** old versions. Don't edit.
+- Figma calls are scarce (Starter plan). Call Figma only when I ask. Don't read the file back to check your own work. Write a whole screen per call. Ask for a screenshot instead.
+- The web app is desktop only. See `docs/product.md`.
+- Don't invent colors, sizes, radii, or copy. Ask first.
+
 ## Communication
 
 Be direct, concise, and technically precise.

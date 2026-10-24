@@ -15,6 +15,67 @@ const WEEKDAY_ABBREVIATIONS = {
     0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat'
 };
 const ACTIVE_SESSION_STORAGE_KEY = 'executionOS_activeSession';
+const ROOM_POLL_INTERVAL_MS = 15000;
+const ROOM_REQUEST_TIMEOUT_MS = 20000;
+const ROOM_JOIN_FRAGMENT = '#join=';
+const BEAT_AVERAGE_INCREMENT_SECONDS = 60;
+const HEARTBEAT_INTERVAL_MS = 15000;
+const CHECKIN_SOUND_URL = 'sounds/checkin.mp3';
+const CHECKIN_INTERVAL_MS = 3600000;
+const CHECKIN_RESPONSE_MS = 300000;
+const ROOM_RETRY_WINDOW_MS = 10000;
+const ROOM_RETRY_DELAY_MS = 1500;
+const MEMBER_STATE_LABELS = {
+    working: 'Working',
+    paused: 'Paused',
+    not_working: 'Not working'
+};
+const ROOM_BUSY_LABELS = {
+    'copy-link': 'Copying…',
+    'refresh-link': 'Creating link…',
+    'delete-room': 'Deleting…',
+    'leave-room': 'Leaving…'
+};
+const ROOM_COPY = {
+    showMissionsLabel: 'Show Missions',
+    copyLinkLabel: 'Copy link',
+    refreshLinkLabel: 'Refresh link',
+    deleteRoomLabel: 'Delete room',
+    leaveRoomLabel: 'Leave room',
+    leaveConfirm: 'Leave this room? You can rejoin only with a valid link.',
+    deleteConfirm: 'Delete this room? Its history is removed for everyone. Members keep their sessions in their personal history.',
+    refreshConfirm: 'Create a new link? The old link will stop working.',
+    linkCopied: 'Link copied.',
+    linkRefreshed: 'New link created.',
+    copyFailed: "Couldn't copy the link.",
+    invalidLink: "This link isn't valid.",
+    roomNameRequired: 'Enter a Room name.',
+    roomLinkRequired: 'Enter a Room link.',
+    createFailed: "Couldn't create the room. Try again.",
+    joinFailed: "Couldn't join the room. Try again.",
+    serverUnreachable: "Couldn't reach the server. Try again.",
+    deleteBusy: 'Someone is working in this room. Try again when they finish.',
+    historyFailed: "Couldn't load the room history.",
+    moreSessionsFailed: "Couldn't load more sessions.",
+    sessionSaved: 'Session saved. Nice work.',
+    sessionEndedGeneric: 'Your session ended while you were away.',
+    finishFailed: "Couldn't finish saving. Your work is still here. Try again.",
+    sessionErrors: {
+        start: "Couldn't start the session. Try again.",
+        pause: "Couldn't pause. Try again.",
+        resume: "Couldn't resume. Try again.",
+        stop: "Couldn't stop. Try again.",
+        continue: "Couldn't continue. Try again.",
+        checkin: "Couldn't confirm. Try again."
+    },
+    actionErrors: {
+        'toggle-missions': "Couldn't update this setting. Try again.",
+        'copy-link': "Couldn't copy the link.",
+        'refresh-link': "Couldn't create a new link. Try again.",
+        'delete-room': "Couldn't delete the room. Try again.",
+        'leave-room': "Couldn't leave the room. Try again."
+    }
+};
 
 
 // ========== STATE ==========
@@ -99,6 +160,92 @@ const streakState = {
     loadGeneration: 0
 };
 
+const roomsState = {
+    rooms: [],
+    hasLoaded: false,
+    isLoading: false,
+    loadGeneration: 0,
+    pollTimer: null,
+    openMenuRoomId: null,
+    renderDeferred: false,
+    busyAction: null
+};
+
+const roomState = {
+    roomId: null,
+    status: 'loading',
+    snapshot: null,
+    sessions: [],
+    dailySummaries: {},
+    nextCursor: null,
+    historyLoaded: false,
+    historyFailure: null,
+    isLoading: false,
+    isLoadingMore: false,
+    loadGeneration: 0,
+    historyGeneration: 0,
+    pollTimer: null,
+    historyObserver: null,
+    menuOpen: false,
+    busyAction: null
+};
+
+const roomSnapshotCache = new Map();
+
+/** Create the empty client state of a room session. */
+function createInitialRoomSessionState() {
+    return {
+        active: false,
+        submissionId: '',
+        roomId: null,
+        roomName: '',
+        isPaused: false,
+        startedAtMs: 0,
+        pausedAtMs: null,
+        pausedSeconds: 0,
+        checkin: { dueAtMs: null, deadlineAtMs: null, outstanding: false },
+        clockOffsetMs: 0,
+        display: {
+            currentMission: '',
+            targetTimeSeconds: 0,
+            actualTimeSeconds: 0,
+            completionStatus: 'partial',
+            percentageCompleted: 0
+        },
+        isBusy: false,
+        busyButton: null,
+        restoreLabel: '',
+        generation: 0,
+        pending: 0,
+        queueTail: Promise.resolve(),
+        eventCounter: 0,
+        heartbeatInFlight: false,
+        finishFailed: false,
+        countdownRefreshed: false,
+        tickTimer: null,
+        heartbeatTimer: null,
+        checkinTimer: null,
+        countdownTimer: null
+    };
+}
+
+const roomSessionState = createInitialRoomSessionState();
+
+const checkinAudio = {
+    context: null,
+    buffer: null,
+    loading: null,
+    source: null,
+    failed: false
+};
+
+const modalState = {
+    openOverlay: null,
+    returnFocus: null,
+    isSubmitting: false,
+    roomLink: ''
+};
+
 
 // ========== DOM REFERENCES ==========
 
@@ -147,6 +294,7 @@ const dom = {
         targetTime: document.getElementById('plan-target-time-input'),
         timeError: document.getElementById('plan-time-error'),
         dashboardButton: document.getElementById('plan-dashboard-btn'),
+        roomsButton: document.getElementById('plan-rooms-btn'),
         startButton: document.getElementById('plan-start-work-btn')
     },
     focus: {
@@ -156,7 +304,8 @@ const dom = {
         targetTime: document.getElementById('focus-target-time-display'),
         currentTime: document.getElementById('focus-current-time-display'),
         pauseButton: document.getElementById('focus-pause-btn'),
-        stopButton: document.getElementById('focus-stop-btn')
+        stopButton: document.getElementById('focus-stop-btn'),
+        roomName: document.getElementById('focus-room-name-display')
     },
     review: {
         screen: document.querySelector('.review-screen'),
@@ -168,12 +317,20 @@ const dom = {
         actualTime: document.getElementById('review-actual-time-display'),
         continueButton: document.getElementById('review-continue-btn'),
         finishButton: document.getElementById('review-finish-btn'),
-        saveMessage: document.getElementById('review-save-message')
+        saveMessage: document.getElementById('review-save-message'),
+        wordmark: document.querySelector('.review-screen .wordmark'),
+        roomName: document.getElementById('review-room-name'),
+        roomSummary: document.getElementById('review-room-summary'),
+        roomTotalTime: document.getElementById('review-room-total-time'),
+        roomSessionCount: document.getElementById('review-room-session-count'),
+        roomPeopleCount: document.getElementById('review-room-people-count'),
+        roomAverageTime: document.getElementById('review-room-average-time')
     },
     dashboard: {
         screen: document.querySelector('.dashboard-screen'),
         backToStatsButton: document.getElementById('dashboard-back-to-stats-btn'),
         newMissionButton: document.getElementById('dashboard-new-mission-btn'),
+        roomsButton: document.getElementById('dashboard-rooms-btn'),
         streakButton: document.getElementById('dashboard-streak-btn'),
         streakPopup: document.getElementById('dashboard-streak-popup'),
         userIcon: document.getElementById('dashboard-user-icon'),
@@ -182,7 +339,6 @@ const dom = {
         menuIcon: document.getElementById('dashboard-user-menu-icon'),
         logoutButton: document.getElementById('dashboard-user-menu-logout-btn'),
         content: document.getElementById('dashboard-content'),
-        saveMessage: document.getElementById('dashboard-save-message'),
         loading: document.getElementById('dashboard-loading'),
         error: document.getElementById('dashboard-error'),
         retryButton: document.getElementById('dashboard-retry-btn'),
@@ -213,6 +369,89 @@ const dom = {
         feedbackMessage: document.getElementById('feedback-message'),
         sendFeedbackButton: document.getElementById('dashboard-send-feedback-btn')
     },
+    rooms: {
+        screen: document.querySelector('.rooms-screen'),
+        newMissionButton: document.getElementById('rooms-new-mission-btn'),
+        dashboardButton: document.getElementById('rooms-dashboard-btn'),
+        streakButton: document.getElementById('rooms-streak-btn'),
+        streakPopup: document.getElementById('rooms-streak-popup'),
+        userIcon: document.getElementById('rooms-user-icon'),
+        userMenu: document.getElementById('rooms-user-menu'),
+        username: document.getElementById('rooms-user-menu-username'),
+        logoutButton: document.getElementById('rooms-user-menu-logout-btn'),
+        createButton: document.getElementById('rooms-create-btn'),
+        joinButton: document.getElementById('rooms-join-btn'),
+        loading: document.getElementById('rooms-loading'),
+        grid: document.getElementById('rooms-grid'),
+        empty: document.getElementById('rooms-empty'),
+        emptyCreateButton: document.getElementById('rooms-empty-create-btn'),
+        error: document.getElementById('rooms-error'),
+        retryButton: document.getElementById('rooms-retry-btn')
+    },
+    room: {
+        screen: document.querySelector('.room-screen'),
+        backButton: document.getElementById('room-back-btn'),
+        title: document.getElementById('room-title'),
+        titleSkeleton: document.getElementById('room-title-skeleton'),
+        menuWrapper: document.getElementById('room-menu-wrapper'),
+        menuButton: document.getElementById('room-menu-btn'),
+        menu: document.getElementById('room-menu'),
+        loading: document.getElementById('room-loading'),
+        data: document.getElementById('room-data'),
+        error: document.getElementById('room-error'),
+        retryButton: document.getElementById('room-retry-btn'),
+        unavailable: document.getElementById('room-unavailable'),
+        unavailableBackButton: document.getElementById('room-unavailable-back-btn'),
+        totalTime: document.getElementById('room-total-time'),
+        sessionCount: document.getElementById('room-session-count'),
+        peopleCount: document.getElementById('room-people-count'),
+        averageTime: document.getElementById('room-average-time'),
+        beatButton: document.getElementById('room-beat-btn'),
+        mission: document.getElementById('room-mission-input'),
+        missionError: document.getElementById('room-mission-error'),
+        targetTime: document.getElementById('room-target-time-input'),
+        timeError: document.getElementById('room-time-error'),
+        startButton: document.getElementById('room-start-work-btn'),
+        startError: document.getElementById('room-start-error'),
+        rankingTitle: document.getElementById('room-ranking-title'),
+        ranking: document.getElementById('room-ranking'),
+        history: document.getElementById('room-history'),
+        historyEmpty: document.getElementById('room-history-empty'),
+        historySentinel: document.getElementById('room-history-sentinel'),
+        historyMessage: document.getElementById('room-history-message'),
+        historyRetryButton: document.getElementById('room-history-retry-btn')
+    },
+    modals: {
+        create: {
+            overlay: document.getElementById('create-room-overlay'),
+            form: document.getElementById('create-room-form'),
+            closeButton: document.getElementById('create-room-close-btn'),
+            input: document.getElementById('create-room-input'),
+            error: document.getElementById('create-room-error'),
+            submitButton: document.getElementById('create-room-submit-btn')
+        },
+        created: {
+            overlay: document.getElementById('room-created-overlay'),
+            closeButton: document.getElementById('room-created-close-btn'),
+            link: document.getElementById('room-created-link'),
+            copyButton: document.getElementById('room-created-copy-btn')
+        },
+        join: {
+            overlay: document.getElementById('join-room-overlay'),
+            form: document.getElementById('join-room-form'),
+            closeButton: document.getElementById('join-room-close-btn'),
+            input: document.getElementById('join-room-input'),
+            error: document.getElementById('join-room-error'),
+            submitButton: document.getElementById('join-room-submit-btn')
+        },
+        checkin: {
+            overlay: document.getElementById('checkin-overlay'),
+            countdown: document.getElementById('checkin-countdown'),
+            confirmButton: document.getElementById('checkin-confirm-btn'),
+            error: document.getElementById('checkin-error')
+        }
+    },
+    floatingMessage: document.getElementById('floating-message'),
     passwordButtons: document.querySelectorAll('.password-visibility-btn')
 };
 
@@ -406,7 +645,7 @@ async function syncOfflineWork() {
             await sessionQueue.remove(userId, item.submissionId);
             synced += 1;
         }
-        setDashboardSaveMessage('Your saved sessions are synced. Nice work.', { saved: true });
+        setFloatingMessage('Your saved sessions are synced. Nice work.', { saved: true });
     } catch (error) {
         console.error('Session sync failed:', error);
         if (authenticatedUserId !== userId) return;
@@ -417,7 +656,7 @@ async function syncOfflineWork() {
         else if (error.status === 400 || error.status === 409) {
             message = 'A saved session needs attention before it can sync. It is still on this browser.';
         }
-        setDashboardSaveMessage(message);
+        setFloatingMessage(message);
     } finally {
         isSyncingSessions = false;
         if (synced && authenticatedUserId === userId) {
@@ -430,19 +669,20 @@ async function syncOfflineWork() {
     }
 }
 
-/** Show temporary save feedback with a five-second hold and one-second fade. */
-function setDashboardSaveMessage(message, { saved = false } = {}) {
+/** Show temporary floating feedback with a five-second hold and one-second fade. */
+function setFloatingMessage(message, { saved = false, error = false } = {}) {
     clearTimeout(saveMessageFadeTimeout);
     clearTimeout(saveMessageHideTimeout);
-    dom.dashboard.saveMessage.textContent = message;
-    dom.dashboard.saveMessage.classList.toggle('session-save-success', saved);
-    dom.dashboard.saveMessage.classList.remove('is-fading');
-    dom.dashboard.saveMessage.hidden = !message;
+    dom.floatingMessage.textContent = message;
+    dom.floatingMessage.classList.toggle('session-save-success', saved);
+    dom.floatingMessage.classList.toggle('session-save-error', error);
+    dom.floatingMessage.classList.remove('is-fading');
+    dom.floatingMessage.hidden = !message;
     if (!message) return;
-    saveMessageFadeTimeout = setTimeout(/** Begin fading the save message after its display interval. */ () => {
-        dom.dashboard.saveMessage.classList.add('is-fading');
-        saveMessageHideTimeout = setTimeout(/** Hide the save message after its fade completes. */ () => {
-            dom.dashboard.saveMessage.hidden = true;
+    saveMessageFadeTimeout = setTimeout(/** Begin fading the message after its display interval. */ () => {
+        dom.floatingMessage.classList.add('is-fading');
+        saveMessageHideTimeout = setTimeout(/** Hide the message after its fade completes. */ () => {
+            dom.floatingMessage.hidden = true;
         }, 1000);
     }, 5000);
 }
@@ -628,13 +868,109 @@ function fetchStreak(anchorDate, currentScreen) {
 }
 
 /** Request deletion of an owned session. */
-function deleteSession(sessionId) {
-    return apiFetch({ path: `delete-session/${sessionId}`, method: 'DELETE', currentScreen: 'dashboard' });
+function deleteSession(sessionId, currentScreen = 'dashboard') {
+    return apiFetch({ path: `delete-session/${sessionId}`, method: 'DELETE', currentScreen });
 }
 
 /** Submit a feedback message from the current screen. */
 function postFeedback(feedbackMessage, currentScreen) {
     return apiFetch({ path: 'feedback', method: 'POST', body: { message: feedbackMessage }, currentScreen });
+}
+
+/** Send a room request with a timeout and the screen to leave if sign-in is lost. */
+function roomFetch(path, method, body, currentScreen) {
+    return apiFetch({
+        path, method, body, currentScreen,
+        signal: AbortSignal.timeout(ROOM_REQUEST_TIMEOUT_MS)
+    });
+}
+
+/** Request the rooms the user belongs to. */
+function fetchRooms(currentScreen = 'rooms') {
+    return roomFetch('rooms', 'GET', undefined, currentScreen);
+}
+
+/** Request creation of a room. */
+function postRoom(name, currentScreen = 'rooms') {
+    return roomFetch('rooms', 'POST', { name }, currentScreen);
+}
+
+/** Request to join a room with its link token. */
+function postJoinRoom(linkToken, currentScreen = 'rooms') {
+    return roomFetch('rooms/join', 'POST', { linkToken }, currentScreen);
+}
+
+/** Request to leave a room. */
+function postLeaveRoom(roomId, currentScreen = 'rooms') {
+    return roomFetch(`rooms/${roomId}/leave`, 'POST', undefined, currentScreen);
+}
+
+/** Request deletion of a room. */
+function deleteRoom(roomId, currentScreen = 'rooms') {
+    return roomFetch(`rooms/${roomId}`, 'DELETE', undefined, currentScreen);
+}
+
+/** Request a room's link token. */
+function fetchRoomLink(roomId, currentScreen = 'rooms') {
+    return roomFetch(`rooms/${roomId}/link`, 'GET', undefined, currentScreen);
+}
+
+/** Request a new link token for a room. */
+function postRefreshRoomLink(roomId, currentScreen = 'rooms') {
+    return roomFetch(`rooms/${roomId}/link/refresh`, 'POST', undefined, currentScreen);
+}
+
+/** Request a change to whether the user's missions show in a room. */
+function patchRoomMembership(roomId, showMissions, currentScreen = 'rooms') {
+    return roomFetch(`rooms/${roomId}/membership`, 'PATCH', { showMissions }, currentScreen);
+}
+
+/** Request a room's details, summary, and ranking. */
+function fetchRoomSnapshot(roomId, currentScreen = 'room') {
+    return roomFetch(`rooms/${roomId}`, 'GET', undefined, currentScreen);
+}
+
+/** Request a page of a room's session history. */
+function fetchRoomSessions(roomId, cursor = null, currentScreen = 'room') {
+    const params = new URLSearchParams({ timezone: getBrowserTimezone() });
+    if (cursor) {
+        params.set('cursor_date', cursor.date);
+        params.set('cursor_id', String(cursor.id));
+    }
+    return roomFetch(`rooms/${roomId}/sessions?${params.toString()}`, 'GET', undefined, currentScreen);
+}
+
+/** Return the name of the screen that is showing now. */
+function getCurrentScreenName() {
+    return document.body.dataset.screen ?? 'loading';
+}
+
+/** Request the user's running room session and any pending notice. */
+function fetchRoomSession(currentScreen = getCurrentScreenName()) {
+    return roomFetch('room-session', 'GET', undefined, currentScreen);
+}
+
+/** Request the start of a room session. */
+function postStartRoomSession(roomId, mission, targetTimeSeconds) {
+    return roomFetch('room-session', 'POST', { roomId, mission, targetTimeSeconds }, 'room');
+}
+
+/** Send a room session event: pause, resume, checkin, or heartbeat. */
+function postRoomSessionEvent(event) {
+    return roomFetch(`room-session/${event}`, 'POST', undefined, getCurrentScreenName());
+}
+
+/** Request that the paused room session be saved and ended. */
+function postFinishRoomSession(submissionId) {
+    return roomFetch('room-session/finish', 'POST', { submissionId }, 'review');
+}
+
+/** Request a room's summary, optionally counting the user's running session. */
+function fetchRoomSummary(roomId, includeMyRunningSession) {
+    return roomFetch(
+        `rooms/${roomId}/summary?include_my_running_session=${includeMyRunningSession}`,
+        'GET', undefined, 'review'
+    );
 }
 
 
@@ -766,21 +1102,23 @@ function formatTrendBucketLabel(bucketStart, period) {
 function setAuthenticatedUser(result) {
     if (authenticatedUserId !== (result.user_id ?? null)) {
         pendingSubmission = null;
-        setDashboardSaveMessage('');
+        setFloatingMessage('');
     }
     accessToken = result.access_token;
     authenticatedUserId = result.user_id ?? null;
     dom.plan.username.textContent = result.username;
     dom.dashboard.username.textContent = result.username;
+    dom.rooms.username.textContent = result.username;
 }
 
 /** Clear in-memory identity and displayed account feedback. */
 function clearAuthenticatedUser() {
     accessToken = null;
     authenticatedUserId = null;
-    setDashboardSaveMessage('');
+    setFloatingMessage('');
     dom.plan.username.textContent = '';
     dom.dashboard.username.textContent = '';
+    dom.rooms.username.textContent = '';
 }
 
 /** Render completion using the colors before and after the target. */
@@ -875,13 +1213,13 @@ function toggleUserMenu(screen) {
 /** Close account menus when a click occurs outside their controls. */
 function closeUserMenusOnOutsideClick(event) {
     if (!isUserMenuOpened) return;
-    const clickedInsidePlanMenu = dom.plan.userMenu.contains(event.target);
-    const clickedPlanIcon = dom.plan.userIcon.contains(event.target);
-    const clickedInsideDashboardMenu = dom.dashboard.userMenu.contains(event.target);
-    const clickedDashboardIcon = dom.dashboard.userIcon.contains(event.target);
-    if (clickedInsidePlanMenu || clickedPlanIcon || clickedInsideDashboardMenu || clickedDashboardIcon) return;
-    dom.plan.userMenu.style.display = 'none';
-    dom.dashboard.userMenu.style.display = 'none';
+    const clickedInsideHeaderMenu = HEADER_SCREENS.some(/** Check whether the click hit this screen's account menu or icon. */ (screen) =>
+        dom[screen].userMenu.contains(event.target) || dom[screen].userIcon.contains(event.target)
+    );
+    if (clickedInsideHeaderMenu) return;
+    HEADER_SCREENS.forEach(/** Close this screen's account menu. */ (screen) => {
+        dom[screen].userMenu.style.display = 'none';
+    });
     isUserMenuOpened = false;
 }
 
@@ -890,16 +1228,21 @@ function closeUserMenusOnOutsideClick(event) {
 
 const SCREEN_DISPLAY = {
     loading: 'flex', register: 'grid', login: 'grid',
-    plan: 'flex', focus: 'flex', review: 'grid', dashboard: 'flex'
+    plan: 'flex', focus: 'flex', review: 'grid', dashboard: 'flex', rooms: 'flex', room: 'flex'
 };
 
+const HEADER_SCREENS = ['plan', 'dashboard', 'rooms'];
+
 const ALLOWED_SCREEN_TRANSITIONS = {
+    loading: ['register', 'login'],
     register: ['loading', 'login'],
-    login: ['register', 'plan', 'focus', 'review', 'dashboard'],
-    plan: ['loading', 'register', 'login', 'dashboard'],
-    focus: ['loading', 'login', 'register', 'plan', 'review'],
+    login: ['register', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'],
+    plan: ['loading', 'register', 'login', 'dashboard', 'rooms'],
+    focus: ['loading', 'login', 'register', 'plan', 'review', 'room'],
     review: ['loading', 'login', 'register', 'focus'],
-    dashboard: ['plan', 'review']
+    dashboard: ['plan', 'review', 'rooms'],
+    rooms: ['loading', 'register', 'login', 'plan', 'dashboard', 'room'],
+    room: ['loading', 'register', 'login', 'rooms', 'review', 'focus']
 };
 
 /** Apply an allowed screen transition and prepare its presentation. */
@@ -912,23 +1255,41 @@ function navigateTo(nextScreen, currentScreen) {
         dashboardState.isLoadingMore = false;
         dashboardState.sessionObserver?.disconnect();
     }
-    if ((currentScreen === 'plan' || currentScreen === 'dashboard') && isUserMenuOpened) {
+    if (currentScreen === 'rooms' && nextScreen !== 'rooms') {
+        leaveRoomsScreen();
+    }
+    if (currentScreen === 'room' && nextScreen !== 'room') {
+        leaveRoomScreen();
+    }
+    if (HEADER_SCREENS.includes(currentScreen) && isUserMenuOpened) {
         toggleUserMenu(currentScreen);
     }
     if (currentScreen === 'loading' && nextScreen === 'register') {
         dom.loading.spinner.style.display = 'none';
     }
+    if (nextScreen === 'login' || nextScreen === 'register' || nextScreen === 'loading') {
+        resetRoomSessionClient();
+        roomsState.hasLoaded = false;
+        roomsState.rooms = [];
+        roomSnapshotCache.clear();
+    }
+    const displaySession = roomSessionState.active ? roomSessionState.display : activeSessionState;
+    if (nextScreen === 'focus') {
+        dom.focus.roomName.hidden = !roomSessionState.active;
+    }
     if (nextScreen === 'focus' && currentScreen !== 'review') {
-        renderFocusSession(activeSessionState);
+        renderFocusSession(displaySession);
     }
     if (nextScreen === 'focus' && currentScreen === 'loading') {
         dom.focus.pauseButton.textContent = 'Resume';
     }
     if (nextScreen === 'review') {
-        renderReviewSession(activeSessionState);
+        renderReviewSession(displaySession);
+        setReviewRoomMode(roomSessionState.active);
     }
     dom[currentScreen].screen.style.display = 'none';
     dom[nextScreen].screen.style.display = SCREEN_DISPLAY[nextScreen];
+    document.body.dataset.screen = nextScreen;
     updateBackToStatsButton();
 }
 
@@ -1597,7 +1958,7 @@ function toggleSessionMenu(event) {
     if (!toggleIcon) return;
     const menu = toggleIcon.parentElement.querySelector('.dashboard-session-menu');
     const wasOpen = menu.style.display === 'flex';
-    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach(/** Close other session menus before toggling the selected menu. */ (otherMenu) => {
+    event.currentTarget.querySelectorAll('.dashboard-session-menu').forEach(/** Close other session menus before toggling the selected menu. */ (otherMenu) => {
         otherMenu.style.display = 'none';
     });
     menu.style.display = wasOpen ? 'none' : 'flex';
@@ -1606,7 +1967,7 @@ function toggleSessionMenu(event) {
 /** Close history menus when clicking outside their controls. */
 function closeSessionMenusOnOutsideClick(event) {
     if (event.target.closest('.dashboard-session-menu, .dashboard-session-open-menu-icon')) return;
-    dom.dashboard.sessionsList.querySelectorAll('.dashboard-session-menu').forEach(/** Close a history session menu. */ (menu) => {
+    document.querySelectorAll('.dashboard-session-menu').forEach(/** Close a history session menu. */ (menu) => {
         menu.style.display = 'none';
     });
 }
@@ -1661,12 +2022,53 @@ async function routeToInitialScreen(currentScreen = 'loading') {
         navigateTo('register', 'loading');
         return;
     }
+    let joinedRoomId = null;
+    let joinUnavailable = false;
+    const joinToken = getJoinTokenFromHash();
+    if (joinToken !== null) {
+        try {
+            const joinResult = await postJoinRoom(joinToken, currentScreen);
+            if (joinResult.success === true) {
+                joinedRoomId = joinResult.room.id;
+            } else if (joinResult.status === 400 || joinResult.status === 404) {
+                joinUnavailable = true;
+            } else {
+                throw new Error(joinResult.error || 'Could not join the room');
+            }
+            clearJoinHash();
+        } catch (error) {
+            if (error.status === 401) return;
+            console.error('Could not join the room:', error);
+            navigateTo('loading', currentScreen);
+            showLoadingScreenError();
+            return;
+        }
+    }
+    try {
+        const { result: roomSessionResult, sentAtMs, receivedAtMs } = await timeRoomRequest(
+            /** Request the running room session. */
+            () => fetchRoomSession(currentScreen)
+        );
+        if (roomSessionResult.status !== 200 || !isRoomSessionEnvelope(roomSessionResult)) {
+            throw new Error(roomSessionResult.error || 'Could not load the room session');
+        }
+        if (applyRoomSessionEnvelope(roomSessionResult, sentAtMs, receivedAtMs)) {
+            enterRoomSessionFocus(currentScreen);
+            return;
+        }
+    } catch (error) {
+        if (error.status === 401) return;
+        console.error('Could not load the room session:', error);
+        navigateTo('loading', currentScreen);
+        showLoadingScreenError();
+        return;
+    }
     let restoredSession = false;
     try {
         restoredSession = loadActiveSession(activeSessionState);
     } catch (error) {
         console.error('Could not restore the active session:', error);
-        setDashboardSaveMessage('Couldn’t restore browser saves. Please reload to try again.');
+        setFloatingMessage('Couldn’t restore browser saves. Please reload to try again.');
     }
     if (restoredSession && pendingSubmission) {
         navigateTo('review', currentScreen);
@@ -1675,6 +2077,14 @@ async function routeToInitialScreen(currentScreen = 'loading') {
     }
     void syncOfflineWork();
     if (!restoredSession) {
+        if (joinedRoomId !== null) {
+            await openRoom(joinedRoomId, currentScreen);
+            return;
+        }
+        if (joinUnavailable) {
+            showUnavailableRoom(currentScreen);
+            return;
+        }
         navigateTo('plan', currentScreen);
         await loadStreak('plan');
         return;
@@ -1684,34 +2094,38 @@ async function routeToInitialScreen(currentScreen = 'loading') {
 }
 
 /** Return a mission or duration validation error, or an empty string. */
-function validatePlan() {
-    if (!dom.plan.mission.value.trim()) return 'Enter your mission.';
-    if (dom.plan.mission.value.length > 50) return 'Keep your mission to 50 characters or fewer.';
-    if (!dom.plan.targetTime.value || !/^\d{2}:\d{2}$/.test(dom.plan.targetTime.value)) {
+function validatePlan(missionInput = dom.plan.mission, timeInput = dom.plan.targetTime) {
+    if (!missionInput.value.trim()) return 'Enter your mission.';
+    if (missionInput.value.length > 50) return 'Keep your mission to 50 characters or fewer.';
+    if (!timeInput.value || !/^\d{2}:\d{2}$/.test(timeInput.value)) {
         return 'Enter a focus time as HH:MM, for example 00:25.';
     }
-    const [hours, minutes] = dom.plan.targetTime.value.split(':').map(Number);
+    const [hours, minutes] = timeInput.value.split(':').map(Number);
     if (minutes > 59) return 'Enter minutes between 00 and 59.';
     if (hours === 0 && minutes === 0) return 'Choose a focus time greater than zero.';
     return '';
 }
 
+/** Validate a mission card's fields and show the first error. Return whether they are valid. */
+function validateMissionFields(fields) {
+    fields.missionError.textContent = '';
+    fields.timeError.textContent = '';
+    fields.mission.removeAttribute('aria-invalid');
+    fields.targetTime.removeAttribute('aria-invalid');
+    const error = validatePlan(fields.mission, fields.targetTime);
+    if (!error) return true;
+    const isMissionError = !fields.mission.value.trim() || fields.mission.value.length > 50;
+    const input = isMissionError ? fields.mission : fields.targetTime;
+    const message = isMissionError ? fields.missionError : fields.timeError;
+    message.textContent = error;
+    input.setAttribute('aria-invalid', 'true');
+    input.focus();
+    return false;
+}
+
 /** Validate the plan and start a timestamp-based work session. */
 function handleStartWork() {
-    dom.plan.missionError.textContent = '';
-    dom.plan.timeError.textContent = '';
-    dom.plan.mission.removeAttribute('aria-invalid');
-    dom.plan.targetTime.removeAttribute('aria-invalid');
-    const error = validatePlan();
-    if (error) {
-        const isMissionError = !dom.plan.mission.value.trim() || dom.plan.mission.value.length > 50;
-        const input = isMissionError ? dom.plan.mission : dom.plan.targetTime;
-        const message = isMissionError ? dom.plan.missionError : dom.plan.timeError;
-        message.textContent = error;
-        input.setAttribute('aria-invalid', 'true');
-        input.focus();
-        return;
-    }
+    if (!validateMissionFields(dom.plan)) return;
     activeSessionState.currentMission = dom.plan.mission.value;
     activeSessionState.targetTimeSeconds = parseHHMMToSeconds(dom.plan.targetTime.value);
     activeSessionState.startTimestamp = new Date().toISOString();
@@ -1721,6 +2135,10 @@ function handleStartWork() {
 
 /** Toggle the active session between paused and running states. */
 function handlePauseResume() {
+    if (roomSessionState.active) {
+        void handleRoomPauseResume();
+        return;
+    }
     if (activeSessionState.isTimerRunning) {
         pauseSession(activeSessionState);
         dom.focus.pauseButton.textContent = 'Resume';
@@ -1733,12 +2151,20 @@ function handlePauseResume() {
 
 /** Stop the active session and open Review. */
 function handleStopWork() {
+    if (roomSessionState.active) {
+        void handleRoomStop();
+        return;
+    }
     stopSession(activeSessionState);
     navigateTo('review', 'focus');
 }
 
 /** Resume reviewed work when no submission is pending. */
 function handleContinueWork() {
+    if (roomSessionState.active) {
+        void handleRoomContinue();
+        return;
+    }
     if (isFinishingSession || pendingSubmission) return;
     dom.review.saveMessage.textContent = '';
     navigateTo('focus', 'review');
@@ -1764,6 +2190,10 @@ function resetApp() {
 
 /** Save or queue the exact submission and show its outcome on Dashboard. */
 async function handleFinishWork() {
+    if (roomSessionState.active) {
+        await handleRoomFinish();
+        return;
+    }
     if (isFinishingSession) return;
     const userId = authenticatedUserId;
     if (userId == null) {
@@ -1837,7 +2267,7 @@ async function handleFinishWork() {
         if (authenticatedUserId !== userId) return;
         resetApp();
         navigateTo('dashboard', 'review');
-        setDashboardSaveMessage(saved
+        setFloatingMessage(saved
             ? 'Session saved. Nice work.'
             : 'Saved on this browser. Waiting to sync. Dashboard totals update after syncing.', { saved });
         await loadDashboard();
@@ -2068,34 +2498,37 @@ function handleTargetTimeKeydown(event) {
     const allowedKeys = /^\d$/.test(event.key) || event.key === 'Backspace';
     if (!allowedKeys) return;
     event.preventDefault();
-    let caretPosition = dom.plan.targetTime.selectionStart;
+    const input = event.currentTarget;
+    let caretPosition = input.selectionStart;
     if (caretPosition === null || caretPosition === 0) return;
     if (caretPosition === 3) caretPosition = 2;
     const digitPosition = caretPosition - 1;
     const replacement = event.key === 'Backspace' ? '0' : event.key;
-    const previousValue = dom.plan.targetTime.value;
-    const characters = dom.plan.targetTime.value.split('');
+    const previousValue = input.value;
+    const characters = input.value.split('');
     characters[digitPosition] = replacement;
-    dom.plan.targetTime.value = characters.join('');
-    dom.plan.targetTime.setSelectionRange(caretPosition, caretPosition);
-    if (dom.plan.targetTime.value !== previousValue) {
-        dom.plan.targetTime.dispatchEvent(new Event('input', { bubbles: true }));
+    input.value = characters.join('');
+    input.setSelectionRange(caretPosition, caretPosition);
+    if (input.value !== previousValue) {
+        input.dispatchEvent(new Event('input', { bubbles: true }));
     }
 }
 
-/** Delete the selected history session and reload Dashboard data. */
+/** Delete the selected history session and reload the Dashboard or Room data. */
 async function handleDeleteSession(event) {
     const deleteButton = event.target.closest('.dashboard-delete-session-btn');
     if (!deleteButton || deleteButton.disabled) return;
     if (!confirm('Delete this session?')) return;
+    const inRoom = event.currentTarget === dom.room.history;
     const menu = deleteButton.closest('.dashboard-session-menu');
     menu.querySelector('.form-error-message')?.remove();
     deleteButton.disabled = true;
     deleteButton.textContent = 'Deleting…';
     try {
-        const result = await deleteSession(deleteButton.dataset.sessionId);
+        const result = await deleteSession(deleteButton.dataset.sessionId, inRoom ? 'room' : 'dashboard');
         if (!result.success) throw new Error('Deletion failed');
-        await loadDashboard();
+        if (inRoom) await loadRoom({ silent: true, reloadHistory: true });
+        else await loadDashboard();
     } catch (error) {
         const message = document.createElement('p');
         message.className = 'form-error-message';
@@ -2375,7 +2808,7 @@ function renderStreakPopup(screen, data, { isLoading = false, failed = false } =
 
 /** Update streak values and calendars on Plan and Dashboard. */
 function renderStreak(data) {
-    for (const screen of ['plan', 'dashboard']) {
+    for (const screen of HEADER_SCREENS) {
         dom[screen].streakButton.textContent =
             `🔥 ${data.current_streak}`;
 
@@ -2398,7 +2831,7 @@ async function loadStreak(currentScreen) {
             }))
         }
     };
-    for (const screen of ['plan', 'dashboard']) {
+    for (const screen of HEADER_SCREENS) {
         renderStreakPopup(screen, pendingData, { isLoading: true });
     }
     try {
@@ -2418,7 +2851,7 @@ async function loadStreak(currentScreen) {
     } catch (error) {
         if (generation !== streakState.loadGeneration) return;
         console.error('Streak loading error:', error);
-        for (const screen of ['plan', 'dashboard']) {
+        for (const screen of HEADER_SCREENS) {
             renderStreakPopup(screen, pendingData, { failed: true });
         }
     }
@@ -2429,8 +2862,9 @@ function toggleStreakPopup(screen) {
     const isOpen =
         streakState.openScreen === screen;
 
-    dom.plan.streakPopup.style.display = 'none';
-    dom.dashboard.streakPopup.style.display = 'none';
+    HEADER_SCREENS.forEach(/** Hide this screen's consistency calendar. */ (headerScreen) => {
+        dom[headerScreen].streakPopup.style.display = 'none';
+    });
 
     if (isOpen) {
         streakState.openScreen = null;
@@ -2460,6 +2894,1697 @@ function closeStreakPopupsOnOutsideClick(event) {
 }
 
 
+// ========== ROOMS ==========
+
+/** Return the shareable link for a room token. */
+function buildRoomLink(linkToken) {
+    return `${window.location.origin}/${ROOM_JOIN_FRAGMENT}${linkToken}`;
+}
+
+/** Return the room link as shown to the user, without the protocol. */
+function buildRoomDisplayLink(linkToken) {
+    return `${window.location.host}/${ROOM_JOIN_FRAGMENT}${linkToken}`;
+}
+
+/** Extract the token from a pasted room link or bare token. */
+function extractRoomLinkToken(value) {
+    const match = value.trim().replace(/\/+$/, '').match(/[A-Za-z0-9_-]+$/);
+    return match ? match[0] : '';
+}
+
+/** Return the join token in the URL fragment, or null when there is none. */
+function getJoinTokenFromHash() {
+    if (!window.location.hash.startsWith(ROOM_JOIN_FRAGMENT)) return null;
+    return window.location.hash.slice(ROOM_JOIN_FRAGMENT.length);
+}
+
+/** Remove the join fragment from the address bar without reloading. */
+function clearJoinHash() {
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+}
+
+/** Show one Rooms surface (loading, rooms, empty, or error) and hide the others. */
+function showRoomsSurface(surface) {
+    dom.rooms.loading.style.display = surface === 'loading' ? 'grid' : 'none';
+    dom.rooms.grid.style.display = surface === 'rooms' ? 'grid' : 'none';
+    dom.rooms.empty.style.display = surface === 'empty' ? 'flex' : 'none';
+    dom.rooms.error.style.display = surface === 'error' ? 'flex' : 'none';
+}
+
+/** Create one action row for a room menu. */
+function createRoomMenuRow(action, label, busyAction) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'room-menu-item';
+    row.dataset.action = action;
+    row.setAttribute('role', 'menuitem');
+    row.disabled = busyAction !== null;
+    row.textContent = busyAction === action ? ROOM_BUSY_LABELS[action] : label;
+    return row;
+}
+
+/** Create the show-missions row. Only its switch is a control. */
+function createRoomMenuSwitchRow() {
+    const row = document.createElement('div');
+    const label = document.createElement('span');
+    const toggle = document.createElement('button');
+    const knob = document.createElement('span');
+
+    row.className = 'room-menu-item room-menu-switch-row';
+    toggle.type = 'button';
+    toggle.className = 'room-switch';
+    toggle.dataset.action = 'toggle-missions';
+    toggle.setAttribute('role', 'switch');
+    toggle.setAttribute('aria-label', ROOM_COPY.showMissionsLabel);
+    knob.className = 'room-switch-knob';
+    label.textContent = ROOM_COPY.showMissionsLabel;
+
+    toggle.appendChild(knob);
+    row.append(label, toggle);
+    return row;
+}
+
+/** Update the switch in place, so its change animates. */
+function updateRoomMenuSwitch(row, room, busyAction) {
+    const toggle = row.querySelector('.room-switch');
+    toggle.setAttribute('aria-checked', String(room.show_missions));
+    toggle.disabled = busyAction !== null && busyAction !== 'toggle-missions';
+}
+
+/** Fill a room menu with the rows this user's role allows. The switch row is reused, never rebuilt. */
+function renderRoomMenu(menu, room, busyAction) {
+    const switchRow = menu.querySelector('.room-menu-switch-row') ?? createRoomMenuSwitchRow();
+    updateRoomMenuSwitch(switchRow, room, busyAction);
+    const rowBusyAction = busyAction === 'toggle-missions' ? null : busyAction;
+    const rows = [switchRow];
+    if (room.is_owner) {
+        rows.push(
+            createRoomMenuRow('copy-link', ROOM_COPY.copyLinkLabel, rowBusyAction),
+            createRoomMenuRow('refresh-link', ROOM_COPY.refreshLinkLabel, rowBusyAction),
+            createRoomMenuRow('delete-room', ROOM_COPY.deleteRoomLabel, rowBusyAction)
+        );
+    }
+    rows.push(createRoomMenuRow('leave-room', ROOM_COPY.leaveRoomLabel, rowBusyAction));
+    menu.replaceChildren(...rows);
+}
+
+/** Build a room card with its menu button and an empty menu. */
+function createRoomCard(room) {
+    const card = document.createElement('article');
+    const header = document.createElement('div');
+    const titleBlock = document.createElement('div');
+    const name = document.createElement('p');
+    const members = document.createElement('p');
+    const menuWrapper = document.createElement('div');
+    const menuToggle = document.createElement('button');
+    const menuIcon = document.createElement('span');
+    const menu = document.createElement('div');
+    const total = document.createElement('div');
+    const totalValue = document.createElement('p');
+    const totalLabel = document.createElement('p');
+    const status = document.createElement('p');
+    const statusDot = document.createElement('span');
+    const statusText = document.createElement('span');
+
+    card.className = 'room-card';
+    card.dataset.roomId = room.id;
+    header.className = 'room-card-header';
+    name.className = 'room-card-name';
+    members.className = 'room-card-members';
+    menuWrapper.className = 'room-menu-wrapper';
+    menuToggle.type = 'button';
+    menuToggle.className = 'room-menu-toggle';
+    menuToggle.dataset.action = 'toggle-menu';
+    menuToggle.setAttribute('aria-label', `Open menu for ${room.name}`);
+    menuToggle.setAttribute('aria-haspopup', 'menu');
+    menuToggle.setAttribute('aria-expanded', 'false');
+    menuIcon.className = 'material-symbols-outlined';
+    menuIcon.setAttribute('aria-hidden', 'true');
+    menu.className = 'room-menu';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    totalValue.className = 'room-card-total';
+    totalLabel.className = 'room-card-total-label';
+    status.className = 'room-card-status';
+    statusDot.className = 'room-card-status-dot';
+
+    name.textContent = room.name;
+    members.textContent = `${room.members_count} ${room.members_count === 1 ? 'member' : 'members'}`;
+    menuIcon.textContent = 'more_vert';
+    totalValue.textContent = formatDurationHoursMinutes(room.my_total_time_seconds);
+    totalLabel.textContent = 'Your total time ever';
+    statusDot.classList.toggle('is-active', room.working_now_count > 0);
+    statusText.textContent = `${room.working_now_count} working now`;
+
+    titleBlock.append(name, members);
+    menuToggle.appendChild(menuIcon);
+    menuWrapper.append(menuToggle, menu);
+    header.append(titleBlock, menuWrapper);
+    total.append(totalValue, totalLabel);
+    status.append(statusDot, statusText);
+    card.append(header, total, status);
+    return card;
+}
+
+/** Render room cards, or the empty state when the user has no rooms. */
+function renderRooms() {
+    if (roomsState.openMenuRoomId !== null) {
+        roomsState.renderDeferred = true;
+        return;
+    }
+    roomsState.renderDeferred = false;
+    dom.rooms.grid.replaceChildren(...roomsState.rooms.map(createRoomCard));
+    showRoomsSurface(roomsState.rooms.length > 0 ? 'rooms' : 'empty');
+}
+
+/** Open the menu of one room, or close every menu when no room is given. */
+function setRoomMenuOpen(roomId) {
+    roomsState.openMenuRoomId = roomId;
+    dom.rooms.grid.querySelectorAll('.room-card').forEach(/** Show or hide this card's menu. */ (card) => {
+        const isOpen = Number(card.dataset.roomId) === roomId;
+        const room = roomsState.rooms.find(/** Match the card's room. */ (item) => item.id === Number(card.dataset.roomId));
+        const menu = card.querySelector('.room-menu');
+        menu.hidden = !isOpen;
+        card.querySelector('.room-menu-toggle').setAttribute('aria-expanded', String(isOpen));
+        if (isOpen && room) renderRoomMenu(menu, room, roomsState.busyAction);
+    });
+    if (roomId === null && roomsState.renderDeferred) renderRooms();
+}
+
+/** Redraw the open menu, for example after an action starts or ends. */
+function refreshOpenRoomMenu() {
+    if (roomsState.openMenuRoomId === null) return;
+    const card = dom.rooms.grid.querySelector(`.room-card[data-room-id="${roomsState.openMenuRoomId}"]`);
+    const room = roomsState.rooms.find(/** Match the open menu's room. */ (item) => item.id === roomsState.openMenuRoomId);
+    if (!card || !room) return;
+    renderRoomMenu(card.querySelector('.room-menu'), room, roomsState.busyAction);
+}
+
+/** Load the user's rooms. A silent load keeps what is on screen while it runs. */
+async function loadRooms({ silent = false, surfaceErrors = !silent } = {}) {
+    const generation = ++roomsState.loadGeneration;
+    roomsState.isLoading = true;
+    if (!silent && !roomsState.hasLoaded) showRoomsSurface('loading');
+
+    try {
+        const result = await fetchRooms();
+        if (generation !== roomsState.loadGeneration) return;
+        if (!result.success) throw new Error(result.error);
+
+        roomsState.rooms = result.rooms;
+        roomsState.hasLoaded = true;
+        renderRooms();
+    } catch (error) {
+        if (generation !== roomsState.loadGeneration) return;
+        console.error('Rooms loading error:', error);
+        if (surfaceErrors || !roomsState.hasLoaded) showRoomsSurface('error');
+    } finally {
+        if (generation === roomsState.loadGeneration) roomsState.isLoading = false;
+    }
+}
+
+/** Refresh the rooms on a timer, skipping hidden tabs and overlapping requests. */
+async function pollRooms() {
+    if (document.hidden || roomsState.isLoading) return;
+    await loadRooms({ silent: true });
+}
+
+/** Start polling the rooms every 15 seconds. */
+function startRoomsPolling() {
+    stopRoomsPolling();
+    roomsState.pollTimer = setInterval(pollRooms, ROOM_POLL_INTERVAL_MS);
+}
+
+/** Stop polling the rooms. */
+function stopRoomsPolling() {
+    clearInterval(roomsState.pollTimer);
+    roomsState.pollTimer = null;
+}
+
+/** Stop everything the Rooms screen started. */
+function leaveRoomsScreen() {
+    stopRoomsPolling();
+    roomsState.loadGeneration += 1;
+    roomsState.isLoading = false;
+    roomsState.openMenuRoomId = null;
+    roomsState.renderDeferred = false;
+    closeModal();
+}
+
+/** Prepare the Rooms screen after it is shown, and load its rooms. */
+async function enterRoomsScreen() {
+    roomsState.openMenuRoomId = null;
+    if (roomsState.hasLoaded) renderRooms();
+    startRoomsPolling();
+    void loadStreak('rooms');
+    await loadRooms();
+}
+
+/** Open Rooms from a header screen. */
+async function handleOpenRooms(currentScreen) {
+    navigateTo('rooms', currentScreen);
+    await enterRoomsScreen();
+}
+
+/** Go from Rooms to mission planning. */
+function handleRoomsToPlan() {
+    navigateTo('plan', 'rooms');
+}
+
+/** Go from Rooms to the Dashboard and load it. */
+async function handleRoomsToDashboard() {
+    navigateTo('dashboard', 'rooms');
+    await loadDashboard();
+}
+
+/** Reload the rooms after a failed first load. */
+async function handleRoomsRetry() {
+    if (dom.rooms.retryButton.disabled) return;
+    dom.rooms.retryButton.disabled = true;
+    dom.rooms.retryButton.textContent = 'Retrying…';
+    roomsState.hasLoaded = false;
+    try {
+        await loadRooms();
+    } finally {
+        dom.rooms.retryButton.disabled = false;
+        dom.rooms.retryButton.textContent = 'Retry';
+    }
+}
+
+/** Run one room menu action for either menu. The hooks say how each screen reacts. */
+async function runRoomMenuAction(action, room, hooks) {
+    if (hooks.isBusy()) return;
+    if (action === 'refresh-link' && !confirm(ROOM_COPY.refreshConfirm)) return;
+    if (action === 'delete-room' && !confirm(ROOM_COPY.deleteConfirm)) return;
+    if (action === 'leave-room' && !confirm(ROOM_COPY.leaveConfirm)) return;
+
+    const previousShowMissions = room.show_missions;
+    if (action === 'toggle-missions') room.show_missions = !previousShowMissions;
+    hooks.setBusy(action);
+    let roomRemoved = false;
+    try {
+        if (action === 'toggle-missions') {
+            const result = await patchRoomMembership(room.id, room.show_missions, hooks.screen);
+            if (!result.success) throw new Error(result.error);
+            room.show_missions = result.show_missions;
+        } else if (action === 'copy-link') {
+            const result = await fetchRoomLink(room.id, hooks.screen);
+            if (!result.success) throw new Error(result.error);
+            await navigator.clipboard.writeText(buildRoomLink(result.link_token));
+            setFloatingMessage(ROOM_COPY.linkCopied);
+        } else if (action === 'refresh-link') {
+            const result = await postRefreshRoomLink(room.id, hooks.screen);
+            if (!result.success) throw new Error(result.error);
+            setFloatingMessage(ROOM_COPY.linkRefreshed);
+        } else if (action === 'delete-room') {
+            const result = await deleteRoom(room.id, hooks.screen);
+            if (result.status === 409) {
+                setFloatingMessage(ROOM_COPY.deleteBusy, { error: true });
+                return;
+            }
+            if (!result.success) throw new Error(result.error);
+            roomRemoved = true;
+        } else if (action === 'leave-room') {
+            const result = await postLeaveRoom(room.id, hooks.screen);
+            if (!result.success) throw new Error(result.error);
+            roomRemoved = true;
+        }
+    } catch (error) {
+        if (action === 'toggle-missions') room.show_missions = previousShowMissions;
+        if (error.status === 401) return;
+        console.error(`Room action "${action}" failed:`, error);
+        setFloatingMessage(ROOM_COPY.actionErrors[action], { error: true });
+    } finally {
+        hooks.setBusy(null);
+        if (roomRemoved) await hooks.onRemoved();
+    }
+}
+
+const roomsMenuHooks = {
+    screen: 'rooms',
+    /** Report whether a Rooms menu action is running. */
+    isBusy: () => roomsState.busyAction !== null,
+    /** Record the running Rooms menu action and redraw the open menu. */
+    setBusy(action) {
+        roomsState.busyAction = action;
+        refreshOpenRoomMenu();
+    },
+    /** Close the menu and reload the rooms after a room is left or deleted. */
+    async onRemoved() {
+        setRoomMenuOpen(null);
+        await loadRooms({ silent: true });
+    }
+};
+
+/** Handle clicks inside the rooms grid: menu buttons, menu actions, and opening a room. */
+async function handleRoomsGridClick(event) {
+    const card = event.target.closest('.room-card');
+    if (!card) return;
+    const roomId = Number(card.dataset.roomId);
+    const actionButton = event.target.closest('[data-action]');
+    if (actionButton) {
+        if (actionButton.disabled) return;
+        if (actionButton.dataset.action === 'toggle-menu') {
+            setRoomMenuOpen(roomsState.openMenuRoomId === roomId ? null : roomId);
+            return;
+        }
+        const room = roomsState.rooms.find(/** Match the room the action targets. */ (item) => item.id === roomId);
+        if (room) await runRoomMenuAction(actionButton.dataset.action, room, roomsMenuHooks);
+        return;
+    }
+    if (event.target.closest('.room-menu-wrapper')) return;
+    await openRoom(roomId, 'rooms');
+}
+
+/** Close the open room menu when clicking outside it. */
+function closeRoomMenuOnOutsideClick(event) {
+    if (roomsState.openMenuRoomId === null || roomsState.busyAction !== null) return;
+    if (event.target.closest('.room-menu, .room-menu-toggle')) return;
+    setRoomMenuOpen(null);
+}
+
+/** Show a modal over the current screen and move focus into it. */
+function openModal(overlay, focusTarget) {
+    modalState.returnFocus = document.activeElement;
+    modalState.openOverlay = overlay;
+    overlay.hidden = false;
+    focusTarget.focus();
+}
+
+/** Keep Tab and Shift+Tab inside the open modal. */
+function trapModalFocus(event) {
+    if (event.key !== 'Tab') return;
+    const focusable = [...event.currentTarget.querySelectorAll('button:not(:disabled), input')];
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+/** Close the open modal and return focus to where it came from. */
+function closeModal() {
+    if (!modalState.openOverlay) return;
+    modalState.openOverlay.hidden = true;
+    modalState.openOverlay = null;
+    modalState.returnFocus?.focus();
+    modalState.returnFocus = null;
+}
+
+/** Show an error under a modal field and mark its input invalid. */
+function showModalFieldError(input, errorElement, message) {
+    errorElement.textContent = message;
+    input.setAttribute('aria-invalid', 'true');
+}
+
+/** Clear a modal field's error and invalid marker. */
+function clearModalFieldError(input, errorElement) {
+    errorElement.textContent = '';
+    input.removeAttribute('aria-invalid');
+}
+
+/** Lock or unlock a modal's submit button with its in-flight label. */
+function setModalSubmitting(submitButton, isSubmitting, label) {
+    modalState.isSubmitting = isSubmitting;
+    submitButton.disabled = isSubmitting;
+    submitButton.textContent = label;
+}
+
+/** Open the Create Room form with a clean field. */
+function openCreateRoomModal() {
+    const modal = dom.modals.create;
+    modal.input.value = '';
+    clearModalFieldError(modal.input, modal.error);
+    openModal(modal.overlay, modal.input);
+}
+
+/** Open the Join Room form with a clean field. */
+function openJoinRoomModal() {
+    const modal = dom.modals.join;
+    modal.input.value = '';
+    clearModalFieldError(modal.input, modal.error);
+    openModal(modal.overlay, modal.input);
+}
+
+/** Validate the room name, create the room, and show its link. */
+async function handleCreateRoomSubmit(event) {
+    event.preventDefault();
+    if (modalState.isSubmitting) return;
+    const modal = dom.modals.create;
+    clearModalFieldError(modal.input, modal.error);
+    const name = modal.input.value.trim();
+    if (!name) {
+        showModalFieldError(modal.input, modal.error, ROOM_COPY.roomNameRequired);
+        modal.input.focus();
+        return;
+    }
+
+    setModalSubmitting(modal.submitButton, true, 'Creating Room…');
+    try {
+        const result = await postRoom(name);
+        if (result.success !== true) {
+            showModalFieldError(modal.input, modal.error, ROOM_COPY.createFailed);
+            return;
+        }
+        modalState.roomLink = buildRoomLink(result.room.link_token);
+        dom.modals.created.link.value = buildRoomDisplayLink(result.room.link_token);
+        closeModal();
+        openModal(dom.modals.created.overlay, dom.modals.created.copyButton);
+        void loadRooms({ silent: true });
+    } catch (error) {
+        if (error.status === 401) return;
+        console.error('Could not create the room:', error);
+        showModalFieldError(modal.input, modal.error, ROOM_COPY.serverUnreachable);
+    } finally {
+        setModalSubmitting(modal.submitButton, false, 'Create Room');
+    }
+}
+
+/** Copy the new room's link and confirm it. */
+async function handleCopyRoomLink() {
+    try {
+        await navigator.clipboard.writeText(modalState.roomLink);
+        setFloatingMessage(ROOM_COPY.linkCopied);
+    } catch (error) {
+        console.error('Could not copy the room link:', error);
+        setFloatingMessage(ROOM_COPY.copyFailed, { error: true });
+    }
+}
+
+/** Validate the pasted link and join the room. */
+async function handleJoinRoomSubmit(event) {
+    event.preventDefault();
+    if (modalState.isSubmitting) return;
+    const modal = dom.modals.join;
+    clearModalFieldError(modal.input, modal.error);
+    const linkToken = extractRoomLinkToken(modal.input.value);
+    if (!linkToken) {
+        showModalFieldError(modal.input, modal.error, ROOM_COPY.roomLinkRequired);
+        modal.input.focus();
+        return;
+    }
+
+    setModalSubmitting(modal.submitButton, true, 'Joining Room…');
+    try {
+        const result = await postJoinRoom(linkToken);
+        if (result.success === true) {
+            closeModal();
+            await openRoom(result.room.id, 'rooms');
+            return;
+        }
+        const invalid = result.status === 400 || result.status === 404;
+        showModalFieldError(modal.input, modal.error, invalid ? ROOM_COPY.invalidLink : ROOM_COPY.joinFailed);
+    } catch (error) {
+        if (error.status === 401) return;
+        console.error('Could not join the room:', error);
+        showModalFieldError(modal.input, modal.error, ROOM_COPY.serverUnreachable);
+    } finally {
+        setModalSubmitting(modal.submitButton, false, 'Join Room');
+    }
+}
+
+/** Close the open modal or room menu with Escape. */
+function handleRoomsKeydown(event) {
+    if (event.key !== 'Escape') return;
+    if (modalState.openOverlay && !modalState.isSubmitting) {
+        closeModal();
+    } else if (roomsState.openMenuRoomId !== null && roomsState.busyAction === null) {
+        setRoomMenuOpen(null);
+    } else if (roomState.menuOpen && roomState.busyAction === null) {
+        setRoomMenuState(false);
+    }
+}
+
+
+// ========== ROOM SCREEN ==========
+
+/** Show one Room surface (loading, ready, error, or unavailable) and hide the others. */
+function showRoomView(view) {
+    roomState.status = view;
+    dom.room.loading.style.display = view === 'loading' ? 'flex' : 'none';
+    dom.room.data.style.display = view === 'ready' ? 'flex' : 'none';
+    dom.room.error.style.display = view === 'error' ? 'flex' : 'none';
+    dom.room.unavailable.style.display = view === 'unavailable' ? 'flex' : 'none';
+    dom.room.menuWrapper.style.display = view === 'ready' ? 'block' : 'none';
+    dom.room.title.hidden = view !== 'ready';
+    dom.room.titleSkeleton.hidden = view !== 'loading';
+    if (view !== 'ready') setRoomMenuState(false);
+}
+
+/** Format an average session time. Averages under a minute show seconds. */
+function formatAverageSessionTime(totalSeconds) {
+    if (totalSeconds === null) return '0m';
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    return formatDurationHoursMinutes(totalSeconds);
+}
+
+/** Format seconds as a HH:MM input value, rounded up to the next whole minute. */
+function formatSecondsAsHHMM(totalSeconds) {
+    const totalMinutes = Math.min(Math.ceil(totalSeconds / 60), 99 * 60 + 59);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/** Fill the target time with the room average plus the beat increment. */
+function handleBeatAverage() {
+    const average = roomState.snapshot?.summary.average_session_time_seconds ?? null;
+    if (average === null) {
+        dom.room.mission.focus();
+        return;
+    }
+    dom.room.targetTime.value = formatSecondsAsHHMM(average + BEAT_AVERAGE_INCREMENT_SECONDS);
+    dom.room.targetTime.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** Create a small label pill, such as Owner or You. */
+function createRoomPill(text) {
+    const pill = document.createElement('span');
+    pill.className = 'room-pill';
+    pill.textContent = text;
+    return pill;
+}
+
+/** Create the ring that shows a member's state. */
+function createMemberRing(member) {
+    const ring = document.createElement('span');
+    ring.className = `member-ring member-ring-${member.state.replace('_', '-')}`;
+    ring.setAttribute('role', 'img');
+    ring.setAttribute('aria-label', MEMBER_STATE_LABELS[member.state]);
+    if (member.state === 'working') {
+        ring.style.setProperty('--ring-pct', `${member.ring_percentage ?? 0}%`);
+    }
+    return ring;
+}
+
+/** Create one row of the ranking. */
+function createRankingRow(member) {
+    const row = document.createElement('div');
+    const position = document.createElement('span');
+    const identity = document.createElement('span');
+    const name = document.createElement('span');
+    const total = document.createElement('span');
+    const sessions = document.createElement('span');
+
+    row.className = 'room-ranking-row';
+    row.classList.toggle('is-you', member.is_you);
+    position.className = 'room-ranking-position';
+    identity.className = 'room-ranking-identity';
+    name.className = 'room-ranking-name';
+    total.className = 'room-ranking-total';
+    sessions.className = 'room-ranking-sessions';
+
+    position.textContent = String(member.position);
+    name.textContent = member.username;
+    total.textContent = formatDurationHoursMinutes(member.total_time_seconds);
+    sessions.textContent = `${member.sessions_count} ${member.sessions_count === 1 ? 'session' : 'sessions'}`;
+
+    identity.appendChild(name);
+    if (member.is_owner) identity.appendChild(createRoomPill('Owner'));
+    if (member.is_you) identity.appendChild(createRoomPill('You'));
+    row.append(position, createMemberRing(member), identity, total, sessions);
+    return row;
+}
+
+/** Render the room details, summary cards, and ranking from the latest snapshot. */
+function renderRoomSnapshot() {
+    const { room, summary, ranking } = roomState.snapshot;
+    dom.room.title.textContent = room.name;
+    dom.room.totalTime.textContent = formatDurationHoursMinutes(summary.total_time_seconds);
+    dom.room.sessionCount.textContent = String(summary.total_sessions);
+    dom.room.peopleCount.textContent = String(summary.members_count);
+    dom.room.averageTime.textContent = formatAverageSessionTime(summary.average_session_time_seconds);
+    dom.room.rankingTitle.textContent = `Ranking — Members of this room (${summary.members_count})`;
+    dom.room.ranking.replaceChildren(...ranking.map(createRankingRow));
+    if (roomState.menuOpen) renderRoomTopMenu();
+}
+
+/** Create a room history session's author, mission, and delete menu. */
+function createRoomSessionMissionSection(session) {
+    const container = document.createElement('div');
+    const info = document.createElement('div');
+    const user = document.createElement('p');
+    const username = document.createElement('span');
+    const mission = document.createElement('p');
+
+    container.className = 'dashboard-session-mission-container';
+    info.className = 'room-session-info';
+    user.className = 'room-session-user';
+    username.className = 'room-session-username';
+    mission.className = 'dashboard-session-mission';
+
+    username.textContent = session.username;
+    mission.textContent = session.mission_hidden ? 'Mission hidden' : session.mission;
+    user.appendChild(username);
+    if (session.is_former_member) {
+        const former = document.createElement('span');
+        former.className = 'room-session-former';
+        former.textContent = ' (not a member anymore)';
+        user.appendChild(former);
+    }
+    info.append(user, mission);
+    container.appendChild(info);
+
+    if (session.is_mine) {
+        const openMenuIcon = document.createElement('span');
+        const menu = document.createElement('div');
+        const deleteButton = document.createElement('button');
+
+        openMenuIcon.className = 'material-symbols-outlined dashboard-session-open-menu-icon dashboard-session-toggle-menu-icon';
+        menu.className = 'dashboard-session-menu';
+        deleteButton.className = 'dashboard-delete-session-btn';
+        openMenuIcon.textContent = 'more_vert';
+        deleteButton.textContent = 'Delete Session';
+        deleteButton.dataset.sessionId = session.id;
+
+        menu.appendChild(deleteButton);
+        container.append(openMenuIcon, menu);
+    }
+    return container;
+}
+
+/** Create the aggregated metrics of one day of room sessions. */
+function createRoomDailySummarySection(summary) {
+    const container = document.createElement('div');
+    const title = document.createElement('p');
+    const metrics = document.createElement('div');
+    const sessions = document.createElement('p');
+    const totalTime = document.createElement('p');
+    const completion = document.createElement('p');
+
+    container.className = 'dashboard-daily-summary';
+    title.className = 'dashboard-daily-summary-title';
+    metrics.className = 'dashboard-daily-summary-metrics';
+    title.textContent = 'Daily Summary';
+    sessions.textContent = `${summary.total_sessions} sessions`;
+    totalTime.textContent = `${formatDurationHoursMinutes(summary.total_time_seconds)} focused`;
+    completion.textContent = `${Math.round(summary.average_completion_percentage)}% completion`;
+
+    metrics.append(sessions, totalTime, completion);
+    container.append(title, metrics);
+    return container;
+}
+
+/** Build one day's card of room sessions, with its date pill and daily summary. */
+function createRoomDateCard(sessions, dailySummary) {
+    const card = document.createElement('div');
+    const dateLabel = document.createElement('p');
+    const hasSummary = Boolean(dailySummary) && dailySummary.total_sessions > 1;
+
+    card.className = 'dashboard-session-card';
+    dateLabel.className = 'dashboard-session-date';
+    dateLabel.textContent = formatSessionDateLabel(sessions[0]);
+    card.appendChild(dateLabel);
+    if (hasSummary) card.appendChild(createRoomDailySummarySection(dailySummary));
+
+    sessions.forEach(/** Append a session and its separator to the daily card. */ (session, index) => {
+        if (index > 0 || hasSummary) {
+            const divider = document.createElement('span');
+            divider.className = 'dashboard-session-division-line';
+            card.appendChild(divider);
+        }
+        card.append(createRoomSessionMissionSection(session), createSessionTimeSection(session));
+    });
+    return card;
+}
+
+/** Render the room history grouped into daily cards, or its empty state. */
+function renderRoomHistory() {
+    const groups = groupSessionsByLocalDate(roomState.sessions);
+    const cards = [...groups.entries()].map(/** Build the card for one local day. */ ([dateKey, daySessions]) =>
+        createRoomDateCard(daySessions, roomState.dailySummaries[dateKey])
+    );
+    dom.room.history.replaceChildren(...cards);
+    dom.room.historyEmpty.style.display =
+        roomState.historyLoaded && roomState.sessions.length === 0 ? 'flex' : 'none';
+}
+
+/** Show a history failure with its Retry button. */
+function showRoomHistoryFailure(kind) {
+    roomState.historyFailure = kind;
+    roomState.historyObserver?.disconnect();
+    dom.room.historyMessage.textContent = kind === 'first' ? ROOM_COPY.historyFailed : ROOM_COPY.moreSessionsFailed;
+    dom.room.historyRetryButton.hidden = false;
+    dom.room.historySentinel.style.display = 'flex';
+}
+
+/** Observe the history sentinel to load more sessions. */
+function setupRoomHistoryObserver() {
+    roomState.historyObserver?.disconnect();
+    if (!roomState.nextCursor) {
+        dom.room.historySentinel.style.display = 'none';
+        return;
+    }
+    dom.room.historySentinel.style.display = 'flex';
+    if (roomState.historyFailure) return;
+
+    roomState.historyObserver = new IntersectionObserver(
+        /** Load another history page when the sentinel enters the viewport. */
+        async (entries) => {
+            if (entries[0].isIntersecting) await loadMoreRoomSessions();
+        },
+        { root: null, rootMargin: '300px' }
+    );
+    roomState.historyObserver.observe(dom.room.historySentinel);
+}
+
+/** Load the first page of the room history. */
+async function loadRoomHistory() {
+    const generation = ++roomState.historyGeneration;
+    roomState.historyObserver?.disconnect();
+    roomState.isLoadingMore = false;
+    roomState.historyFailure = null;
+    dom.room.historyMessage.textContent = '';
+    dom.room.historyRetryButton.hidden = true;
+
+    try {
+        const result = await fetchRoomSessions(roomState.roomId);
+        if (generation !== roomState.historyGeneration) return;
+        if (result.status === 404) {
+            showUnavailableRoom();
+            return;
+        }
+        if (!result.success) throw new Error(result.error);
+
+        roomState.sessions = result.sessions;
+        roomState.dailySummaries = result.daily_summaries;
+        roomState.nextCursor = result.next_cursor;
+        roomState.historyLoaded = true;
+        renderRoomHistory();
+        setupRoomHistoryObserver();
+    } catch (error) {
+        if (generation !== roomState.historyGeneration) return;
+        console.error('Room history loading error:', error);
+        showRoomHistoryFailure('first');
+    }
+}
+
+/** Load and append the next page of the room history. */
+async function loadMoreRoomSessions() {
+    if (roomState.isLoading || roomState.isLoadingMore || roomState.historyFailure || !roomState.nextCursor) return;
+
+    const generation = roomState.historyGeneration;
+    roomState.isLoadingMore = true;
+    dom.room.historyRetryButton.hidden = true;
+    dom.room.historyMessage.textContent = 'Loading more...';
+
+    try {
+        const result = await fetchRoomSessions(roomState.roomId, roomState.nextCursor);
+        if (generation !== roomState.historyGeneration) return;
+        if (!result.success) throw new Error(result.error);
+
+        roomState.sessions.push(...result.sessions);
+        Object.assign(roomState.dailySummaries, result.daily_summaries);
+        roomState.nextCursor = result.next_cursor;
+        dom.room.historyMessage.textContent = '';
+        renderRoomHistory();
+    } catch (error) {
+        if (generation !== roomState.historyGeneration) return;
+        console.error('Room history pagination error:', error);
+        showRoomHistoryFailure('more');
+    } finally {
+        if (generation === roomState.historyGeneration) {
+            roomState.isLoadingMore = false;
+            if (!roomState.historyFailure) setupRoomHistoryObserver();
+        }
+    }
+}
+
+/** Retry the failed history request. */
+async function handleRoomHistoryRetry() {
+    if (roomState.isLoadingMore) return;
+    if (roomState.historyFailure === 'first') {
+        await loadRoomHistory();
+        return;
+    }
+    roomState.historyFailure = null;
+    await loadMoreRoomSessions();
+}
+
+/** Load the room snapshot, and the history when it is needed. */
+async function loadRoom({ silent = false, reloadHistory = false, surfaceErrors = !silent } = {}) {
+    const generation = ++roomState.loadGeneration;
+    roomState.isLoading = true;
+    if (!silent) showRoomView('loading');
+
+    try {
+        const result = await fetchRoomSnapshot(roomState.roomId);
+        if (generation !== roomState.loadGeneration) return;
+        if (result.status === 404) {
+            showUnavailableRoom();
+            return;
+        }
+        if (!result.success) throw new Error(result.error);
+
+        const previousTotal = roomState.snapshot?.summary.total_sessions;
+        roomState.snapshot = { room: result.room, summary: result.summary, ranking: result.ranking };
+        roomSnapshotCache.set(roomState.roomId, roomState.snapshot);
+        renderRoomSnapshot();
+        showRoomView('ready');
+
+        const totalChanged = previousTotal !== undefined && previousTotal !== result.summary.total_sessions;
+        if (reloadHistory || !roomState.historyLoaded || totalChanged) await loadRoomHistory();
+    } catch (error) {
+        if (generation !== roomState.loadGeneration) return;
+        console.error('Room loading error:', error);
+        if (surfaceErrors || !roomState.snapshot) showRoomView('error');
+    } finally {
+        if (generation === roomState.loadGeneration) roomState.isLoading = false;
+    }
+}
+
+/** Refresh the room on a timer, skipping hidden tabs and overlapping requests. */
+async function pollRoom() {
+    if (document.hidden || roomState.isLoading) return;
+    await loadRoom({ silent: true });
+}
+
+/** Start polling the room every 15 seconds. */
+function startRoomPolling() {
+    stopRoomPolling();
+    roomState.pollTimer = setInterval(pollRoom, ROOM_POLL_INTERVAL_MS);
+}
+
+/** Stop polling the room. */
+function stopRoomPolling() {
+    clearInterval(roomState.pollTimer);
+    roomState.pollTimer = null;
+}
+
+/** Forget the previous room and prepare a clean Room screen. */
+function resetRoomState(roomId) {
+    stopRoomPolling();
+    roomState.historyObserver?.disconnect();
+    roomState.loadGeneration += 1;
+    roomState.historyGeneration += 1;
+    Object.assign(roomState, {
+        roomId,
+        snapshot: null,
+        sessions: [],
+        dailySummaries: {},
+        nextCursor: null,
+        historyLoaded: false,
+        historyFailure: null,
+        isLoading: false,
+        isLoadingMore: false,
+        busyAction: null
+    });
+    dom.room.history.replaceChildren();
+    dom.room.historyEmpty.style.display = 'none';
+    dom.room.historySentinel.style.display = 'none';
+    dom.room.historyMessage.textContent = '';
+    dom.room.historyRetryButton.hidden = true;
+    dom.room.mission.value = '';
+    dom.room.targetTime.value = '00:00';
+    dom.room.missionError.textContent = '';
+    dom.room.timeError.textContent = '';
+    dom.room.mission.removeAttribute('aria-invalid');
+    dom.room.targetTime.removeAttribute('aria-invalid');
+    showRoomView('loading');
+}
+
+/** Stop everything the Room screen started. */
+function leaveRoomScreen() {
+    stopRoomPolling();
+    roomState.historyObserver?.disconnect();
+    roomState.loadGeneration += 1;
+    roomState.historyGeneration += 1;
+    roomState.isLoading = false;
+    setRoomMenuState(false);
+}
+
+/** Open a room from another screen and load it. */
+async function openRoom(roomId, currentScreen) {
+    resetRoomState(roomId);
+    const cached = roomSnapshotCache.get(roomId);
+    if (cached) {
+        roomState.snapshot = cached;
+        renderRoomSnapshot();
+        showRoomView('ready');
+    }
+    navigateTo('room', currentScreen);
+    startRoomPolling();
+    await loadRoom({ silent: Boolean(cached), reloadHistory: Boolean(cached), surfaceErrors: true });
+}
+
+/** Show the "This room isn't available" state, from the Room screen or another one. */
+function showUnavailableRoom(currentScreen = null) {
+    if (currentScreen !== null) {
+        resetRoomState(null);
+        navigateTo('room', currentScreen);
+    }
+    stopRoomPolling();
+    roomState.historyObserver?.disconnect();
+    showRoomView('unavailable');
+}
+
+/** Go back to the Rooms screen. */
+async function handleRoomBack() {
+    navigateTo('rooms', 'room');
+    await enterRoomsScreen();
+}
+
+/** Retry loading the room after a failed first load. */
+async function handleRoomRetry() {
+    if (dom.room.retryButton.disabled) return;
+    dom.room.retryButton.disabled = true;
+    dom.room.retryButton.textContent = 'Retrying…';
+    try {
+        await loadRoom();
+    } finally {
+        dom.room.retryButton.disabled = false;
+        dom.room.retryButton.textContent = 'Retry';
+    }
+}
+
+/** Redraw the top bar menu from the latest snapshot. */
+function renderRoomTopMenu() {
+    if (!roomState.snapshot) return;
+    renderRoomMenu(dom.room.menu, roomState.snapshot.room, roomState.busyAction);
+}
+
+/** Open or close the top bar menu. */
+function setRoomMenuState(open) {
+    roomState.menuOpen = open;
+    dom.room.menu.hidden = !open;
+    dom.room.menuButton.setAttribute('aria-expanded', String(open));
+    if (open) renderRoomTopMenu();
+}
+
+const roomMenuHooks = {
+    screen: 'room',
+    /** Report whether a Room menu action is running. */
+    isBusy: () => roomState.busyAction !== null,
+    /** Record the running Room menu action and redraw the menu. */
+    setBusy(action) {
+        roomState.busyAction = action;
+        renderRoomTopMenu();
+    },
+    /** Return to Rooms after the room is left or deleted. */
+    async onRemoved() {
+        setRoomMenuState(false);
+        await handleRoomBack();
+    }
+};
+
+/** Handle a click on a top bar menu action. */
+async function handleRoomMenuClick(event) {
+    const actionButton = event.target.closest('[data-action]');
+    if (!actionButton || actionButton.disabled || !roomState.snapshot) return;
+    await runRoomMenuAction(actionButton.dataset.action, roomState.snapshot.room, roomMenuHooks);
+}
+
+/** Close the top bar menu when clicking outside it. */
+function closeRoomTopMenuOnOutsideClick(event) {
+    if (!roomState.menuOpen || roomState.busyAction !== null) return;
+    if (event.target.closest('#room-menu-wrapper')) return;
+    setRoomMenuState(false);
+}
+
+
+// ========== ROOM SESSION ==========
+
+/** Report whether a response is a room-session envelope. */
+function isRoomSessionEnvelope(result) {
+    return typeof result?.server_time === 'string';
+}
+
+/** Parse a server timestamp, which is UTC without a Z. */
+function parseServerTime(value) {
+    return Date.parse(`${value}Z`);
+}
+
+/** Return the current time on the server's clock, in milliseconds. */
+function getServerNowMs() {
+    return Date.now() + roomSessionState.clockOffsetMs;
+}
+
+/** Return the seconds worked so far, from the server's timestamps. */
+function computeRoomActualSeconds(nowMs) {
+    const endMs = roomSessionState.pausedAtMs ?? nowMs;
+    const elapsedSeconds = (endMs - roomSessionState.startedAtMs) / 1000 - roomSessionState.pausedSeconds;
+    return Math.max(0, Math.floor(elapsedSeconds));
+}
+
+/** Refresh the display values and return the exact completion percentage. */
+function updateRoomDisplay() {
+    const display = roomSessionState.display;
+    display.actualTimeSeconds = computeRoomActualSeconds(getServerNowMs());
+    display.percentageCompleted = Math.floor(display.actualTimeSeconds / display.targetTimeSeconds * 100);
+    display.completionStatus = display.actualTimeSeconds >= display.targetTimeSeconds ? 'completed' : 'partial';
+    return display.actualTimeSeconds / display.targetTimeSeconds * 100;
+}
+
+/** Format seconds as m:ss for a countdown. */
+function formatCountdown(totalSeconds) {
+    return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
+/** Return the floating message for a session that ended without the user. */
+function getSessionEndMessage(notice) {
+    const time = formatDurationHoursMinutes(notice.actual_time_seconds ?? 0);
+    const messages = {
+        'missed_checkin:true': { text: `You didn't check in. Session saved up to ${time}.` },
+        'missed_checkin:false': { text: "You didn't check in and there was no activity. Session not saved.", error: true },
+        'paused_timeout:true': { text: `You left your session paused. Saved at ${time}.` },
+        'disconnected:true': { text: `Your session ended when the app closed. Saved up to ${time}.` },
+        'disconnected:false': { text: 'Your session ended when the app closed, with no activity. Not saved.', error: true }
+    };
+    return messages[`${notice.reason}:${notice.saved}`]
+        ?? { text: ROOM_COPY.sessionEndedGeneric, error: !notice.saved };
+}
+
+/** Estimate the server clock offset, assuming the server stamped the reply midway through the round trip. */
+function updateClockOffset(envelope, sentAtMs = Date.now(), receivedAtMs = Date.now()) {
+    roomSessionState.clockOffsetMs = parseServerTime(envelope.server_time) - (sentAtMs + receivedAtMs) / 2;
+}
+
+/** Copy a room-session envelope into the client state. Return whether a session is active. */
+function applyRoomSessionEnvelope(envelope, sentAtMs, receivedAtMs) {
+    updateClockOffset(envelope, sentAtMs, receivedAtMs);
+    if (envelope.notice) {
+        const { text, error } = getSessionEndMessage(envelope.notice);
+        setFloatingMessage(text, { error: Boolean(error) });
+    }
+    if (!envelope.active) return false;
+
+    const session = envelope.session;
+    const checkin = session.checkin;
+    Object.assign(roomSessionState, {
+        active: true,
+        submissionId: session.submission_id,
+        roomId: session.room_id,
+        roomName: session.room_name ?? '',
+        isPaused: session.state === 'paused',
+        startedAtMs: parseServerTime(session.started_at),
+        pausedAtMs: session.paused_at === null ? null : parseServerTime(session.paused_at),
+        pausedSeconds: session.paused_seconds,
+        checkin: {
+            dueAtMs: checkin.due_at === null ? null : parseServerTime(checkin.due_at),
+            deadlineAtMs: checkin.deadline_at === null ? null : parseServerTime(checkin.deadline_at),
+            outstanding: checkin.outstanding
+        }
+    });
+    roomSessionState.display.currentMission = session.mission;
+    roomSessionState.display.targetTimeSeconds = session.target_time_seconds;
+    scheduleCheckin();
+    return true;
+}
+
+/** Render the Focus screen from the room session state. */
+function renderRoomFocus() {
+    const exactPercentage = updateRoomDisplay();
+    dom.focus.roomName.textContent = roomSessionState.roomName;
+    renderFocusSession(roomSessionState.display);
+    renderFocusTimer(roomSessionState.display, exactPercentage);
+    dom.focus.pauseButton.textContent = roomSessionState.isPaused ? 'Resume' : 'Pause';
+}
+
+/** Redraw Focus after the server changed the session, when Focus is showing. */
+function refreshRoomSessionView() {
+    if (getCurrentScreenName() === 'focus') renderRoomFocus();
+}
+
+/** Update the running timer display once per second. */
+function tickRoomSession() {
+    if (!roomSessionState.active || roomSessionState.isPaused) return;
+    const exactPercentage = updateRoomDisplay();
+    renderFocusTimer(roomSessionState.display, exactPercentage);
+}
+
+/** Start the display timer and the heartbeat. */
+function startRoomSessionTimers() {
+    stopRoomSessionTimers();
+    roomSessionState.tickTimer = setInterval(tickRoomSession, 1000);
+    roomSessionState.heartbeatTimer = setInterval(sendRoomHeartbeat, HEARTBEAT_INTERVAL_MS);
+}
+
+/** Stop the display timer and the heartbeat. */
+function stopRoomSessionTimers() {
+    clearInterval(roomSessionState.tickTimer);
+    clearInterval(roomSessionState.heartbeatTimer);
+    roomSessionState.tickTimer = null;
+    roomSessionState.heartbeatTimer = null;
+}
+
+/** Tell the server the client is alive, ignoring answers that an event has overtaken. */
+async function sendRoomHeartbeat() {
+    const state = roomSessionState;
+    if (!state.active || state.heartbeatInFlight || state.isBusy || state.pending > 0) return;
+    state.heartbeatInFlight = true;
+    const eventCounter = state.eventCounter;
+    try {
+        const { result, sentAtMs, receivedAtMs } = await timeRoomRequest(() => postRoomSessionEvent('heartbeat'));
+        if (!state.active || eventCounter !== state.eventCounter) return;
+        if (!isRoomSessionEnvelope(result)) return;
+        if (applyRoomSessionEnvelope(result, sentAtMs, receivedAtMs)) reconcileRoomSessionScreen();
+        else await endRoomSession();
+    } catch (error) {
+        if (error.status !== 401) console.error('Heartbeat failed:', error);
+    } finally {
+        roomSessionState.heartbeatInFlight = false;
+    }
+}
+
+/** Ask the server for the current room session, for example when a check-in expires. */
+async function refreshRoomSession() {
+    try {
+        const { result, sentAtMs, receivedAtMs } = await timeRoomRequest(() => fetchRoomSession());
+        if (!isRoomSessionEnvelope(result)) return;
+        if (applyRoomSessionEnvelope(result, sentAtMs, receivedAtMs)) reconcileRoomSessionScreen();
+        else await endRoomSession();
+    } catch (error) {
+        if (error.status !== 401) console.error('Could not refresh the room session:', error);
+    }
+}
+
+/** Run a request and return its result with the times it was sent and answered. */
+async function timeRoomRequest(request) {
+    const sentAtMs = Date.now();
+    const result = await request();
+    return { result, sentAtMs, receivedAtMs: Date.now() };
+}
+
+/** Show the screen the server's session state calls for, then redraw it. */
+function reconcileRoomSessionScreen() {
+    const screen = getCurrentScreenName();
+    if (!roomSessionState.isPaused && screen === 'review') {
+        roomSessionState.finishFailed = false;
+        enterRoomSessionFocus('review');
+        return;
+    }
+    refreshRoomSessionView();
+}
+
+/** Create the audio context on a user gesture, load the sound, and schedule it. */
+async function unlockCheckinAudio() {
+    if (checkinAudio.failed) return;
+    try {
+        if (!checkinAudio.context) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            checkinAudio.context = new AudioContextClass();
+        }
+        if (checkinAudio.context.state === 'running' && checkinAudio.buffer) return;
+        if (checkinAudio.context.state === 'suspended') await checkinAudio.context.resume();
+        checkinAudio.loading ??= fetch(CHECKIN_SOUND_URL)
+            .then(/** Read the sound file. */ (response) => {
+                if (!response.ok) throw new Error(`Sound file not found (${response.status})`);
+                return response.arrayBuffer();
+            })
+            .then(/** Decode the sound file. */ (data) => checkinAudio.context.decodeAudioData(data))
+            .then(/** Keep the decoded sound. */ (buffer) => { checkinAudio.buffer = buffer; });
+        await checkinAudio.loading;
+        armCheckinSound();
+    } catch (error) {
+        checkinAudio.failed = true;
+        console.error('Could not prepare the check-in sound:', error);
+    }
+}
+
+/** Stop a scheduled check-in sound. */
+function cancelCheckinSound() {
+    try {
+        checkinAudio.source?.stop();
+    } catch (error) {
+        console.error('Could not stop the check-in sound:', error);
+    }
+    checkinAudio.source = null;
+}
+
+/** Schedule the check-in sound on the audio clock, which tab throttling does not delay. */
+function armCheckinSound() {
+    cancelCheckinSound();
+    const { context, buffer } = checkinAudio;
+    const { dueAtMs } = roomSessionState.checkin;
+    if (!context || !buffer || context.state !== 'running') return;
+    if (!roomSessionState.active || roomSessionState.isPaused || dueAtMs === null) return;
+    const delayMs = dueAtMs - getServerNowMs();
+    if (delayMs < 0) return;
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    source.start(context.currentTime + delayMs / 1000);
+    checkinAudio.source = source;
+}
+
+/** Try to unlock the sound on any click or key press while a room session runs. */
+function handleRoomSessionGesture() {
+    if (roomSessionState.active) void unlockCheckinAudio();
+}
+
+/** Open the check-in popup and start its countdown. */
+function openCheckinModal() {
+    const modal = dom.modals.checkin;
+    if (!roomSessionState.active || !modal.overlay.hidden) return;
+    roomSessionState.countdownRefreshed = false;
+    modal.error.textContent = '';
+    modal.overlay.hidden = false;
+    modal.confirmButton.focus();
+    void updateCheckinCountdown();
+    roomSessionState.countdownTimer = setInterval(updateCheckinCountdown, 1000);
+}
+
+/** Close the check-in popup and stop its countdown. */
+function closeCheckinModal() {
+    clearInterval(roomSessionState.countdownTimer);
+    roomSessionState.countdownTimer = null;
+    dom.modals.checkin.overlay.hidden = true;
+}
+
+/** Show the time left to respond. At zero, ask the server once what happened. */
+async function updateCheckinCountdown() {
+    const deadlineAtMs = roomSessionState.checkin.deadlineAtMs ?? getServerNowMs();
+    const remainingSeconds = Math.ceil((deadlineAtMs - getServerNowMs()) / 1000);
+    dom.modals.checkin.countdown.textContent = `${formatCountdown(Math.max(0, remainingSeconds))} left to respond`;
+    if (remainingSeconds > 0 || roomSessionState.countdownRefreshed) return;
+    roomSessionState.countdownRefreshed = true;
+    await refreshRoomSession();
+}
+
+/** Open the check-in popup at its due time, or close it when nothing is due. */
+function scheduleCheckin() {
+    clearTimeout(roomSessionState.checkinTimer);
+    cancelCheckinSound();
+    const { dueAtMs, outstanding } = roomSessionState.checkin;
+    if (!roomSessionState.active || roomSessionState.isPaused || dueAtMs === null) {
+        closeCheckinModal();
+        return;
+    }
+    const delayMs = dueAtMs - getServerNowMs();
+    if (outstanding || delayMs <= 0) {
+        openCheckinModal();
+        return;
+    }
+    closeCheckinModal();
+    roomSessionState.checkinTimer = setTimeout(openCheckinModal, delayMs);
+    armCheckinSound();
+}
+
+/** Lock or unlock the room session controls while a server-confirmed request (Finish) is in flight. */
+function setRoomSessionBusy(isBusy, button = null, busyLabel = '') {
+    const controls = [
+        dom.focus.pauseButton, dom.focus.stopButton, dom.review.continueButton,
+        dom.review.finishButton, dom.modals.checkin.confirmButton, dom.room.startButton
+    ];
+    roomSessionState.isBusy = isBusy;
+    controls.forEach(/** Set the disabled state of a room session control. */ (control) => {
+        control.disabled = isBusy;
+    });
+    if (isBusy && button) {
+        roomSessionState.busyButton = button;
+        roomSessionState.restoreLabel = button.textContent;
+        button.textContent = busyLabel;
+    } else if (!isBusy && roomSessionState.busyButton) {
+        roomSessionState.busyButton.textContent = roomSessionState.restoreLabel;
+        roomSessionState.busyButton = null;
+    }
+}
+
+/** Send one server-confirmed room session request under the single in-flight lock. */
+async function performRoomSessionRequest(button, busyLabel, request, minimumFeedbackStartedAt = null) {
+    if (roomSessionState.isBusy) return { skipped: true };
+    roomSessionState.eventCounter += 1;
+    setRoomSessionBusy(true, button, busyLabel);
+    try {
+        const result = await request();
+        if (minimumFeedbackStartedAt !== null) await waitForMinimumFeedback(minimumFeedbackStartedAt);
+        return { result };
+    } catch (error) {
+        if (error.status === 401) return { unauthorized: true };
+        console.error('Room session request failed:', error);
+        return { failed: true };
+    } finally {
+        setRoomSessionBusy(false);
+    }
+}
+
+/** Wait for the given number of milliseconds. */
+function delay(milliseconds) {
+    return new Promise(/** Resolve when the delay expires. */ (resolve) => setTimeout(resolve, milliseconds));
+}
+
+/** Send a request, retrying network and server failures until the retry window closes. */
+async function sendRoomSessionWithRetry(request, generation) {
+    const startedAt = performance.now();
+    for (;;) {
+        try {
+            const timed = await timeRoomRequest(request);
+            if (isRoomSessionEnvelope(timed.result) || timed.result.status < 500) return timed;
+        } catch (error) {
+            if (error.status === 401) return { unauthorized: true };
+            console.error('Room session request failed:', error);
+        }
+        if (performance.now() - startedAt + ROOM_RETRY_DELAY_MS > ROOM_RETRY_WINDOW_MS) return { failed: true };
+        await delay(ROOM_RETRY_DELAY_MS);
+        if (generation !== roomSessionState.generation) return { stale: true };
+    }
+}
+
+/** Queue a request behind the earlier ones, so the server sees events in the order the user made them. */
+function enqueueRoomSessionRequest(request) {
+    const state = roomSessionState;
+    const generation = state.generation;
+    state.pending += 1;
+    state.eventCounter += 1;
+    const job = state.queueTail.then(/** Send this request unless the session was reset first. */ async () => {
+        const outcome = generation === state.generation
+            ? await sendRoomSessionWithRetry(request, generation)
+            : { stale: true };
+        if (generation === state.generation) state.pending -= 1;
+        return outcome;
+    });
+    state.queueTail = job;
+    return job;
+}
+
+/** Show a room session error as a floating message. */
+function showRoomSessionError(message) {
+    setFloatingMessage(message, { error: true });
+}
+
+/** Show an error under the Start Work button. */
+function showRoomStartError(message) {
+    dom.room.startError.textContent = message;
+}
+
+/** Show an error on the Review screen. */
+function showReviewRoomError(message) {
+    dom.review.saveMessage.textContent = message;
+}
+
+/**
+ * Apply the outcome of a queued request. Only the last request in the queue applies the server's
+ * state, and a failed one asks the server what is true. Return whether the server accepted it.
+ */
+async function settleRoomSessionOutcome(outcome, errorMessage) {
+    const state = roomSessionState;
+    if (outcome.stale || outcome.unauthorized) return false;
+    const envelope = outcome.result;
+    if (outcome.failed || !isRoomSessionEnvelope(envelope)) {
+        showRoomSessionError(errorMessage);
+        if (state.pending === 0) await refreshRoomSession();
+        return false;
+    }
+    if (state.pending > 0) {
+        updateClockOffset(envelope, outcome.sentAtMs, outcome.receivedAtMs);
+        if (envelope.session) state.submissionId = envelope.session.submission_id;
+        return envelope.success === true;
+    }
+    if (applyRoomSessionEnvelope(envelope, outcome.sentAtMs, outcome.receivedAtMs)) reconcileRoomSessionScreen();
+    else await endRoomSession();
+    return envelope.success === true;
+}
+
+/** Show the Focus screen for the running room session and start its timers. */
+function enterRoomSessionFocus(currentScreen) {
+    navigateTo('focus', currentScreen);
+    renderRoomFocus();
+    startRoomSessionTimers();
+    scheduleCheckin();
+}
+
+/** Clear everything the client holds about a room session, keeping the clock offset. */
+function resetRoomSessionClient() {
+    const generation = roomSessionState.generation + 1;
+    const clockOffsetMs = roomSessionState.clockOffsetMs;
+    stopRoomSessionTimers();
+    clearTimeout(roomSessionState.checkinTimer);
+    closeCheckinModal();
+    cancelCheckinSound();
+    if (roomSessionState.isBusy) setRoomSessionBusy(false);
+    Object.assign(roomSessionState, createInitialRoomSessionState(), { generation, clockOffsetMs });
+}
+
+/** Add a just-saved session to the cached room summary, so the room looks right before it reloads. */
+function addSavedSessionToCachedSummary(roomId, seconds) {
+    const cached = roomSnapshotCache.get(roomId);
+    if (!cached) return;
+    const summary = cached.summary;
+    const totalSessions = summary.total_sessions + 1;
+    const totalTime = summary.total_time_seconds + seconds;
+    roomSnapshotCache.set(roomId, {
+        ...cached,
+        summary: {
+            ...summary,
+            total_sessions: totalSessions,
+            total_time_seconds: totalTime,
+            average_session_time_seconds: Math.round(totalTime / totalSessions)
+        }
+    });
+}
+
+/** Leave Focus or Review after the session ended, and return to its room. */
+async function endRoomSession({ saved = false } = {}) {
+    const roomId = roomSessionState.roomId;
+    const savedSeconds = roomSessionState.display.actualTimeSeconds;
+    const screen = getCurrentScreenName();
+    resetRoomSessionClient();
+    dom.review.continueButton.classList.replace('normal-button', 'cta-button');
+    dom.review.finishButton.textContent = 'Finish';
+    dom.review.saveMessage.textContent = '';
+    if (saved) {
+        setFloatingMessage(ROOM_COPY.sessionSaved, { saved: true });
+        addSavedSessionToCachedSummary(roomId, savedSeconds);
+    }
+    if (roomId !== null && (screen === 'focus' || screen === 'review')) await openRoom(roomId, screen);
+}
+
+/** Show Focus for a session the server has not confirmed yet. */
+function beginLocalRoomSession(roomId, mission, targetTimeSeconds) {
+    const startedAtMs = Math.round(getServerNowMs());
+    Object.assign(roomSessionState, {
+        active: true,
+        submissionId: '',
+        roomId,
+        roomName: roomState.snapshot?.room.name ?? '',
+        isPaused: false,
+        startedAtMs,
+        pausedAtMs: null,
+        pausedSeconds: 0,
+        checkin: {
+            dueAtMs: startedAtMs + CHECKIN_INTERVAL_MS,
+            deadlineAtMs: startedAtMs + CHECKIN_INTERVAL_MS + CHECKIN_RESPONSE_MS,
+            outstanding: false
+        }
+    });
+    roomSessionState.display.currentMission = mission;
+    roomSessionState.display.targetTimeSeconds = targetTimeSeconds;
+    enterRoomSessionFocus('room');
+}
+
+/** Pause the session on this screen right away. */
+function applyLocalPause() {
+    roomSessionState.isPaused = true;
+    roomSessionState.pausedAtMs = getServerNowMs();
+    scheduleCheckin();
+}
+
+/** Resume the session on this screen right away. The check-in moves later by the time paused. */
+function applyLocalResume() {
+    const state = roomSessionState;
+    const pausedForMs = getServerNowMs() - state.pausedAtMs;
+    state.pausedSeconds += pausedForMs / 1000;
+    state.pausedAtMs = null;
+    state.isPaused = false;
+    if (state.checkin.dueAtMs !== null) {
+        state.checkin.dueAtMs += pausedForMs;
+        state.checkin.deadlineAtMs += pausedForMs;
+    }
+    scheduleCheckin();
+}
+
+/** Undo the Start screen after the server could not start the session, keeping the form. */
+function rollbackRoomStart(errorMessage) {
+    resetRoomSessionClient();
+    navigateTo('room', 'focus');
+    startRoomPolling();
+    void loadRoom({ silent: true });
+    showRoomSessionError(errorMessage);
+}
+
+/** Apply the server's answer to Start: keep the session, or return to the Room screen. */
+async function settleRoomStart(outcome) {
+    if (outcome.stale || outcome.unauthorized) return;
+    if (outcome.result?.status === 404) {
+        resetRoomSessionClient();
+        showUnavailableRoom('focus');
+        return;
+    }
+    if (outcome.failed || !isRoomSessionEnvelope(outcome.result)) {
+        rollbackRoomStart(ROOM_COPY.sessionErrors.start);
+        return;
+    }
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.start);
+}
+
+/** Validate the mission card, show Focus at once, and start the room session on the server. */
+async function handleRoomStartWork() {
+    dom.room.startError.textContent = '';
+    if (roomSessionState.active || !validateMissionFields(dom.room)) return;
+    void unlockCheckinAudio();
+    const roomId = roomState.roomId;
+    const mission = dom.room.mission.value;
+    const targetTimeSeconds = parseHHMMToSeconds(dom.room.targetTime.value);
+    beginLocalRoomSession(roomId, mission, targetTimeSeconds);
+    const outcome = await enqueueRoomSessionRequest(
+        /** Send the Start request for the room's mission card. */
+        () => postStartRoomSession(roomId, mission, targetTimeSeconds)
+    );
+    await settleRoomStart(outcome);
+}
+
+/** Pause or resume the room session from Focus. */
+async function handleRoomPauseResume() {
+    if (!roomSessionState.active) return;
+    const pausing = !roomSessionState.isPaused;
+    if (pausing) applyLocalPause();
+    else applyLocalResume();
+    renderRoomFocus();
+    const outcome = await enqueueRoomSessionRequest(
+        /** Send the pause or resume event. */
+        () => postRoomSessionEvent(pausing ? 'pause' : 'resume')
+    );
+    await settleRoomSessionOutcome(outcome, pausing ? ROOM_COPY.sessionErrors.pause : ROOM_COPY.sessionErrors.resume);
+}
+
+/** Stop the room session: open Review at once and pause it on the server. */
+async function handleRoomStop() {
+    if (!roomSessionState.active) return;
+    const needsPause = !roomSessionState.isPaused;
+    if (needsPause) applyLocalPause();
+    updateRoomDisplay();
+    navigateTo('review', 'focus');
+    if (!renderReviewRoomSummaryFromCache()) renderReviewRoomSummary(null);
+    void loadReviewRoomSummary();
+    if (!needsPause) return;
+    const outcome = await enqueueRoomSessionRequest(
+        /** Send the pause event that Stop uses. */
+        () => postRoomSessionEvent('pause')
+    );
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.stop);
+}
+
+/** Resume reviewed work: return to Focus at once and resume on the server. */
+async function handleRoomContinue() {
+    if (!roomSessionState.active) return;
+    dom.review.saveMessage.textContent = '';
+    roomSessionState.finishFailed = false;
+    if (roomSessionState.isPaused) applyLocalResume();
+    navigateTo('focus', 'review');
+    renderRoomFocus();
+    const outcome = await enqueueRoomSessionRequest(
+        /** Send the resume event that Continue uses. */
+        () => postRoomSessionEvent('resume')
+    );
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.continue);
+}
+
+/** Save the room session on the server. A failed Finish retries with the same submission ID. */
+async function handleRoomFinish() {
+    const state = roomSessionState;
+    const feedbackStartedAt = performance.now();
+    dom.review.saveMessage.textContent = '';
+    const outcome = await performRoomSessionRequest(
+        dom.review.finishButton, state.finishFailed ? 'Retrying…' : 'Saving…',
+        /** Wait for earlier events, then send the Finish request for this session. */
+        async () => {
+            await state.queueTail;
+            if (!state.active || !state.submissionId) throw new Error('The session ended before it could be saved');
+            return postFinishRoomSession(state.submissionId);
+        },
+        feedbackStartedAt
+    );
+    if (outcome.skipped || outcome.unauthorized || !state.active) return;
+    const result = outcome.result;
+    if (outcome.failed || !isRoomSessionEnvelope(result)) {
+        state.finishFailed = true;
+        dom.review.finishButton.textContent = 'Try again';
+        showReviewRoomError(ROOM_COPY.finishFailed);
+        return;
+    }
+    if (applyRoomSessionEnvelope(result)) {
+        state.finishFailed = false;
+        if (!state.isPaused) {
+            navigateTo('focus', 'review');
+            renderRoomFocus();
+        }
+        return;
+    }
+    await endRoomSession({ saved: result.saved === true });
+}
+
+/** Confirm presence: close the popup at once and send the check-in. */
+async function handleCheckinConfirm() {
+    const state = roomSessionState;
+    if (!state.active) return;
+    if (state.checkin.dueAtMs !== null) {
+        state.checkin.dueAtMs += CHECKIN_INTERVAL_MS;
+        state.checkin.deadlineAtMs += CHECKIN_INTERVAL_MS;
+    }
+    state.checkin.outstanding = false;
+    scheduleCheckin();
+    const outcome = await enqueueRoomSessionRequest(
+        /** Send the check-in event. */
+        () => postRoomSessionEvent('checkin')
+    );
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.checkin);
+}
+
+/** Show or hide the room version of the Review screen. */
+function setReviewRoomMode(enabled) {
+    dom.review.wordmark.hidden = enabled;
+    dom.review.roomName.hidden = !enabled;
+    dom.review.roomSummary.hidden = !enabled;
+    if (!enabled) return;
+    dom.review.roomName.textContent = roomSessionState.roomName;
+    dom.review.finishButton.textContent = roomSessionState.finishFailed ? 'Try again' : 'Finish';
+}
+
+/** Fill the Review summary cards, or dashes when no summary is available. */
+function renderReviewRoomSummary(summary) {
+    dom.review.roomTotalTime.textContent = summary ? formatDurationHoursMinutes(summary.total_time_seconds) : '—';
+    dom.review.roomSessionCount.textContent = summary ? String(summary.total_sessions) : '—';
+    dom.review.roomPeopleCount.textContent = summary ? String(summary.members_count) : '—';
+    dom.review.roomAverageTime.textContent = summary
+        ? formatAverageSessionTime(summary.average_session_time_seconds)
+        : '—';
+}
+
+/** Fill the Review cards at once from the last known room summary plus this session. Return whether it could. */
+function renderReviewRoomSummaryFromCache() {
+    const cached = roomSnapshotCache.get(roomSessionState.roomId);
+    if (!cached) return false;
+    const totalSessions = cached.summary.total_sessions + 1;
+    const totalTime = cached.summary.total_time_seconds + roomSessionState.display.actualTimeSeconds;
+    renderReviewRoomSummary({
+        ...cached.summary,
+        total_sessions: totalSessions,
+        total_time_seconds: totalTime,
+        average_session_time_seconds: Math.round(totalTime / totalSessions)
+    });
+    return true;
+}
+
+/** Load the room's summary once, counting the paused session, to correct the Review cards. */
+async function loadReviewRoomSummary() {
+    const roomId = roomSessionState.roomId;
+    try {
+        const result = await fetchRoomSummary(roomId, true);
+        if (!roomSessionState.active || roomSessionState.roomId !== roomId) return;
+        if (!result.success) throw new Error(result.error);
+        renderReviewRoomSummary(result.summary);
+    } catch (error) {
+        if (error.status !== 401) console.error('Could not load the room summary:', error);
+    }
+}
+
+
 // ========== EVENT WIRING ==========
 
 /** Connect application controls and browser events to their handlers. */
@@ -2481,7 +4606,10 @@ function registerEventListeners() {
         }
     });
 
-    for (const [input, message] of [[dom.plan.mission, dom.plan.missionError], [dom.plan.targetTime, dom.plan.timeError]]) {
+    for (const [input, message] of [
+        [dom.plan.mission, dom.plan.missionError], [dom.plan.targetTime, dom.plan.timeError],
+        [dom.room.mission, dom.room.missionError], [dom.room.targetTime, dom.room.timeError]
+    ]) {
         input.addEventListener('input', /** Clear a plan field error when its value changes. */ () => {
             message.textContent = '';
             input.removeAttribute('aria-invalid');
@@ -2583,6 +4711,68 @@ function registerEventListeners() {
     dom.dashboard.feedbackForm.addEventListener('submit', handleSubmitFeedback);
     dom.dashboard.feedbackInput.addEventListener('input', handleFeedbackInput);
     document.addEventListener('click', closeFeedbackFormOnOutsideClick);
+
+    dom.plan.roomsButton.addEventListener('click', /** Open Rooms from Plan. */ () => handleOpenRooms('plan'));
+    dom.dashboard.roomsButton.addEventListener('click', /** Open Rooms from Dashboard. */ () => handleOpenRooms('dashboard'));
+    dom.rooms.userIcon.addEventListener('click', /** Toggle the Rooms account menu. */ () => toggleUserMenu('rooms'));
+    dom.rooms.logoutButton.addEventListener('click', /** Log out from Rooms. */ () => handleLogout('rooms'));
+    dom.rooms.streakButton.addEventListener('click', /** Toggle the Rooms consistency calendar. */ () => toggleStreakPopup('rooms'));
+    dom.rooms.newMissionButton.addEventListener('click', handleRoomsToPlan);
+    dom.rooms.dashboardButton.addEventListener('click', handleRoomsToDashboard);
+    dom.rooms.createButton.addEventListener('click', openCreateRoomModal);
+    dom.rooms.emptyCreateButton.addEventListener('click', openCreateRoomModal);
+    dom.rooms.joinButton.addEventListener('click', openJoinRoomModal);
+    dom.rooms.retryButton.addEventListener('click', handleRoomsRetry);
+    dom.rooms.grid.addEventListener('click', handleRoomsGridClick);
+    document.addEventListener('click', closeRoomMenuOnOutsideClick);
+    document.addEventListener('keydown', handleRoomsKeydown);
+    document.addEventListener('visibilitychange', /** Refresh the rooms as soon as the tab is visible again. */ () => {
+        if (!document.hidden && roomsState.pollTimer !== null) void pollRooms();
+    });
+
+    dom.modals.create.form.addEventListener('submit', handleCreateRoomSubmit);
+    dom.modals.join.form.addEventListener('submit', handleJoinRoomSubmit);
+    dom.modals.created.copyButton.addEventListener('click', handleCopyRoomLink);
+    dom.modals.created.link.addEventListener('focus', /** Select the whole link for manual copying. */ () => dom.modals.created.link.select());
+    [dom.modals.create, dom.modals.join].forEach(/** Clear a modal field error when the field changes. */ (modal) => {
+        modal.input.addEventListener('input', /** Clear the edited field's error. */ () => clearModalFieldError(modal.input, modal.error));
+    });
+    [dom.modals.create, dom.modals.created, dom.modals.join].forEach(/** Wire a modal's close controls. */ (modal) => {
+        modal.closeButton.addEventListener('click', /** Close the modal unless it is submitting. */ () => {
+            if (!modalState.isSubmitting) closeModal();
+        });
+        modal.overlay.addEventListener('keydown', trapModalFocus);
+        modal.overlay.addEventListener('click', /** Close the modal when clicking its backdrop. */ (event) => {
+            if (event.target === modal.overlay && !modalState.isSubmitting) closeModal();
+        });
+    });
+
+    dom.room.backButton.addEventListener('click', handleRoomBack);
+    dom.room.unavailableBackButton.addEventListener('click', handleRoomBack);
+    dom.room.retryButton.addEventListener('click', handleRoomRetry);
+    dom.room.menuButton.addEventListener('click', /** Toggle the Room top bar menu. */ () => setRoomMenuState(!roomState.menuOpen));
+    dom.room.menu.addEventListener('click', handleRoomMenuClick);
+    document.addEventListener('click', closeRoomTopMenuOnOutsideClick);
+    dom.room.beatButton.addEventListener('click', handleBeatAverage);
+    dom.room.targetTime.addEventListener('keydown', handleTargetTimeKeydown);
+    dom.room.startButton.addEventListener('click', handleRoomStartWork);
+    [dom.room.mission, dom.room.targetTime].forEach(/** Clear the Start Work error when a field changes. */ (input) => {
+        input.addEventListener('input', /** Clear the error under Start Work. */ () => { dom.room.startError.textContent = ''; });
+    });
+    dom.modals.checkin.confirmButton.addEventListener('click', handleCheckinConfirm);
+    dom.modals.checkin.overlay.addEventListener('keydown', /** Keep focus on the only button while the popup is open. */ (event) => {
+        if (event.key !== 'Tab') return;
+        event.preventDefault();
+        dom.modals.checkin.confirmButton.focus();
+    });
+    document.addEventListener('pointerdown', handleRoomSessionGesture);
+    document.addEventListener('keydown', handleRoomSessionGesture);
+    dom.room.history.addEventListener('click', toggleSessionMenu);
+    dom.room.history.addEventListener('click', handleDeleteSession);
+    dom.room.historyRetryButton.addEventListener('click', handleRoomHistoryRetry);
+    document.addEventListener('visibilitychange', /** Refresh the room as soon as the tab is visible again. */ () => {
+        if (!document.hidden && roomState.pollTimer !== null) void pollRoom();
+    });
 }
 
 
