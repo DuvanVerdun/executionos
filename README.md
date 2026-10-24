@@ -24,6 +24,8 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 - Automatic access-token refresh
 - Offline session queue and retry
 - Session deletion
+- Dashboard with trends, streaks, and a consistency calendar
+- Co-DeepWork Rooms: join with a link, work together, ranking, hourly check-ins, and sessions saved to both your history and the room
 
 ## Stack
 
@@ -53,6 +55,12 @@ Accounts, user sessions, deletion, and completed core UI.
 
 **v0.4 — Polished UI & UX**  
 Redesigned and polished the core experience.
+
+**v0.5 — Visual Dashboard & Streaks**  
+Trend charts, streaks, a consistency calendar, and a full UI redesign.
+
+**v0.6 — Co-DeepWork Rooms**  
+Shared rooms where small groups do deep work together, with server-held sessions and check-ins.
 
 ## About the project
 

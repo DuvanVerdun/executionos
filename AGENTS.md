@@ -166,8 +166,8 @@ When a version ships, the product docs catch up. `product.md`, `architecture.md`
 - Visual truth: `frontend/style.css`. Read it fully before any UI work. Don't copy its values into docs.
 - Copy truth: `frontend/index.html` and the Figma file. Don't copy text into docs.
 - Figma file: "ExecutionOS", key `B7vEWYtHv9pK4eK2V5ug6K`. Pages:
-  - **Screens:** v0.5 live reference and current work.
-  - **Foundations:** current tokens and components. Until it is rebuilt for v0.6, `style.css` wins.
+  - **Screens:** v0.6 live reference and current work.
+  - **Foundations:** current tokens and components. Until it is rebuilt, `style.css` wins.
   - **Archive:** old versions. Don't edit.
 - Figma calls are scarce (Starter plan). Call Figma only when I ask. Don't read the file back to check your own work. Write a whole screen per call. Ask for a screenshot instead.
 - The web app is desktop only. See `docs/product.md`.

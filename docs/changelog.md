@@ -3,9 +3,18 @@
 Each version is a meaningful product step. Small fixes and polish get their
 own commits, not their own entry.
 
-## v0.6 — Co-DeepWork Rooms (in progress)
+## v0.6 — Co-DeepWork Rooms (Oct 24, 2026)
 
-See `docs/current-roadmap.md`.
+- Rooms: create, join with a link, leave, and owner-only delete, with link copy and refresh.
+- Rooms screen with room cards and a live "working now" count.
+- Room screen: four summary cards, mission card, ranking with member state rings, and a paginated room history.
+- Option to hide your missions in a room.
+- Room sessions held by the server: Start, Pause, Resume, Stop, Continue, and Finish.
+- Hourly check-in popup with sound, and automatic saving when a session ends on its own, with a message when you return.
+- Session recovery after a reload or a closed tab.
+- Fast, optimistic session controls that retry and roll back on failure.
+- Rooms and Room screens open instantly from cached data and refresh in the background.
+- Floating messages for session results and errors.
 
 ## v0.5 — Visual Dashboard, Streaks, and UI Redesign (Oct 7, 2026)
 

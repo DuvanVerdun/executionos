@@ -143,12 +143,12 @@ Polish should improve comprehension, continuity, trust, or motivation rather tha
 
 ## Product Boundaries
 
-ExecutionOS is centered on personal execution. Every session belongs to the user's personal history, dashboard, and streak.
+ExecutionOS is centered on personal execution. Every session belongs to the user's personal history, dashboard, and streak. Rooms are a layer on top of personal execution, not a replacement for it.
 
 It is not trying to become:
 
 - A general-purpose project management platform.
-- A team collaboration suite.
+- A team collaboration suite. Rooms exist so small groups can do deep work together, not to manage a team's work.
 - A calendar replacement.
 - A complete task-management system.
 - A general social network.
@@ -166,6 +166,27 @@ Desktop only. Design canvas: 1440×1024, for Figma prototypes. The built app is 
 - **Mission:** what you plan to work on.
 - **Target time:** the time you set as your goal for the session.
 - **Actual time:** time the timer really ran. Paused time never counts.
+- **Room:** a shared space where a small group runs sessions together. People join with a link. There is no member limit.
+- **Owner:** the user who created the room, or the member who took over when the previous owner left. Only the owner can copy or refresh the link and delete the room.
+- **Member:** a user who has joined a room and has not left it.
+- **Former member:** a user who left. Their sessions stay in the room history and totals, marked "(not a member anymore)".
+- **Room session:** a session started inside a room. It is held by the server while it runs, and it is saved to the user's personal history and to the room.
+- **Check-in:** once per hour of actual time, a popup asks "Are you still there?" The user has 5 minutes to click **Still here**.
+- **Working, Paused, Not working:** the state each member shows in the ranking.
+
+## Rooms
+
+Rules a user can observe:
+
+- A room has four summary cards (total time, sessions, people, average session time), a mission card, a ranking, and a history of everyone's sessions.
+- The ranking is ordered by total focused time. Ties go to whoever joined earlier. Positions are never shared.
+- A user can hide their missions in a room. Others then see "Mission hidden", with times still shown.
+- When the owner leaves, ownership passes to the member who joined earliest. When the last member leaves, the room is deleted. Members keep their sessions in their personal history.
+- A room cannot be deleted while anyone has a running or paused session in it. A user cannot leave a room while their own session runs there.
+- When a session ends on its own, it is saved at the user's last Pause, Stop, or successful check-in. With none of those, it is not saved. This applies to a missed check-in, a closed tab, a lost connection, and a session left paused for an hour.
+- Work done after a Resume is lost if the next check-in is missed. This is intentional: paused time is never counted as work.
+- A user who returns after a session ended without them sees a message saying what happened.
+- Personal sessions can be started at any time, even while in rooms. They never appear in a room.
 
 ## Product Decision Test
 

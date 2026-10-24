@@ -185,6 +185,7 @@ Separate refactoring from unrelated feature work when combining them would make 
 
 ## Git Workflow
 
+- One branch per version. Merge it into `main` with a pull request, tag the release (for example `v0.6`), then delete the branch.
 - Hotfixes use short-lived branches merged into `main`.
 
 ## Communication
