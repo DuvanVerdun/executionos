@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from dashboard_service import _as_utc_aware  # pyright: ignore[reportPrivateUsage]
 from extensions import db
 from models import ActiveRoomSession, Room, RoomMembership, Session, SessionEndNotice
-from room_service import get_active_membership, running_session_facts
+from room_service import RoomNotAvailableError, running_session_facts
 from room_session_rules import (
     OverdueReason,
     RunningSessionFacts,
@@ -23,6 +23,8 @@ from room_session_rules import (
 
 
 MISSION_MAX_LENGTH = 200
+
+LoadedRow = tuple[ActiveRoomSession, str]
 
 
 class RoomSessionConflictError(Exception):
@@ -38,10 +40,18 @@ def _iso(value: datetime) -> str:
     return _as_utc_aware(value).replace(tzinfo=None).isoformat(timespec="milliseconds")
 
 
-def _load_row(user_id: int) -> ActiveRoomSession | None:
-    return db.session.execute(
-        select(ActiveRoomSession).where(ActiveRoomSession.user_id == user_id)
-    ).scalar_one_or_none()
+def _load_row(user_id: int) -> LoadedRow | None:
+    """Load the user's running row together with its room name, in one query."""
+    result = db.session.execute(
+        select(ActiveRoomSession, Room.name)
+        .join(Room, Room.id == ActiveRoomSession.room_id)
+        .where(ActiveRoomSession.user_id == user_id)
+    ).tuples().first()
+
+    if result is None:
+        return None
+
+    return result[0], result[1]
 
 
 # ---------- Finalization ----------
@@ -173,11 +183,7 @@ def _consume_notice(user_id: int) -> dict[str, Any] | None:
     return payload
 
 
-def _session_payload(facts: RunningSessionFacts, now: datetime) -> dict[str, Any]:
-    room_name = db.session.execute(
-        select(Room.name).where(Room.id == facts.room_id)
-    ).scalar_one_or_none()
-
+def _session_payload(facts: RunningSessionFacts, room_name: str, now: datetime) -> dict[str, Any]:
     running = facts.paused_at is None
 
     return {
@@ -202,22 +208,30 @@ def _session_payload(facts: RunningSessionFacts, now: datetime) -> dict[str, Any
 
 def _respond(
     user_id: int,
-    row: ActiveRoomSession | None,
+    loaded: LoadedRow | None,
     now: datetime,
     conflict: bool = False,
+    consume_notice: bool = True,
 ) -> dict[str, Any]:
-    """Refresh the heartbeat, build the envelope, consume the notice, and commit."""
-    if row is not None:
-        row.last_heartbeat_at = now
+    """Refresh the heartbeat, build the envelope, and commit.
 
-    facts = running_session_facts(row) if row is not None else None
+    The pending notice is read only when asked to, or when no session is running,
+    because a running session cannot have a notice waiting.
+    """
+    facts: RunningSessionFacts | None = None
+    room_name = ""
+
+    if loaded is not None:
+        row, room_name = loaded
+        row.last_heartbeat_at = now
+        facts = running_session_facts(row)
 
     envelope: dict[str, Any] = {
         "success": True,
         "server_time": _iso(now),
         "active": facts is not None,
-        "session": _session_payload(facts, now) if facts is not None else None,
-        "notice": _consume_notice(user_id),
+        "session": _session_payload(facts, room_name, now) if facts is not None else None,
+        "notice": _consume_notice(user_id) if (consume_notice or facts is None) else None,
     }
     db.session.commit()
 
@@ -227,21 +241,34 @@ def _respond(
     return envelope
 
 
-def _begin(user_id: int) -> datetime:
-    """Finalize this user's overdue row, then return the request time."""
-    finalize_overdue_for_users([user_id])
-    return datetime.now(UTC)
+def _begin(user_id: int) -> tuple[datetime, LoadedRow | None]:
+    """Load the user's row once. An overdue row is finalized and reported as missing."""
+    now = datetime.now(UTC)
+    loaded = _load_row(user_id)
+
+    if loaded is None:
+        return now, None
+
+    facts = running_session_facts(loaded[0])
+    reason = overdue_reason(facts, now)
+
+    if reason is None:
+        return now, loaded
+
+    _finalize_row(facts, reason, now)
+    return now, None
 
 
 # ---------- Operations ----------
 
 def get_room_session_for_user(user_id: int) -> dict[str, Any]:
-    now = _begin(user_id)
-    return _respond(user_id, _load_row(user_id), now)
+    now, loaded = _begin(user_id)
+    return _respond(user_id, loaded, now)
 
 
 def heartbeat_room_session_for_user(user_id: int) -> dict[str, Any]:
-    return get_room_session_for_user(user_id)
+    now, loaded = _begin(user_id)
+    return _respond(user_id, loaded, now, consume_notice=False)
 
 
 def _validate_start_input(
@@ -269,6 +296,24 @@ def _validate_start_input(
     return raw_room_id, raw_mission, raw_target_time_seconds
 
 
+def _load_member_room_name(room_id: int, user_id: int) -> str:
+    """Return the room's name if the user is an active member, in one query."""
+    room_name = db.session.execute(
+        select(Room.name)
+        .join(RoomMembership, RoomMembership.room_id == Room.id)
+        .where(
+            Room.id == room_id,
+            RoomMembership.user_id == user_id,
+            RoomMembership.left_at.is_(None),
+        )
+    ).scalar_one_or_none()
+
+    if room_name is None:
+        raise RoomNotAvailableError()
+
+    return room_name
+
+
 def start_room_session_for_user(
     user_id: int,
     raw_room_id: object,
@@ -279,10 +324,9 @@ def start_room_session_for_user(
         raw_room_id, raw_mission, raw_target_time_seconds
     )
 
-    now = _begin(user_id)
-    get_active_membership(room_id, user_id)
+    now, existing = _begin(user_id)
+    room_name = _load_member_room_name(room_id, user_id)
 
-    existing = _load_row(user_id)
     if existing is not None:
         return _respond(user_id, existing, now, conflict=True)
 
@@ -303,53 +347,53 @@ def start_room_session_for_user(
         db.session.rollback()
         return _respond(user_id, _load_row(user_id), now, conflict=True)
 
-    return _respond(user_id, row, now)
+    return _respond(user_id, (row, room_name), now)
 
 
 def pause_room_session_for_user(user_id: int) -> dict[str, Any]:
-    now = _begin(user_id)
-    row = _load_row(user_id)
+    now, loaded = _begin(user_id)
 
-    if row is None:
+    if loaded is None:
         return _respond(user_id, None, now)
 
+    row = loaded[0]
     facts = running_session_facts(row)
 
     if facts.paused_at is not None:
-        return _respond(user_id, row, now)
+        return _respond(user_id, loaded, now, consume_notice=False)
 
     if checkin_is_outstanding(facts, now):
-        return _respond(user_id, row, now, conflict=True)
+        return _respond(user_id, loaded, now, conflict=True, consume_notice=False)
 
     row.last_interaction_at = now
     row.last_interaction_actual_seconds = actual_time_seconds(facts, now)
     row.paused_at = now
-    return _respond(user_id, row, now)
+    return _respond(user_id, loaded, now, consume_notice=False)
 
 
 def resume_room_session_for_user(user_id: int) -> dict[str, Any]:
-    now = _begin(user_id)
-    row = _load_row(user_id)
+    now, loaded = _begin(user_id)
 
-    if row is None:
+    if loaded is None:
         return _respond(user_id, None, now)
 
+    row = loaded[0]
     facts = running_session_facts(row)
 
     if facts.paused_at is not None:
         row.paused_seconds = facts.paused_seconds + (now - facts.paused_at).total_seconds()
         row.paused_at = None
 
-    return _respond(user_id, row, now)
+    return _respond(user_id, loaded, now, consume_notice=False)
 
 
 def checkin_room_session_for_user(user_id: int) -> dict[str, Any]:
-    now = _begin(user_id)
-    row = _load_row(user_id)
+    now, loaded = _begin(user_id)
 
-    if row is None:
+    if loaded is None:
         return _respond(user_id, None, now)
 
+    row = loaded[0]
     facts = running_session_facts(row)
 
     if checkin_is_outstanding(facts, now) and now <= checkin_deadline_at(facts):
@@ -357,7 +401,7 @@ def checkin_room_session_for_user(user_id: int) -> dict[str, Any]:
         row.last_interaction_at = now
         row.last_interaction_actual_seconds = actual_time_seconds(facts, now)
 
-    return _respond(user_id, row, now)
+    return _respond(user_id, loaded, now, consume_notice=False)
 
 
 def _find_saved_session_id(user_id: int, submission_id: str) -> int | None:
@@ -375,15 +419,14 @@ def finish_room_session_for_user(user_id: int, raw_submission_id: object) -> dic
 
     submission_id = str(UUID(raw_submission_id))
 
-    now = _begin(user_id)
-    row = _load_row(user_id)
+    now, loaded = _begin(user_id)
     saved_session_id: int | None = None
 
-    if row is not None:
-        facts = running_session_facts(row)
+    if loaded is not None:
+        facts = running_session_facts(loaded[0])
 
         if facts.submission_id != submission_id or facts.paused_at is None:
-            return _respond(user_id, row, now, conflict=True)
+            return _respond(user_id, loaded, now, conflict=True)
 
         try:
             if _claim_row(facts):

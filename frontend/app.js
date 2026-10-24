@@ -21,6 +21,10 @@ const ROOM_JOIN_FRAGMENT = '#join=';
 const BEAT_AVERAGE_INCREMENT_SECONDS = 60;
 const HEARTBEAT_INTERVAL_MS = 15000;
 const CHECKIN_SOUND_URL = 'sounds/checkin.mp3';
+const CHECKIN_INTERVAL_MS = 3600000;
+const CHECKIN_RESPONSE_MS = 300000;
+const ROOM_RETRY_WINDOW_MS = 10000;
+const ROOM_RETRY_DELAY_MS = 1500;
 const MEMBER_STATE_LABELS = {
     working: 'Working',
     paused: 'Paused',
@@ -186,6 +190,8 @@ const roomState = {
     busyAction: null
 };
 
+const roomSnapshotCache = new Map();
+
 /** Create the empty client state of a room session. */
 function createInitialRoomSessionState() {
     return {
@@ -209,6 +215,9 @@ function createInitialRoomSessionState() {
         isBusy: false,
         busyButton: null,
         restoreLabel: '',
+        generation: 0,
+        pending: 0,
+        queueTail: Promise.resolve(),
         eventCounter: 0,
         heartbeatInFlight: false,
         finishFailed: false,
@@ -1260,6 +1269,9 @@ function navigateTo(nextScreen, currentScreen) {
     }
     if (nextScreen === 'login' || nextScreen === 'register' || nextScreen === 'loading') {
         resetRoomSessionClient();
+        roomsState.hasLoaded = false;
+        roomsState.rooms = [];
+        roomSnapshotCache.clear();
     }
     const displaySession = roomSessionState.active ? roomSessionState.display : activeSessionState;
     if (nextScreen === 'focus') {
@@ -2033,11 +2045,14 @@ async function routeToInitialScreen(currentScreen = 'loading') {
         }
     }
     try {
-        const roomSessionResult = await fetchRoomSession(currentScreen);
+        const { result: roomSessionResult, sentAtMs, receivedAtMs } = await timeRoomRequest(
+            /** Request the running room session. */
+            () => fetchRoomSession(currentScreen)
+        );
         if (roomSessionResult.status !== 200 || !isRoomSessionEnvelope(roomSessionResult)) {
             throw new Error(roomSessionResult.error || 'Could not load the room session');
         }
-        if (applyRoomSessionEnvelope(roomSessionResult)) {
+        if (applyRoomSessionEnvelope(roomSessionResult, sentAtMs, receivedAtMs)) {
             enterRoomSessionFocus(currentScreen);
             return;
         }
@@ -3066,7 +3081,7 @@ function refreshOpenRoomMenu() {
 }
 
 /** Load the user's rooms. A silent load keeps what is on screen while it runs. */
-async function loadRooms({ silent = false } = {}) {
+async function loadRooms({ silent = false, surfaceErrors = !silent } = {}) {
     const generation = ++roomsState.loadGeneration;
     roomsState.isLoading = true;
     if (!silent && !roomsState.hasLoaded) showRoomsSurface('loading');
@@ -3082,7 +3097,7 @@ async function loadRooms({ silent = false } = {}) {
     } catch (error) {
         if (generation !== roomsState.loadGeneration) return;
         console.error('Rooms loading error:', error);
-        if (!roomsState.hasLoaded) showRoomsSurface('error');
+        if (surfaceErrors || !roomsState.hasLoaded) showRoomsSurface('error');
     } finally {
         if (generation === roomsState.loadGeneration) roomsState.isLoading = false;
     }
@@ -3118,8 +3133,8 @@ function leaveRoomsScreen() {
 
 /** Prepare the Rooms screen after it is shown, and load its rooms. */
 async function enterRoomsScreen() {
-    roomsState.hasLoaded = false;
     roomsState.openMenuRoomId = null;
+    if (roomsState.hasLoaded) renderRooms();
     startRoomsPolling();
     void loadStreak('rooms');
     await loadRooms();
@@ -3712,7 +3727,7 @@ async function handleRoomHistoryRetry() {
 }
 
 /** Load the room snapshot, and the history when it is needed. */
-async function loadRoom({ silent = false, reloadHistory = false } = {}) {
+async function loadRoom({ silent = false, reloadHistory = false, surfaceErrors = !silent } = {}) {
     const generation = ++roomState.loadGeneration;
     roomState.isLoading = true;
     if (!silent) showRoomView('loading');
@@ -3728,6 +3743,7 @@ async function loadRoom({ silent = false, reloadHistory = false } = {}) {
 
         const previousTotal = roomState.snapshot?.summary.total_sessions;
         roomState.snapshot = { room: result.room, summary: result.summary, ranking: result.ranking };
+        roomSnapshotCache.set(roomState.roomId, roomState.snapshot);
         renderRoomSnapshot();
         showRoomView('ready');
 
@@ -3736,7 +3752,7 @@ async function loadRoom({ silent = false, reloadHistory = false } = {}) {
     } catch (error) {
         if (generation !== roomState.loadGeneration) return;
         console.error('Room loading error:', error);
-        if (!roomState.snapshot) showRoomView('error');
+        if (surfaceErrors || !roomState.snapshot) showRoomView('error');
     } finally {
         if (generation === roomState.loadGeneration) roomState.isLoading = false;
     }
@@ -3805,9 +3821,15 @@ function leaveRoomScreen() {
 /** Open a room from another screen and load it. */
 async function openRoom(roomId, currentScreen) {
     resetRoomState(roomId);
+    const cached = roomSnapshotCache.get(roomId);
+    if (cached) {
+        roomState.snapshot = cached;
+        renderRoomSnapshot();
+        showRoomView('ready');
+    }
     navigateTo('room', currentScreen);
     startRoomPolling();
-    await loadRoom();
+    await loadRoom({ silent: Boolean(cached), reloadHistory: Boolean(cached), surfaceErrors: true });
 }
 
 /** Show the "This room isn't available" state, from the Room screen or another one. */
@@ -3937,9 +3959,14 @@ function getSessionEndMessage(notice) {
         ?? { text: ROOM_COPY.sessionEndedGeneric, error: !notice.saved };
 }
 
+/** Estimate the server clock offset, assuming the server stamped the reply midway through the round trip. */
+function updateClockOffset(envelope, sentAtMs = Date.now(), receivedAtMs = Date.now()) {
+    roomSessionState.clockOffsetMs = parseServerTime(envelope.server_time) - (sentAtMs + receivedAtMs) / 2;
+}
+
 /** Copy a room-session envelope into the client state. Return whether a session is active. */
-function applyRoomSessionEnvelope(envelope) {
-    roomSessionState.clockOffsetMs = parseServerTime(envelope.server_time) - Date.now();
+function applyRoomSessionEnvelope(envelope, sentAtMs, receivedAtMs) {
+    updateClockOffset(envelope, sentAtMs, receivedAtMs);
     if (envelope.notice) {
         const { text, error } = getSessionEndMessage(envelope.notice);
         setFloatingMessage(text, { error: Boolean(error) });
@@ -4007,14 +4034,15 @@ function stopRoomSessionTimers() {
 
 /** Tell the server the client is alive, ignoring answers that an event has overtaken. */
 async function sendRoomHeartbeat() {
-    if (!roomSessionState.active || roomSessionState.heartbeatInFlight || roomSessionState.isBusy) return;
-    roomSessionState.heartbeatInFlight = true;
-    const eventCounter = roomSessionState.eventCounter;
+    const state = roomSessionState;
+    if (!state.active || state.heartbeatInFlight || state.isBusy || state.pending > 0) return;
+    state.heartbeatInFlight = true;
+    const eventCounter = state.eventCounter;
     try {
-        const result = await postRoomSessionEvent('heartbeat');
-        if (!roomSessionState.active || eventCounter !== roomSessionState.eventCounter) return;
+        const { result, sentAtMs, receivedAtMs } = await timeRoomRequest(() => postRoomSessionEvent('heartbeat'));
+        if (!state.active || eventCounter !== state.eventCounter) return;
         if (!isRoomSessionEnvelope(result)) return;
-        if (applyRoomSessionEnvelope(result)) refreshRoomSessionView();
+        if (applyRoomSessionEnvelope(result, sentAtMs, receivedAtMs)) reconcileRoomSessionScreen();
         else await endRoomSession();
     } catch (error) {
         if (error.status !== 401) console.error('Heartbeat failed:', error);
@@ -4026,13 +4054,31 @@ async function sendRoomHeartbeat() {
 /** Ask the server for the current room session, for example when a check-in expires. */
 async function refreshRoomSession() {
     try {
-        const result = await fetchRoomSession();
+        const { result, sentAtMs, receivedAtMs } = await timeRoomRequest(() => fetchRoomSession());
         if (!isRoomSessionEnvelope(result)) return;
-        if (applyRoomSessionEnvelope(result)) refreshRoomSessionView();
+        if (applyRoomSessionEnvelope(result, sentAtMs, receivedAtMs)) reconcileRoomSessionScreen();
         else await endRoomSession();
     } catch (error) {
         if (error.status !== 401) console.error('Could not refresh the room session:', error);
     }
+}
+
+/** Run a request and return its result with the times it was sent and answered. */
+async function timeRoomRequest(request) {
+    const sentAtMs = Date.now();
+    const result = await request();
+    return { result, sentAtMs, receivedAtMs: Date.now() };
+}
+
+/** Show the screen the server's session state calls for, then redraw it. */
+function reconcileRoomSessionScreen() {
+    const screen = getCurrentScreenName();
+    if (!roomSessionState.isPaused && screen === 'review') {
+        roomSessionState.finishFailed = false;
+        enterRoomSessionFocus('review');
+        return;
+    }
+    refreshRoomSessionView();
 }
 
 /** Create the audio context on a user gesture, load the sound, and schedule it. */
@@ -4140,7 +4186,7 @@ function scheduleCheckin() {
     armCheckinSound();
 }
 
-/** Lock or unlock every room session control while one request is in flight. */
+/** Lock or unlock the room session controls while a server-confirmed request (Finish) is in flight. */
 function setRoomSessionBusy(isBusy, button = null, busyLabel = '') {
     const controls = [
         dom.focus.pauseButton, dom.focus.stopButton, dom.review.continueButton,
@@ -4160,7 +4206,7 @@ function setRoomSessionBusy(isBusy, button = null, busyLabel = '') {
     }
 }
 
-/** Send one room session request under the single in-flight lock. */
+/** Send one server-confirmed room session request under the single in-flight lock. */
 async function performRoomSessionRequest(button, busyLabel, request, minimumFeedbackStartedAt = null) {
     if (roomSessionState.isBusy) return { skipped: true };
     roomSessionState.eventCounter += 1;
@@ -4178,6 +4224,45 @@ async function performRoomSessionRequest(button, busyLabel, request, minimumFeed
     }
 }
 
+/** Wait for the given number of milliseconds. */
+function delay(milliseconds) {
+    return new Promise(/** Resolve when the delay expires. */ (resolve) => setTimeout(resolve, milliseconds));
+}
+
+/** Send a request, retrying network and server failures until the retry window closes. */
+async function sendRoomSessionWithRetry(request, generation) {
+    const startedAt = performance.now();
+    for (;;) {
+        try {
+            const timed = await timeRoomRequest(request);
+            if (isRoomSessionEnvelope(timed.result) || timed.result.status < 500) return timed;
+        } catch (error) {
+            if (error.status === 401) return { unauthorized: true };
+            console.error('Room session request failed:', error);
+        }
+        if (performance.now() - startedAt + ROOM_RETRY_DELAY_MS > ROOM_RETRY_WINDOW_MS) return { failed: true };
+        await delay(ROOM_RETRY_DELAY_MS);
+        if (generation !== roomSessionState.generation) return { stale: true };
+    }
+}
+
+/** Queue a request behind the earlier ones, so the server sees events in the order the user made them. */
+function enqueueRoomSessionRequest(request) {
+    const state = roomSessionState;
+    const generation = state.generation;
+    state.pending += 1;
+    state.eventCounter += 1;
+    const job = state.queueTail.then(/** Send this request unless the session was reset first. */ async () => {
+        const outcome = generation === state.generation
+            ? await sendRoomSessionWithRetry(request, generation)
+            : { stale: true };
+        if (generation === state.generation) state.pending -= 1;
+        return outcome;
+    });
+    state.queueTail = job;
+    return job;
+}
+
 /** Show a room session error as a floating message. */
 function showRoomSessionError(message) {
     setFloatingMessage(message, { error: true });
@@ -4193,23 +4278,27 @@ function showReviewRoomError(message) {
     dom.review.saveMessage.textContent = message;
 }
 
-/** Show an error inside the check-in popup. */
-function showCheckinError(message) {
-    dom.modals.checkin.error.textContent = message;
-}
-
-/** Apply a request outcome. Return its envelope when a session is still active, else null. */
-function resolveRoomSessionOutcome(outcome, errorMessage, showError = showRoomSessionError) {
-    if (outcome.skipped || outcome.unauthorized) return null;
-    if (outcome.failed || !isRoomSessionEnvelope(outcome.result)) {
-        showError(errorMessage);
-        return null;
+/**
+ * Apply the outcome of a queued request. Only the last request in the queue applies the server's
+ * state, and a failed one asks the server what is true. Return whether the server accepted it.
+ */
+async function settleRoomSessionOutcome(outcome, errorMessage) {
+    const state = roomSessionState;
+    if (outcome.stale || outcome.unauthorized) return false;
+    const envelope = outcome.result;
+    if (outcome.failed || !isRoomSessionEnvelope(envelope)) {
+        showRoomSessionError(errorMessage);
+        if (state.pending === 0) await refreshRoomSession();
+        return false;
     }
-    if (!applyRoomSessionEnvelope(outcome.result)) {
-        void endRoomSession();
-        return null;
+    if (state.pending > 0) {
+        updateClockOffset(envelope, outcome.sentAtMs, outcome.receivedAtMs);
+        if (envelope.session) state.submissionId = envelope.session.submission_id;
+        return envelope.success === true;
     }
-    return outcome.result;
+    if (applyRoomSessionEnvelope(envelope, outcome.sentAtMs, outcome.receivedAtMs)) reconcileRoomSessionScreen();
+    else await endRoomSession();
+    return envelope.success === true;
 }
 
 /** Show the Focus screen for the running room session and start its timers. */
@@ -4220,109 +4309,208 @@ function enterRoomSessionFocus(currentScreen) {
     scheduleCheckin();
 }
 
-/** Clear everything the client holds about a room session. */
+/** Clear everything the client holds about a room session, keeping the clock offset. */
 function resetRoomSessionClient() {
+    const generation = roomSessionState.generation + 1;
+    const clockOffsetMs = roomSessionState.clockOffsetMs;
     stopRoomSessionTimers();
     clearTimeout(roomSessionState.checkinTimer);
     closeCheckinModal();
     cancelCheckinSound();
     if (roomSessionState.isBusy) setRoomSessionBusy(false);
-    Object.assign(roomSessionState, createInitialRoomSessionState());
+    Object.assign(roomSessionState, createInitialRoomSessionState(), { generation, clockOffsetMs });
+}
+
+/** Add a just-saved session to the cached room summary, so the room looks right before it reloads. */
+function addSavedSessionToCachedSummary(roomId, seconds) {
+    const cached = roomSnapshotCache.get(roomId);
+    if (!cached) return;
+    const summary = cached.summary;
+    const totalSessions = summary.total_sessions + 1;
+    const totalTime = summary.total_time_seconds + seconds;
+    roomSnapshotCache.set(roomId, {
+        ...cached,
+        summary: {
+            ...summary,
+            total_sessions: totalSessions,
+            total_time_seconds: totalTime,
+            average_session_time_seconds: Math.round(totalTime / totalSessions)
+        }
+    });
 }
 
 /** Leave Focus or Review after the session ended, and return to its room. */
 async function endRoomSession({ saved = false } = {}) {
     const roomId = roomSessionState.roomId;
+    const savedSeconds = roomSessionState.display.actualTimeSeconds;
     const screen = getCurrentScreenName();
     resetRoomSessionClient();
     dom.review.continueButton.classList.replace('normal-button', 'cta-button');
     dom.review.finishButton.textContent = 'Finish';
     dom.review.saveMessage.textContent = '';
-    if (saved) setFloatingMessage(ROOM_COPY.sessionSaved, { saved: true });
+    if (saved) {
+        setFloatingMessage(ROOM_COPY.sessionSaved, { saved: true });
+        addSavedSessionToCachedSummary(roomId, savedSeconds);
+    }
     if (roomId !== null && (screen === 'focus' || screen === 'review')) await openRoom(roomId, screen);
 }
 
-/** Validate the mission card and start a room session on the server. */
-async function handleRoomStartWork() {
-    dom.room.startError.textContent = '';
-    if (!validateMissionFields(dom.room)) return;
-    void unlockCheckinAudio();
-    const outcome = await performRoomSessionRequest(
-        dom.room.startButton, 'Starting…',
-        /** Send the Start request for the room's mission card. */
-        () => postStartRoomSession(roomState.roomId, dom.room.mission.value, parseHHMMToSeconds(dom.room.targetTime.value))
-    );
-    if (outcome.skipped || outcome.unauthorized) return;
+/** Show Focus for a session the server has not confirmed yet. */
+function beginLocalRoomSession(roomId, mission, targetTimeSeconds) {
+    const startedAtMs = Math.round(getServerNowMs());
+    Object.assign(roomSessionState, {
+        active: true,
+        submissionId: '',
+        roomId,
+        roomName: roomState.snapshot?.room.name ?? '',
+        isPaused: false,
+        startedAtMs,
+        pausedAtMs: null,
+        pausedSeconds: 0,
+        checkin: {
+            dueAtMs: startedAtMs + CHECKIN_INTERVAL_MS,
+            deadlineAtMs: startedAtMs + CHECKIN_INTERVAL_MS + CHECKIN_RESPONSE_MS,
+            outstanding: false
+        }
+    });
+    roomSessionState.display.currentMission = mission;
+    roomSessionState.display.targetTimeSeconds = targetTimeSeconds;
+    enterRoomSessionFocus('room');
+}
+
+/** Pause the session on this screen right away. */
+function applyLocalPause() {
+    roomSessionState.isPaused = true;
+    roomSessionState.pausedAtMs = getServerNowMs();
+    scheduleCheckin();
+}
+
+/** Resume the session on this screen right away. The check-in moves later by the time paused. */
+function applyLocalResume() {
+    const state = roomSessionState;
+    const pausedForMs = getServerNowMs() - state.pausedAtMs;
+    state.pausedSeconds += pausedForMs / 1000;
+    state.pausedAtMs = null;
+    state.isPaused = false;
+    if (state.checkin.dueAtMs !== null) {
+        state.checkin.dueAtMs += pausedForMs;
+        state.checkin.deadlineAtMs += pausedForMs;
+    }
+    scheduleCheckin();
+}
+
+/** Undo the Start screen after the server could not start the session, keeping the form. */
+function rollbackRoomStart(errorMessage) {
+    resetRoomSessionClient();
+    navigateTo('room', 'focus');
+    startRoomPolling();
+    void loadRoom({ silent: true });
+    showRoomSessionError(errorMessage);
+}
+
+/** Apply the server's answer to Start: keep the session, or return to the Room screen. */
+async function settleRoomStart(outcome) {
+    if (outcome.stale || outcome.unauthorized) return;
     if (outcome.result?.status === 404) {
-        showUnavailableRoom();
+        resetRoomSessionClient();
+        showUnavailableRoom('focus');
         return;
     }
-    const envelope = resolveRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.start, showRoomStartError);
-    if (envelope) enterRoomSessionFocus('room');
+    if (outcome.failed || !isRoomSessionEnvelope(outcome.result)) {
+        rollbackRoomStart(ROOM_COPY.sessionErrors.start);
+        return;
+    }
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.start);
+}
+
+/** Validate the mission card, show Focus at once, and start the room session on the server. */
+async function handleRoomStartWork() {
+    dom.room.startError.textContent = '';
+    if (roomSessionState.active || !validateMissionFields(dom.room)) return;
+    void unlockCheckinAudio();
+    const roomId = roomState.roomId;
+    const mission = dom.room.mission.value;
+    const targetTimeSeconds = parseHHMMToSeconds(dom.room.targetTime.value);
+    beginLocalRoomSession(roomId, mission, targetTimeSeconds);
+    const outcome = await enqueueRoomSessionRequest(
+        /** Send the Start request for the room's mission card. */
+        () => postStartRoomSession(roomId, mission, targetTimeSeconds)
+    );
+    await settleRoomStart(outcome);
 }
 
 /** Pause or resume the room session from Focus. */
 async function handleRoomPauseResume() {
+    if (!roomSessionState.active) return;
     const pausing = !roomSessionState.isPaused;
-    const outcome = await performRoomSessionRequest(
-        dom.focus.pauseButton, pausing ? 'Pausing…' : 'Resuming…',
+    if (pausing) applyLocalPause();
+    else applyLocalResume();
+    renderRoomFocus();
+    const outcome = await enqueueRoomSessionRequest(
         /** Send the pause or resume event. */
         () => postRoomSessionEvent(pausing ? 'pause' : 'resume')
     );
-    const errorMessage = pausing ? ROOM_COPY.sessionErrors.pause : ROOM_COPY.sessionErrors.resume;
-    if (resolveRoomSessionOutcome(outcome, errorMessage)) renderRoomFocus();
+    await settleRoomSessionOutcome(outcome, pausing ? ROOM_COPY.sessionErrors.pause : ROOM_COPY.sessionErrors.resume);
 }
 
-/** Stop the room session: pause it on the server and open Review. */
+/** Stop the room session: open Review at once and pause it on the server. */
 async function handleRoomStop() {
-    const outcome = await performRoomSessionRequest(
-        dom.focus.stopButton, 'Stopping…',
+    if (!roomSessionState.active) return;
+    const needsPause = !roomSessionState.isPaused;
+    if (needsPause) applyLocalPause();
+    updateRoomDisplay();
+    navigateTo('review', 'focus');
+    if (!renderReviewRoomSummaryFromCache()) renderReviewRoomSummary(null);
+    void loadReviewRoomSummary();
+    if (!needsPause) return;
+    const outcome = await enqueueRoomSessionRequest(
         /** Send the pause event that Stop uses. */
         () => postRoomSessionEvent('pause')
     );
-    if (!resolveRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.stop)) return;
-    renderRoomFocus();
-    if (!roomSessionState.isPaused) return;
-    navigateTo('review', 'focus');
-    void loadReviewRoomSummary();
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.stop);
 }
 
-/** Resume reviewed work and return to Focus. */
+/** Resume reviewed work: return to Focus at once and resume on the server. */
 async function handleRoomContinue() {
+    if (!roomSessionState.active) return;
     dom.review.saveMessage.textContent = '';
-    const outcome = await performRoomSessionRequest(
-        dom.review.continueButton, 'Continuing…',
+    roomSessionState.finishFailed = false;
+    if (roomSessionState.isPaused) applyLocalResume();
+    navigateTo('focus', 'review');
+    renderRoomFocus();
+    const outcome = await enqueueRoomSessionRequest(
         /** Send the resume event that Continue uses. */
         () => postRoomSessionEvent('resume')
     );
-    if (!resolveRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.continue, showReviewRoomError)) return;
-    if (roomSessionState.isPaused) return;
-    roomSessionState.finishFailed = false;
-    navigateTo('focus', 'review');
-    renderRoomFocus();
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.continue);
 }
 
 /** Save the room session on the server. A failed Finish retries with the same submission ID. */
 async function handleRoomFinish() {
+    const state = roomSessionState;
     const feedbackStartedAt = performance.now();
     dom.review.saveMessage.textContent = '';
     const outcome = await performRoomSessionRequest(
-        dom.review.finishButton, roomSessionState.finishFailed ? 'Retrying…' : 'Saving…',
-        /** Send the Finish request for this session. */
-        () => postFinishRoomSession(roomSessionState.submissionId),
+        dom.review.finishButton, state.finishFailed ? 'Retrying…' : 'Saving…',
+        /** Wait for earlier events, then send the Finish request for this session. */
+        async () => {
+            await state.queueTail;
+            if (!state.active || !state.submissionId) throw new Error('The session ended before it could be saved');
+            return postFinishRoomSession(state.submissionId);
+        },
         feedbackStartedAt
     );
-    if (outcome.skipped || outcome.unauthorized) return;
+    if (outcome.skipped || outcome.unauthorized || !state.active) return;
     const result = outcome.result;
     if (outcome.failed || !isRoomSessionEnvelope(result)) {
-        roomSessionState.finishFailed = true;
+        state.finishFailed = true;
         dom.review.finishButton.textContent = 'Try again';
         showReviewRoomError(ROOM_COPY.finishFailed);
         return;
     }
     if (applyRoomSessionEnvelope(result)) {
-        roomSessionState.finishFailed = false;
-        if (!roomSessionState.isPaused) {
+        state.finishFailed = false;
+        if (!state.isPaused) {
             navigateTo('focus', 'review');
             renderRoomFocus();
         }
@@ -4331,15 +4519,21 @@ async function handleRoomFinish() {
     await endRoomSession({ saved: result.saved === true });
 }
 
-/** Confirm presence for the outstanding check-in. */
+/** Confirm presence: close the popup at once and send the check-in. */
 async function handleCheckinConfirm() {
-    dom.modals.checkin.error.textContent = '';
-    const outcome = await performRoomSessionRequest(
-        dom.modals.checkin.confirmButton, 'Confirming…',
+    const state = roomSessionState;
+    if (!state.active) return;
+    if (state.checkin.dueAtMs !== null) {
+        state.checkin.dueAtMs += CHECKIN_INTERVAL_MS;
+        state.checkin.deadlineAtMs += CHECKIN_INTERVAL_MS;
+    }
+    state.checkin.outstanding = false;
+    scheduleCheckin();
+    const outcome = await enqueueRoomSessionRequest(
         /** Send the check-in event. */
         () => postRoomSessionEvent('checkin')
     );
-    if (resolveRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.checkin, showCheckinError)) refreshRoomSessionView();
+    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.checkin);
 }
 
 /** Show or hide the room version of the Review screen. */
@@ -4362,10 +4556,24 @@ function renderReviewRoomSummary(summary) {
         : '—';
 }
 
-/** Load the room's summary once, counting the paused session, for the Review cards. */
+/** Fill the Review cards at once from the last known room summary plus this session. Return whether it could. */
+function renderReviewRoomSummaryFromCache() {
+    const cached = roomSnapshotCache.get(roomSessionState.roomId);
+    if (!cached) return false;
+    const totalSessions = cached.summary.total_sessions + 1;
+    const totalTime = cached.summary.total_time_seconds + roomSessionState.display.actualTimeSeconds;
+    renderReviewRoomSummary({
+        ...cached.summary,
+        total_sessions: totalSessions,
+        total_time_seconds: totalTime,
+        average_session_time_seconds: Math.round(totalTime / totalSessions)
+    });
+    return true;
+}
+
+/** Load the room's summary once, counting the paused session, to correct the Review cards. */
 async function loadReviewRoomSummary() {
     const roomId = roomSessionState.roomId;
-    renderReviewRoomSummary(null);
     try {
         const result = await fetchRoomSummary(roomId, true);
         if (!roomSessionState.active || roomSessionState.roomId !== roomId) return;
