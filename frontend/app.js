@@ -33,7 +33,7 @@ const ROOM_BUSY_LABELS = {
     'leave-room': 'Leaving…'
 };
 const ROOM_COPY = {
-    showMissionsLabel: 'Show my missions in this room',
+    showMissionsLabel: 'Show Missions',
     copyLinkLabel: 'Copy link',
     refreshLinkLabel: 'Refresh link',
     deleteRoomLabel: 'Delete room',
@@ -2928,20 +2928,19 @@ function createRoomMenuRow(action, label, busyAction) {
     return row;
 }
 
-/** Create the show-missions switch row for a room menu. */
-function createRoomMenuSwitchRow(room, busyAction) {
-    const row = document.createElement('button');
+/** Create the show-missions row. Only its switch is a control. */
+function createRoomMenuSwitchRow() {
+    const row = document.createElement('div');
     const label = document.createElement('span');
-    const toggle = document.createElement('span');
+    const toggle = document.createElement('button');
     const knob = document.createElement('span');
 
-    row.type = 'button';
-    row.className = 'room-menu-item';
-    row.dataset.action = 'toggle-missions';
-    row.setAttribute('role', 'switch');
-    row.setAttribute('aria-checked', String(room.show_missions));
-    row.disabled = busyAction !== null;
+    row.className = 'room-menu-item room-menu-switch-row';
+    toggle.type = 'button';
     toggle.className = 'room-switch';
+    toggle.dataset.action = 'toggle-missions';
+    toggle.setAttribute('role', 'switch');
+    toggle.setAttribute('aria-label', ROOM_COPY.showMissionsLabel);
     knob.className = 'room-switch-knob';
     label.textContent = ROOM_COPY.showMissionsLabel;
 
@@ -2950,17 +2949,27 @@ function createRoomMenuSwitchRow(room, busyAction) {
     return row;
 }
 
-/** Fill a room menu with the rows this user's role allows. */
+/** Update the switch in place, so its change animates. */
+function updateRoomMenuSwitch(row, room, busyAction) {
+    const toggle = row.querySelector('.room-switch');
+    toggle.setAttribute('aria-checked', String(room.show_missions));
+    toggle.disabled = busyAction !== null && busyAction !== 'toggle-missions';
+}
+
+/** Fill a room menu with the rows this user's role allows. The switch row is reused, never rebuilt. */
 function renderRoomMenu(menu, room, busyAction) {
-    const rows = [createRoomMenuSwitchRow(room, busyAction)];
+    const switchRow = menu.querySelector('.room-menu-switch-row') ?? createRoomMenuSwitchRow();
+    updateRoomMenuSwitch(switchRow, room, busyAction);
+    const rowBusyAction = busyAction === 'toggle-missions' ? null : busyAction;
+    const rows = [switchRow];
     if (room.is_owner) {
         rows.push(
-            createRoomMenuRow('copy-link', ROOM_COPY.copyLinkLabel, busyAction),
-            createRoomMenuRow('refresh-link', ROOM_COPY.refreshLinkLabel, busyAction),
-            createRoomMenuRow('delete-room', ROOM_COPY.deleteRoomLabel, busyAction)
+            createRoomMenuRow('copy-link', ROOM_COPY.copyLinkLabel, rowBusyAction),
+            createRoomMenuRow('refresh-link', ROOM_COPY.refreshLinkLabel, rowBusyAction),
+            createRoomMenuRow('delete-room', ROOM_COPY.deleteRoomLabel, rowBusyAction)
         );
     }
-    rows.push(createRoomMenuRow('leave-room', ROOM_COPY.leaveRoomLabel, busyAction));
+    rows.push(createRoomMenuRow('leave-room', ROOM_COPY.leaveRoomLabel, rowBusyAction));
     menu.replaceChildren(...rows);
 }
 
@@ -3154,11 +3163,13 @@ async function runRoomMenuAction(action, room, hooks) {
     if (action === 'delete-room' && !confirm(ROOM_COPY.deleteConfirm)) return;
     if (action === 'leave-room' && !confirm(ROOM_COPY.leaveConfirm)) return;
 
+    const previousShowMissions = room.show_missions;
+    if (action === 'toggle-missions') room.show_missions = !previousShowMissions;
     hooks.setBusy(action);
     let roomRemoved = false;
     try {
         if (action === 'toggle-missions') {
-            const result = await patchRoomMembership(room.id, !room.show_missions, hooks.screen);
+            const result = await patchRoomMembership(room.id, room.show_missions, hooks.screen);
             if (!result.success) throw new Error(result.error);
             room.show_missions = result.show_missions;
         } else if (action === 'copy-link') {
@@ -3184,6 +3195,7 @@ async function runRoomMenuAction(action, room, hooks) {
             roomRemoved = true;
         }
     } catch (error) {
+        if (action === 'toggle-missions') room.show_missions = previousShowMissions;
         if (error.status === 401) return;
         console.error(`Room action "${action}" failed:`, error);
         setFloatingMessage(ROOM_COPY.actionErrors[action], { error: true });
@@ -3242,6 +3254,22 @@ function openModal(overlay, focusTarget) {
     modalState.openOverlay = overlay;
     overlay.hidden = false;
     focusTarget.focus();
+}
+
+/** Keep Tab and Shift+Tab inside the open modal. */
+function trapModalFocus(event) {
+    if (event.key !== 'Tab') return;
+    const focusable = [...event.currentTarget.querySelectorAll('button:not(:disabled), input')];
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
 }
 
 /** Close the open modal and return focus to where it came from. */
@@ -3393,6 +3421,13 @@ function showRoomView(view) {
     if (view !== 'ready') setRoomMenuState(false);
 }
 
+/** Format an average session time. Averages under a minute show seconds. */
+function formatAverageSessionTime(totalSeconds) {
+    if (totalSeconds === null) return '0m';
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    return formatDurationHoursMinutes(totalSeconds);
+}
+
 /** Format seconds as a HH:MM input value, rounded up to the next whole minute. */
 function formatSecondsAsHHMM(totalSeconds) {
     const totalMinutes = Math.min(Math.ceil(totalSeconds / 60), 99 * 60 + 59);
@@ -3468,9 +3503,7 @@ function renderRoomSnapshot() {
     dom.room.totalTime.textContent = formatDurationHoursMinutes(summary.total_time_seconds);
     dom.room.sessionCount.textContent = String(summary.total_sessions);
     dom.room.peopleCount.textContent = String(summary.members_count);
-    dom.room.averageTime.textContent = summary.average_session_time_seconds === null
-        ? '0m'
-        : formatDurationHoursMinutes(summary.average_session_time_seconds);
+    dom.room.averageTime.textContent = formatAverageSessionTime(summary.average_session_time_seconds);
     dom.room.rankingTitle.textContent = `Ranking — Members of this room (${summary.members_count})`;
     dom.room.ranking.replaceChildren(...ranking.map(createRankingRow));
     if (roomState.menuOpen) renderRoomTopMenu();
@@ -4325,7 +4358,7 @@ function renderReviewRoomSummary(summary) {
     dom.review.roomSessionCount.textContent = summary ? String(summary.total_sessions) : '—';
     dom.review.roomPeopleCount.textContent = summary ? String(summary.members_count) : '—';
     dom.review.roomAverageTime.textContent = summary
-        ? (summary.average_session_time_seconds === null ? '0m' : formatDurationHoursMinutes(summary.average_session_time_seconds))
+        ? formatAverageSessionTime(summary.average_session_time_seconds)
         : '—';
 }
 
@@ -4500,6 +4533,7 @@ function registerEventListeners() {
         modal.closeButton.addEventListener('click', /** Close the modal unless it is submitting. */ () => {
             if (!modalState.isSubmitting) closeModal();
         });
+        modal.overlay.addEventListener('keydown', trapModalFocus);
         modal.overlay.addEventListener('click', /** Close the modal when clicking its backdrop. */ (event) => {
             if (event.target === modal.overlay && !modalState.isSubmitting) closeModal();
         });
