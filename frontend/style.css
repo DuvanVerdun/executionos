@@ -24,6 +24,10 @@
     initial-value: 0%;
 }
 
+html {
+    scrollbar-gutter: stable;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -47,6 +51,7 @@ p, h1, h2, h3 {
 
 .loading-screen {
     display: flex;
+    gap: clamp(24px, 1.67vw, 32px);
 }
 
 .register-screen, .login-screen, .plan-screen, .focus-screen, .review-screen, .dashboard-screen {
@@ -201,6 +206,10 @@ button {
     color: var(--color-page);
 }
 
+.white-filled-button:hover:not(:disabled) {
+    filter: brightness(0.85);
+}
+
 .switch-btn-container {
     display: flex;
     justify-content: end;
@@ -244,6 +253,7 @@ button {
 
 #loading-spinner-container {
     display: flex;
+    min-height: 0;
 }
 
 .loading-retry-container {
@@ -297,6 +307,7 @@ button {
     gap: clamp(12px, 2.5vh, 24px);
 }
 
+.loading-screen > .wordmark,
 .register-screen > .wordmark,
 .login-screen > .wordmark {
     font-size: clamp(32px, 2.5vw, 36px);
@@ -950,7 +961,6 @@ button {
     flex-shrink: 0;
     --pct: 0%;
     background: conic-gradient(var(--color-white) 0%, var(--color-white) var(--pct), var(--color-border) var(--pct), var(--color-border) 100%);
-    transform: scaleX(-1);
     
     transition: --pct 1s linear;
 }
@@ -970,7 +980,6 @@ button {
 #focus-current-time-display,
 .focus-button-container {
     z-index: 1;
-    transform: scaleX(-1);
 }
 
 .focus-display-container {
@@ -1042,17 +1051,17 @@ button {
     .focus-display-container {
         width: 58%;
         bottom: 62%;
-        transform: translateX(-50%) scaleX(-1);
+        transform: translateX(-50%);
     }
 
     .focus-button-container {
         top: 68%;
-        transform: translateX(-50%) scaleX(-1);
+        transform: translateX(-50%);
     }
 
     #focus-current-time-display {
         top: 50%;
-        transform: translate(-50%, -50%) scaleX(-1);
+        transform: translate(-50%, -50%);
     }
 
     .focus-display-container,
@@ -1165,7 +1174,6 @@ button {
     border-radius: 50%;
     --pct: 0%;
     background: conic-gradient(var(--color-white) 0%, var(--color-white) var(--pct), var(--color-border) var(--pct), var(--color-border) 100%);
-    transform: scaleX(-1);
     
     transition: --pct 1s linear;
 }
@@ -1194,7 +1202,6 @@ button {
     width: clamp(48px, 7vh, 64px);
     aspect-ratio: 1;
     z-index: 1;
-    transform: scaleX(-1);
 }
 
 #review-completion-status-display {
@@ -1714,10 +1721,6 @@ button {
     font-size: calc(22 * var(--feedback-size-unit));
     line-height: 1.25;
     cursor: pointer;
-}
-
-#dashboard-send-feedback-btn:hover:not(:disabled) {
-    filter: brightness(1.1);
 }
 
 
@@ -2749,7 +2752,6 @@ button {
 
 .member-ring-working {
     background: conic-gradient(var(--color-reward) var(--ring-pct, 0%), var(--color-border) 0);
-    transform: scaleX(-1);
 }
 
 .member-ring-paused {
@@ -2831,7 +2833,6 @@ body[data-screen="room"] .floating-message {
     left: 0;
     right: 0;
     z-index: 1;
-    transform: scaleX(-1);
     text-align: center;
     font-size: var(--header);
     line-height: 1.25;
