@@ -22,7 +22,7 @@ from helpers import (
 )
 
 # The only routes that may answer without a token. Adding a public route is a deliberate decision.
-PUBLIC_ENDPOINTS = {"register", "login", "static"}
+PUBLIC_ENDPOINTS = {"auth.register", "auth.login", "static"}
 
 
 def test_register_creates_account_and_normalizes_names(client: FlaskClient[Response]):

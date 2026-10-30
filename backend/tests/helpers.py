@@ -10,7 +10,7 @@ from flask.wrappers import Response
 from sqlalchemy.pool import StaticPool
 
 from executionos.extensions import db
-from main import create_app
+from executionos.factory import create_app
 from executionos.models import Session
 
 USER = {"username": "Duvan", "email": "Duvan@Example.com", "password": "correct-horse-1"}

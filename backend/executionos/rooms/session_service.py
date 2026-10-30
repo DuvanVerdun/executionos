@@ -1,8 +1,9 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from flask import current_app
 from sqlalchemy import Select, delete, select
 from sqlalchemy.exc import IntegrityError
 
@@ -161,6 +162,15 @@ def finalize_overdue_for_user_rooms(user_id: int) -> None:
     ).scalars().all()
 
     finalize_overdue_for_rooms(list(room_ids))
+
+
+def finalize_quietly(finalize: Callable[[], None]) -> None:
+    """Finalize overdue room sessions on a read path. A failure is logged, never raised."""
+    try:
+        finalize()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Could not finalize overdue room sessions")
 
 
 # ---------- Envelope ----------
