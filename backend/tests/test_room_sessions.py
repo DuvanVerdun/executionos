@@ -6,7 +6,7 @@ import pytest
 from flask import Flask
 from sqlalchemy import select
 
-from extensions import db
+from executionos.extensions import db
 from helpers import (
     body,
     call,
@@ -16,7 +16,7 @@ from helpers import (
     make_account,
     start_room_session,
 )
-from models import ActiveRoomSession
+from executionos.models import ActiveRoomSession
 
 
 def test_start_pause_finish_saves_the_session_in_both_places(app: Flask):

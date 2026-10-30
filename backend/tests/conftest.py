@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pytest
-from extensions import db
+from executionos.extensions import db
 from collections.abc import Generator
 from flask import Flask
 from flask.testing import FlaskClient

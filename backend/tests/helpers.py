@@ -9,9 +9,9 @@ from flask.testing import FlaskClient
 from flask.wrappers import Response
 from sqlalchemy.pool import StaticPool
 
-from extensions import db
+from executionos.extensions import db
 from main import create_app
-from models import Session
+from executionos.models import Session
 
 USER = {"username": "Duvan", "email": "Duvan@Example.com", "password": "correct-horse-1"}
 SESSION_DAY = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)

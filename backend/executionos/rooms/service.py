@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from dashboard_service import (
+from executionos.dashboard.service import (
     SessionSummaryAccumulator,
     _as_utc_aware,  # pyright: ignore[reportPrivateUsage]
     _local_day_start_as_utc_naive,  # pyright: ignore[reportPrivateUsage]
@@ -15,9 +15,9 @@ from dashboard_service import (
     _session_completion_percentage,  # pyright: ignore[reportPrivateUsage]
     _session_local_date,  # pyright: ignore[reportPrivateUsage]
 )
-from extensions import db
-from models import ActiveRoomSession, Room, RoomMembership, Session, User
-from room_session_rules import (
+from executionos.extensions import db
+from executionos.models import ActiveRoomSession, Room, RoomMembership, Session, User
+from executionos.rooms.rules import (
     RunningSessionFacts,
     actual_time_seconds,
     member_state,

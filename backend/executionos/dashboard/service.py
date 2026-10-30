@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import and_, or_, select
 
-from extensions import db
-from models import Session
+from executionos.extensions import db
+from executionos.models import Session
 
 
 Period = Literal["week", "month", "year", "all_time"]

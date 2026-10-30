@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash  # typ
 from flask_jwt_extended import create_access_token, create_refresh_token  # type: ignore[reportUnknownVariableType]
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt  # type: ignore[reportUnknownVariableType]
 
-from extensions import db, jwt
+from executionos.extensions import db, jwt
 
 import os
 from dotenv import load_dotenv
@@ -52,7 +52,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False
     jwt.init_app(app)
 
-    from models import User  # noqa: F401
+    from executionos.models import User  # noqa: F401
 
     @app.route("/api/register", methods=["POST"])
     def register() -> tuple[Any, int]:
@@ -331,9 +331,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "error": "Could not log out"
             }), 500
 
-    from models import Session  # noqa: F401
+    from executionos.models import Session  # noqa: F401
 
-    from dashboard_service import (
+    from executionos.dashboard.service import (
         get_dashboard_data,
         get_paginated_sessions,
         get_streak_data,
@@ -343,7 +343,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         parse_timezone
     )
 
-    from room_session_service import (
+    from executionos.rooms.session_service import (
         RoomSessionConflictError,
         checkin_room_session_for_user,
         finalize_overdue_for_rooms,
@@ -611,7 +611,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             }), 500
 
     
-    from models import Feedback  # noqa: F401
+    from executionos.models import Feedback  # noqa: F401
 
     @app.route("/api/feedback", methods=["POST"])
     @jwt_required()
@@ -678,7 +678,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "error": "Could not submit feedback"
             }), 500
 
-    from room_service import (
+    from executionos.rooms.service import (
         RoomConflictError,
         RoomForbiddenError,
         RoomNotAvailableError,

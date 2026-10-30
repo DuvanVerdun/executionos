@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from dashboard_service import _calculate_streak_states  # pyright: ignore[reportPrivateUsage]
+from executionos.dashboard.service import _calculate_streak_states  # pyright: ignore[reportPrivateUsage]
 from helpers import body, call, dashboard, list_sessions, make_account, save_session
 
 # work days, today, expected streak, expected rest days left this week

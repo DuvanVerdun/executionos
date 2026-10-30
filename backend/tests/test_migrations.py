@@ -5,7 +5,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from flask_migrate import upgrade # type: ignore
 
-from extensions import db
+from executionos.extensions import db
 from helpers import make_test_app
 
 MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"

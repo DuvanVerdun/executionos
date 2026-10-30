@@ -6,11 +6,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import Select, delete, select
 from sqlalchemy.exc import IntegrityError
 
-from dashboard_service import _as_utc_aware  # pyright: ignore[reportPrivateUsage]
-from extensions import db
-from models import ActiveRoomSession, Room, RoomMembership, Session, SessionEndNotice
-from room_service import RoomNotAvailableError, running_session_facts
-from room_session_rules import (
+from executionos.dashboard.service import _as_utc_aware  # pyright: ignore[reportPrivateUsage]
+from executionos.extensions import db
+from executionos.models import ActiveRoomSession, Room, RoomMembership, Session, SessionEndNotice
+from executionos.rooms.service import RoomNotAvailableError, running_session_facts
+from executionos.rooms.rules import (
     OverdueReason,
     RunningSessionFacts,
     actual_time_seconds,

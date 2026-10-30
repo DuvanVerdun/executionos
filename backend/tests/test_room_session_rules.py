@@ -1,4 +1,4 @@
-from room_session_rules import (
+from executionos.rooms.rules import (
     RunningSessionFacts,
     actual_time_seconds,
     checkin_deadline_at,

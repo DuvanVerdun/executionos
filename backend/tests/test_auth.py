@@ -4,8 +4,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 from flask.wrappers import Response
 from sqlalchemy import select
-from extensions import db
-from models import User
+from executionos.extensions import db
+from executionos.models import User
 from typing import cast
 
 from helpers import (

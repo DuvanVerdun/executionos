@@ -5,7 +5,7 @@ import pytest
 from flask import Flask
 from sqlalchemy import select
 
-from extensions import db
+from executionos.extensions import db
 from helpers import (
     SESSION_DAY,
     body,
@@ -16,7 +16,7 @@ from helpers import (
     make_account,
     seed_session,
 )
-from models import Session
+from executionos.models import Session
 
 # method, url, payload. {room_id} is filled in by the test.
 ROOM_ROUTES = [
