@@ -7,10 +7,10 @@ from flask import current_app
 from sqlalchemy import Select, delete, select
 from sqlalchemy.exc import IntegrityError
 
-from executionos.dashboard.service import _as_utc_aware  # pyright: ignore[reportPrivateUsage]
 from executionos.extensions import db
 from executionos.models import ActiveRoomSession, Room, RoomMembership, Session, SessionEndNotice
 from executionos.rooms.service import RoomNotAvailableError, running_session_facts
+from executionos.timeutils import utc_iso
 from executionos.rooms.rules import (
     OverdueReason,
     RunningSessionFacts,
@@ -34,11 +34,6 @@ class RoomSessionConflictError(Exception):
     def __init__(self, envelope: dict[str, Any]) -> None:
         super().__init__("Room session conflict")
         self.envelope = envelope
-
-
-def _iso(value: datetime) -> str:
-    """Naive UTC ISO 8601 with milliseconds. The client appends the Z."""
-    return _as_utc_aware(value).replace(tzinfo=None).isoformat(timespec="milliseconds")
 
 
 def _load_row(user_id: int) -> LoadedRow | None:
@@ -202,15 +197,15 @@ def _session_payload(facts: RunningSessionFacts, room_name: str, now: datetime) 
         "room_name": room_name,
         "mission": facts.mission,
         "target_time_seconds": facts.target_time_seconds,
-        "started_at": _iso(facts.started_at),
-        "paused_at": _iso(facts.paused_at) if facts.paused_at is not None else None,
+        "started_at": utc_iso(facts.started_at),
+        "paused_at": utc_iso(facts.paused_at) if facts.paused_at is not None else None,
         "paused_seconds": facts.paused_seconds,
         "actual_time_seconds": actual_time_seconds(facts, now),
         "state": "running" if running else "paused",
         "checkin": {
             "mark": facts.last_checkin_mark + 1,
-            "due_at": _iso(checkin_due_at(facts)) if running else None,
-            "deadline_at": _iso(checkin_deadline_at(facts)) if running else None,
+            "due_at": utc_iso(checkin_due_at(facts)) if running else None,
+            "deadline_at": utc_iso(checkin_deadline_at(facts)) if running else None,
             "outstanding": checkin_is_outstanding(facts, now),
         },
     }
@@ -238,7 +233,7 @@ def _respond(
 
     envelope: dict[str, Any] = {
         "success": True,
-        "server_time": _iso(now),
+        "server_time": utc_iso(now),
         "active": facts is not None,
         "session": _session_payload(facts, room_name, now) if facts is not None else None,
         "notice": _consume_notice(user_id) if (consume_notice or facts is None) else None,

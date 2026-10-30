@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
+from urllib.parse import urlencode
 
 from flask import Flask
 from flask.testing import FlaskClient
@@ -117,6 +118,21 @@ def list_sessions(who: Account) -> list[dict[str, Any]]:
     today = datetime.now(UTC).date().isoformat()
     result = call(who, "GET", f"/api/get-sessions?period=all_time&anchor_date={today}&timezone=UTC")
     return cast(list[dict[str, Any]], body(result)["sessions"])
+
+
+def all_pages(who: Account, url: str) -> list[list[dict[str, Any]]]:
+    """Follow next_cursor until the last page. Returns the sessions of each page."""
+    pages: list[list[dict[str, Any]]] = []
+    cursor = ""
+
+    while True:
+        data = body(call(who, "GET", url + cursor))
+        pages.append(data["sessions"])
+
+        if data["next_cursor"] is None:
+            return pages
+
+        cursor = "&" + urlencode({"cursor_date": data["next_cursor"]["date"], "cursor_id": data["next_cursor"]["id"]})
 
 
 def dashboard(who: Account, period: str, anchor_date: str, timezone: str) -> dict[str, Any]:

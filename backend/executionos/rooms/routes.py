@@ -1,11 +1,11 @@
-from datetime import datetime
-from typing import Any, cast
+from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 
-from executionos.dashboard.service import parse_cursor_datetime, parse_timezone
+from executionos.errors import error_response
 from executionos.extensions import db
+from executionos.params import parse_timezone, read_cursor, read_json_object
 from executionos.rooms.service import (
     RoomConflictError,
     RoomForbiddenError,
@@ -39,29 +39,23 @@ from executionos.rooms.session_service import (
 rooms_bp = Blueprint("rooms", __name__)
 
 
-def read_json_object() -> dict[str, Any]:
-    raw_data: object = request.get_json(silent=True)  # type: ignore[reportUnknownMemberType]
-    if not isinstance(raw_data, dict):
-        raise ValueError("A JSON object is required")
-    return cast(dict[str, Any], raw_data)
-
 def room_error_response(error: Exception) -> tuple[Any, int]:
     """Map a room error to a generic response. Never expose str(error)."""
     db.session.rollback()
 
     if isinstance(error, RoomNotAvailableError):
-        return jsonify({"success": False, "error": "Room not available"}), 404  # type: ignore
+        return error_response("Room not available", 404)
     if isinstance(error, RoomForbiddenError):
-        return jsonify({"success": False, "error": "Not allowed"}), 403  # type: ignore
+        return error_response("Not allowed", 403)
     if isinstance(error, RoomSessionConflictError):
         return jsonify({**error.envelope, "success": False, "error": "Session conflict"}), 409  # type: ignore
     if isinstance(error, RoomConflictError):
-        return jsonify({"success": False, "error": "A session is running"}), 409  # type: ignore
+        return error_response("A session is running", 409)
     if isinstance(error, ValueError):
-        return jsonify({"success": False, "error": "Invalid room data"}), 400  # type: ignore
+        return error_response("Invalid room data", 400)
 
     current_app.logger.error("Room request failed", exc_info=error)
-    return jsonify({"success": False, "error": "Room request failed"}), 500  # type: ignore
+    return error_response("Room request failed", 500)
 
 @rooms_bp.route("/api/rooms", methods=["GET"])
 @jwt_required()
@@ -198,20 +192,9 @@ def get_room_sessions(room_id: int) -> tuple[Any, int]:
     try:
         timezone = parse_timezone(request.args.get("timezone"))
 
-        raw_cursor_date = request.args.get("cursor_date")
-        raw_cursor_id = request.args.get("cursor_id")
-
-        if (raw_cursor_date is None) != (raw_cursor_id is None):
-            raise ValueError("cursor_date and cursor_id must be provided together")
+        cursor_date, cursor_id = read_cursor()
 
         finalize_quietly(lambda: finalize_overdue_for_rooms([room_id]))
-
-        cursor_date: datetime | None = None
-        cursor_id: int | None = None
-
-        if raw_cursor_date is not None and raw_cursor_id is not None:
-            cursor_date = parse_cursor_datetime(raw_cursor_date)
-            cursor_id = int(raw_cursor_id)
 
         result = get_room_sessions_for_user(
             user_id, room_id, timezone, cursor_date, cursor_id

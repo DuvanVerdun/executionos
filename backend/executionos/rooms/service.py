@@ -1,22 +1,16 @@
 import re
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from executionos.dashboard.service import (
-    SessionSummaryAccumulator,
-    _as_utc_aware,  # pyright: ignore[reportPrivateUsage]
-    _local_day_start_as_utc_naive,  # pyright: ignore[reportPrivateUsage]
-    _serialize_session,  # pyright: ignore[reportPrivateUsage]
-    _session_completion_percentage,  # pyright: ignore[reportPrivateUsage]
-    _session_local_date,  # pyright: ignore[reportPrivateUsage]
-)
 from executionos.extensions import db
 from executionos.models import ActiveRoomSession, Room, RoomMembership, Session, User
+from executionos.sessions.history import PAGE_SIZE, apply_cursor, daily_summaries, next_cursor, serialize_session
+from executionos.timeutils import as_utc_aware
 from executionos.rooms.rules import (
     RunningSessionFacts,
     actual_time_seconds,
@@ -29,7 +23,6 @@ from executionos.rooms.rules import (
 ROOM_NAME_MAX_LENGTH = 50
 LINK_TOKEN_BYTES = 16
 LINK_TOKEN_MAX_LENGTH = 64
-HISTORY_PAGE_SIZE = 20
 
 _LINK_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
@@ -124,17 +117,17 @@ def running_session_facts(row: ActiveRoomSession) -> RunningSessionFacts:
         submission_id=row.submission_id,
         mission=row.mission,
         target_time_seconds=row.target_time_seconds,
-        started_at=_as_utc_aware(row.started_at),
-        paused_at=_as_utc_aware(row.paused_at) if row.paused_at is not None else None,
+        started_at=as_utc_aware(row.started_at),
+        paused_at=as_utc_aware(row.paused_at) if row.paused_at is not None else None,
         paused_seconds=row.paused_seconds,
         last_checkin_mark=row.last_checkin_mark,
         last_interaction_at=(
-            _as_utc_aware(row.last_interaction_at)
+            as_utc_aware(row.last_interaction_at)
             if row.last_interaction_at is not None
             else None
         ),
         last_interaction_actual_seconds=row.last_interaction_actual_seconds,
-        last_heartbeat_at=_as_utc_aware(row.last_heartbeat_at),
+        last_heartbeat_at=as_utc_aware(row.last_heartbeat_at),
     )
 
 
@@ -492,58 +485,6 @@ def get_room_summary_for_user(
     return _build_summary(members_count, _load_user_totals(room_id), running_seconds)
 
 
-def _build_room_daily_summaries(
-    room_id: int,
-    page: list[Session],
-    timezone: ZoneInfo,
-) -> dict[str, dict[str, Any]]:
-    """Daily summaries over the whole room's sessions on the days shown."""
-    if not page:
-        return {}
-
-    represented_dates = {_session_local_date(session, timezone) for session in page}
-
-    start_utc = _local_day_start_as_utc_naive(min(represented_dates), timezone)
-    end_utc = _local_day_start_as_utc_naive(
-        max(represented_dates) + timedelta(days=1), timezone
-    )
-
-    sessions = db.session.execute(
-        select(Session).where(
-            Session.room_id == room_id,
-            Session.date >= start_utc,
-            Session.date < end_utc,
-        )
-    ).scalars().all()
-
-    accumulators = {day: SessionSummaryAccumulator() for day in represented_dates}
-
-    for session in sessions:
-        accumulator = accumulators.get(_session_local_date(session, timezone))
-
-        if accumulator is None:
-            continue
-
-        accumulator.total_sessions += 1
-        accumulator.total_time_seconds += session.actual_time_seconds
-        accumulator.completion_sum += _session_completion_percentage(session)
-
-    return {
-        day.isoformat(): {
-            "total_sessions": accumulator.total_sessions,
-            "total_time_seconds": accumulator.total_time_seconds,
-            "average_completion_percentage": round(
-                accumulator.completion_sum / accumulator.total_sessions, 1
-            ),
-            "average_session_time_seconds": round(
-                accumulator.total_time_seconds / accumulator.total_sessions
-            ),
-        }
-        for day, accumulator in accumulators.items()
-        if accumulator.total_sessions > 0
-    }
-
-
 def get_room_sessions_for_user(
     user_id: int,
     room_id: int,
@@ -566,30 +507,15 @@ def get_room_sessions_for_user(
         .where(Session.room_id == room_id)
     )
 
-    if cursor_date is not None and cursor_id is not None:
-        statement = statement.where(
-            or_(
-                Session.date < cursor_date,
-                and_(Session.date == cursor_date, Session.id < cursor_id),
-            )
-        )
+    statement = apply_cursor(statement, cursor_date, cursor_id)
 
     rows = db.session.execute(
         statement.order_by(Session.date.desc(), Session.id.desc())
-        .limit(HISTORY_PAGE_SIZE + 1)
+        .limit(PAGE_SIZE + 1)
     ).tuples().all()
 
-    has_more = len(rows) > HISTORY_PAGE_SIZE
-    page = rows[:HISTORY_PAGE_SIZE]
-
-    next_cursor: dict[str, Any] | None = None
-
-    if has_more and page:
-        last_session = page[-1][0]
-        next_cursor = {
-            "date": _as_utc_aware(last_session.date).replace(tzinfo=None).isoformat(),
-            "id": last_session.id,
-        }
+    has_more = len(rows) > PAGE_SIZE
+    page = rows[:PAGE_SIZE]
 
     sessions: list[dict[str, Any]] = []
 
@@ -597,7 +523,7 @@ def get_room_sessions_for_user(
         is_mine = session.user_id == user_id
         mission_hidden = not is_mine and not show_missions
 
-        item = _serialize_session(session)
+        item = serialize_session(session)
         item.update({
             "mission": None if mission_hidden else session.mission,
             "mission_hidden": mission_hidden,
@@ -609,8 +535,6 @@ def get_room_sessions_for_user(
 
     return {
         "sessions": sessions,
-        "daily_summaries": _build_room_daily_summaries(
-            room_id, [row[0] for row in page], timezone
-        ),
-        "next_cursor": next_cursor,
+        "daily_summaries": daily_summaries([row[0] for row in page], timezone, Session.room_id == room_id),
+        "next_cursor": next_cursor([row[0] for row in page], has_more),
     }

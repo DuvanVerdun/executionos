@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 from werkzeug.exceptions import HTTPException
 
+from executionos.errors import error_response, server_error
 from executionos.extensions import db
 from executionos.models import Feedback
 
@@ -21,32 +22,20 @@ def feedback() -> tuple[Any, int]:
 
 
         if not isinstance(data, dict):  # type: ignore
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": "JSON is not a object/dictionary"
-            }), 400
+            return error_response("JSON is not a object/dictionary", 400)
 
         raw_message = data.get("message")
 
         if not isinstance(raw_message, str):
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": "Message is not a string"
-            }), 400
+            return error_response("Message is not a string", 400)
         
         message = raw_message.strip()
         
         if not message:
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": "Message is empty"
-            }), 400
+            return error_response("Message is empty", 400)
 
         if len(message) > 2000:
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": "Message exceeds 2000 characters"
-            }), 400
+            return error_response("Message exceeds 2000 characters", 400)
 
 
         new_feedback = Feedback(
@@ -64,14 +53,6 @@ def feedback() -> tuple[Any, int]:
             "feedback_id": new_feedback.id
         }), 201
     except HTTPException:
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": "Invalid request data"
-        }), 400
+        return error_response("Invalid request data", 400)
     except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Could not submit feedback")
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": "Could not submit feedback"
-        }), 500
+        return server_error("Could not submit feedback")

@@ -7,16 +7,12 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from executionos.dashboard.service import (
-    get_paginated_sessions,
-    parse_anchor_date,
-    parse_cursor_datetime,
-    parse_period,
-    parse_timezone,
-)
+from executionos.errors import error_response, server_error
 from executionos.extensions import db
 from executionos.models import Session
+from executionos.params import parse_anchor_date, parse_period, parse_timezone, read_cursor
 from executionos.rooms.session_service import finalize_overdue_for_users, finalize_quietly
+from executionos.sessions.service import get_paginated_sessions
 
 sessions_bp = Blueprint("sessions", __name__)
 
@@ -37,26 +33,7 @@ def get_sessions() -> tuple[Any, int]:
             request.args.get("timezone")
         )
 
-        raw_cursor_date = request.args.get("cursor_date")
-        raw_cursor_id = request.args.get("cursor_id")
-
-        if (raw_cursor_date is None) != (raw_cursor_id is None):
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": (
-                    "cursor_date and cursor_id must be "
-                    "provided together"
-                ),
-            }), 400
-
-        cursor_date: datetime | None = None
-        cursor_id: int | None = None
-
-        if raw_cursor_date is not None and raw_cursor_id is not None:
-            cursor_date = parse_cursor_datetime(
-                raw_cursor_date
-            )
-            cursor_id = int(raw_cursor_id)
+        cursor_date, cursor_id = read_cursor()
 
         result = get_paginated_sessions(
             user_id=user_id,
@@ -73,18 +50,10 @@ def get_sessions() -> tuple[Any, int]:
         }), 200
 
     except ValueError as e:
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": str(e),
-        }), 400
+        return error_response(str(e), 400)
 
     except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Could not load sessions")
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": "Could not load sessions"
-        }), 500
+        return server_error("Could not load sessions")
 
 @sessions_bp.route("/api/save-session", methods=["POST"])
 @jwt_required()
@@ -136,7 +105,7 @@ def save_session() -> tuple[Any, int]:
         }), 201
     except (ValueError, TypeError, KeyError):
         db.session.rollback()
-        return jsonify({"success": False, "error": "Invalid session data"}), 400  # type: ignore
+        return error_response("Invalid session data", 400)
     except IntegrityError:
         db.session.rollback()
 
@@ -147,11 +116,9 @@ def save_session() -> tuple[Any, int]:
             if existing is not None:
                 return jsonify({"success": True, "session_id": existing.id}), 200  # type: ignore
         current_app.logger.exception("Could not save session")
-        return jsonify({"success": False, "error": "Could not save session"}), 500  # type: ignore
+        return error_response("Could not save session", 500)
     except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Could not save session")
-        return jsonify({"success": False, "error": "Could not save session"}), 500  # type: ignore
+        return server_error("Could not save session")
 
 @sessions_bp.route("/api/delete-session/<int:session_id>", methods=["DELETE"])
 @jwt_required()
@@ -163,10 +130,7 @@ def delete_session(session_id: int) -> tuple[Any, int]:
         session = db.session.execute(select(Session).filter_by(id=session_id, user_id=user_id)).scalar_one_or_none()
 
         if session is None:
-            return jsonify({  # type: ignore
-                "success": False,
-                "error": "Session not found"
-            }), 404
+            return error_response("Session not found", 404)
 
         db.session.delete(session)
         db.session.commit()
@@ -177,9 +141,4 @@ def delete_session(session_id: int) -> tuple[Any, int]:
             "session_id": session_id
         }), 200
     except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Could not delete session")
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": "Could not delete session"
-        }), 500
+        return server_error("Could not delete session")

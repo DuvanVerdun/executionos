@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Any
 
+from datetime import timedelta
+
 import pytest
 from flask import Flask
 from sqlalchemy import select
@@ -12,6 +14,7 @@ from helpers import (
     call,
     create_room,
     join_room,
+    all_pages,
     list_sessions,
     make_account,
     seed_session,
@@ -141,3 +144,27 @@ def test_ranking_orders_by_total_time_then_join_order_and_totals_include_former_
         "members_count": 3,
         "average_session_time_seconds": 825,
     }
+
+
+def test_room_history_paging_visits_every_session_once(app: Flask):
+    ana = make_account(app, "ana")
+    room = create_room(ana)
+    for hours_ago in range(25):
+        seed_session(ana.user_id, SESSION_DAY - timedelta(hours=hours_ago), 60, room_id=room["id"])
+
+    pages = all_pages(ana, f"/api/rooms/{room['id']}/sessions?timezone=UTC")
+
+    assert [len(page) for page in pages] == [20, 5]
+    assert len({session["id"] for page in pages for session in page}) == 25
+
+
+def test_room_daily_summaries_count_only_that_rooms_sessions(app: Flask):
+    ana = make_account(app, "ana")
+    room = create_room(ana)
+    seed_session(ana.user_id, SESSION_DAY, 900, room_id=room["id"])
+    seed_session(ana.user_id, SESSION_DAY, 300)  # a personal session on the same day
+
+    page = body(call(ana, "GET", f"/api/rooms/{room['id']}/sessions?timezone=UTC"))
+
+    day = page["daily_summaries"]["2026-10-27"]
+    assert (day["total_sessions"], day["total_time_seconds"]) == (1, 900)

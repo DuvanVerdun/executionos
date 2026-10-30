@@ -3,14 +3,9 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 
-from executionos.dashboard.service import (
-    get_dashboard_data,
-    get_streak_data,
-    parse_anchor_date,
-    parse_period,
-    parse_timezone,
-)
-from executionos.extensions import db
+from executionos.dashboard.service import get_dashboard_data, get_streak_data
+from executionos.errors import error_response, server_error
+from executionos.params import parse_anchor_date, parse_period, parse_timezone
 from executionos.rooms.session_service import finalize_overdue_for_users, finalize_quietly
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -43,18 +38,10 @@ def streak() -> tuple[Any, int]:
         }), 200
 
     except ValueError as e:
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": str(e),
-        }), 400
+        return error_response(str(e), 400)
 
     except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Could not load streak")
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": "Could not load streak"
-        }), 500
+        return server_error("Could not load streak")
 
 @dashboard_bp.route("/api/dashboard", methods=["GET"])
 @jwt_required()
@@ -85,15 +72,7 @@ def dashboard() -> tuple[Any, int]:
         }), 200
 
     except ValueError as e:
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": str(e),
-        }), 400
+        return error_response(str(e), 400)
 
     except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Could not load dashboard")
-        return jsonify({  # type: ignore
-            "success": False,
-            "error": "Could not load dashboard"
-        }), 500
+        return server_error("Could not load dashboard")
