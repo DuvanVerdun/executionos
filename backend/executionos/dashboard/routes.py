@@ -3,7 +3,8 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 
-from executionos.dashboard.service import get_dashboard_data, get_streak_data
+from executionos.dashboard.service import get_dashboard_data
+from executionos.dashboard.streak import get_streak_data
 from executionos.errors import error_response, server_error
 from executionos.params import parse_anchor_date, parse_period, parse_timezone
 from executionos.rooms.session_service import finalize_overdue_for_users, finalize_quietly

@@ -3,27 +3,24 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 
-from executionos.errors import error_response
-from executionos.extensions import db
 from executionos.params import parse_timezone, read_cursor, read_json_object
+from executionos.rooms.errors import room_error_response
+from executionos.rooms.queries import (
+    get_room_sessions_for_user,
+    get_room_snapshot_for_user,
+    get_room_summary_for_user,
+)
 from executionos.rooms.service import (
-    RoomConflictError,
-    RoomForbiddenError,
-    RoomNotAvailableError,
     create_room_for_user,
     delete_room_for_user,
     get_room_link_for_user,
     join_room_for_user,
     leave_room_for_user,
-    get_room_sessions_for_user,
-    get_room_snapshot_for_user,
-    get_room_summary_for_user,
     list_rooms_for_user,
     refresh_room_link_for_user,
     set_show_missions_for_user,
 )
 from executionos.rooms.session_service import (
-    RoomSessionConflictError,
     checkin_room_session_for_user,
     finalize_overdue_for_rooms,
     finalize_overdue_for_user_rooms,
@@ -38,24 +35,6 @@ from executionos.rooms.session_service import (
 
 rooms_bp = Blueprint("rooms", __name__)
 
-
-def room_error_response(error: Exception) -> tuple[Any, int]:
-    """Map a room error to a generic response. Never expose str(error)."""
-    db.session.rollback()
-
-    if isinstance(error, RoomNotAvailableError):
-        return error_response("Room not available", 404)
-    if isinstance(error, RoomForbiddenError):
-        return error_response("Not allowed", 403)
-    if isinstance(error, RoomSessionConflictError):
-        return jsonify({**error.envelope, "success": False, "error": "Session conflict"}), 409  # type: ignore
-    if isinstance(error, RoomConflictError):
-        return error_response("A session is running", 409)
-    if isinstance(error, ValueError):
-        return error_response("Invalid room data", 400)
-
-    current_app.logger.error("Room request failed", exc_info=error)
-    return error_response("Room request failed", 500)
 
 @rooms_bp.route("/api/rooms", methods=["GET"])
 @jwt_required()

@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from executionos.dashboard.service import _calculate_streak_states  # pyright: ignore[reportPrivateUsage]
+from executionos.dashboard.streak import calculate_streak_states
 from helpers import body, call, dashboard, list_sessions, make_account, save_session
 
 # work days, today, expected streak, expected rest days left this week
@@ -34,7 +34,7 @@ def test_streak_rules(
     expected_streak: int,
     expected_rest_days_left: int,
 ):
-    streak, rest_days_left, _ = _calculate_streak_states(work_days, today)
+    streak, rest_days_left, _ = calculate_streak_states(work_days, today)
 
     assert streak == expected_streak
     assert rest_days_left == expected_rest_days_left

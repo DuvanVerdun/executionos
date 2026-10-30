@@ -9,7 +9,8 @@ from sqlalchemy.exc import IntegrityError
 
 from executionos.extensions import db
 from executionos.models import ActiveRoomSession, Room, RoomMembership, Session, SessionEndNotice
-from executionos.rooms.service import RoomNotAvailableError, running_session_facts
+from executionos.rooms.errors import RoomNotAvailableError, RoomSessionConflictError
+from executionos.rooms.service import running_session_facts
 from executionos.timeutils import utc_iso
 from executionos.rooms.rules import (
     OverdueReason,
@@ -26,14 +27,6 @@ from executionos.rooms.rules import (
 MISSION_MAX_LENGTH = 200
 
 LoadedRow = tuple[ActiveRoomSession, str]
-
-
-class RoomSessionConflictError(Exception):
-    """A room-session request that conflicts with the current state. Carries the envelope."""
-
-    def __init__(self, envelope: dict[str, Any]) -> None:
-        super().__init__("Room session conflict")
-        self.envelope = envelope
 
 
 def _load_row(user_id: int) -> LoadedRow | None:
