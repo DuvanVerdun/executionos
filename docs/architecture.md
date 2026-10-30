@@ -67,6 +67,50 @@ Single repository with explicit boundaries:
 
 Do not move responsibilities between layers without a concrete reason.
 
+## Backend Structure
+
+`backend/main.py` only builds the app, so `gunicorn main:app` and `FLASK_APP=main.py`
+keep working. All code lives in the `executionos` package, one folder per feature the
+user sees. `migrations/` and `tests/` stay beside it.
+
+```
+executionos/
+  factory.py       create_app(): builds the app and registers every blueprint
+  config.py        settings: production from the environment, or a test dict
+  extensions.py    db and jwt
+  models.py        all tables
+  errors.py        error_response() and server_error(): every failure answer
+  timeutils.py     UTC helpers and week/month/year bounds
+  params.py        reading request values (period, date, timezone, cursor, JSON body)
+  feedback.py      feedback route (a feature this small is one file)
+  auth/            routes.py, tokens.py
+  sessions/        routes.py, service.py, history.py
+  dashboard/       routes.py, service.py, streak.py
+  rooms/           routes.py, service.py, queries.py, session_service.py, rules.py, errors.py
+```
+
+- **Arrows only go down.** `routes.py` → `service` / `queries` / `streak` → shared
+  modules (`rules`, `history`, `timeutils`, `params`, `errors`, `models`,
+  `extensions`). A file never imports from a file above it. Only `factory.py` imports
+  `routes.py` files.
+- **A route is thin.** It reads the request, calls a function, and answers. One
+  blueprint per feature, URLs unchanged (`/api/...`).
+- **A new feature is a new folder.** Anything two features need goes in the shared
+  modules, never in one feature's folder.
+- **`sessions/history.py`** holds what any list of sessions needs, personal or room:
+  serializing, completion, daily summaries and cursor paging.
+- Absolute imports (`from executionos.models import Session`). No empty
+  `__init__.py` files.
+
+## Backend Tests
+
+- `python -m pytest` from `backend/`. Tests call the API like the frontend does, on
+  an empty in-memory database built by `create_app(test_config)`. They never touch
+  Turso.
+- `pyright` (strict, `pyrightconfig.json`) is the same check as Pylance.
+  `requirements-dev.txt` holds both tools.
+- GitHub Actions runs both on every push (`.github/workflows/tests.yml`).
+
 ## Data Model Principle
 
 The database stores facts, not conclusions.
@@ -230,12 +274,13 @@ Three ideas run through everything:
 
 ### Modules
 
-- `room_session_rules.py`: pure rules and the time constants. No database, no
-  clock.
-- `room_service.py`: rooms, memberships, snapshot, summary, history.
-- `room_session_service.py`: running sessions and finalization.
-- Import direction: `room_session_service` → `room_service` →
-  `room_session_rules`. Routes live in `main.py`. Service functions are named
+- `rooms/rules.py`: pure rules and the time constants. No database, no clock.
+- `rooms/service.py`: rooms and memberships (the actions that change data).
+- `rooms/queries.py`: snapshot, summary and history (reads only).
+- `rooms/session_service.py`: running sessions and finalization.
+- `rooms/errors.py`: the room exceptions and their mapping to answers.
+- Import direction: `session_service` → `service` → `rules`, and `queries` →
+  `service`. Routes live in `rooms/routes.py`. Service functions are named
   `*_for_user`.
 
 ### Constants
@@ -248,7 +293,7 @@ Three ideas run through everything:
 | `CHECKIN_RESPONSE_SECONDS` | 300 | backend |
 | `ROOM_NAME_MAX_LENGTH` | 50 | backend |
 | `LINK_TOKEN_BYTES` | 16 | backend |
-| `HISTORY_PAGE_SIZE` | 20 | backend |
+| `PAGE_SIZE` | 20, personal list and room history | backend |
 | `HEARTBEAT_INTERVAL_MS`, `ROOM_POLL_INTERVAL_MS` | 15000 | client |
 
 ### Data model

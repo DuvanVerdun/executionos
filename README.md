@@ -34,6 +34,7 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 **Database:** Turso / SQLite  
 **ORM:** SQLAlchemy  
 **Authentication:** JWT access + refresh tokens  
+**Quality:** pytest and strict pyright, run by GitHub Actions on every push  
 **Deployment:** Netlify + Render
 
 ## Architecture
@@ -41,6 +42,8 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 Frontend → Flask API → Turso / SQLite
 
 The frontend is deployed separately from the backend and database.
+
+The backend is one Python package with a folder per feature (`auth`, `sessions`, `dashboard`, `rooms`). See `docs/architecture.md`.
 
 ## Version history
 
