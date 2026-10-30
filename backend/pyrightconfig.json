@@ -1,0 +1,5 @@
+{
+  "typeCheckingMode": "strict",
+  "exclude": ["venv", "migrations", "**/__pycache__"],
+  "extraPaths": ["venv/lib/python3.13/site-packages"]
+}

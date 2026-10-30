@@ -1,7 +1,7 @@
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Literal, cast
+from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import and_, or_, select
@@ -33,7 +33,7 @@ def parse_period(raw_period: str | None) -> Period:
     if raw_period not in ("week", "month", "year", "all_time"):
         raise ValueError("Invalid period")
 
-    return cast(Period, raw_period)
+    return raw_period
 
 
 def parse_anchor_date(raw_anchor_date: str | None) -> date:

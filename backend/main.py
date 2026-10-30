@@ -7,9 +7,10 @@ from flask import Flask, request, jsonify  # type: ignore[attr-defined]
 from flask_cors import CORS
 from flask_migrate import Migrate
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
+from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 from werkzeug.security import generate_password_hash, check_password_hash  # type: ignore[reportUnknownVariableType]
 from flask_jwt_extended import create_access_token, create_refresh_token  # type: ignore[reportUnknownVariableType]
@@ -24,24 +25,28 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def create_app() -> Flask:
+def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     """Create and configure the Flask application and its API routes."""
     app = Flask(__name__)
 
-    turso_url = os.environ["TURSO_DATABASE_URL"]
-    db_uri = f"sqlite+{turso_url}?secure=true"
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]},
-        "poolclass": NullPool
-    }
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    if test_config is None:
+        turso_url = os.environ["TURSO_DATABASE_URL"]
+        db_uri = f"sqlite+{turso_url}?secure=true"
+        app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {"auth_token": os.environ["TURSO_AUTH_TOKEN"]},
+            "poolclass": NullPool
+        }
+        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+        app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
+    else:
+        app.config.update(test_config)
 
     db.init_app(app)
     Migrate(app, db)
     CORS(app, supports_credentials=True, origins=["https://executionos-mvp.netlify.app", "http://localhost:5500"])
 
-    app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
     app.config["JWT_REFRESH_COOKIE_NAME"] = "refresh_token"
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False
@@ -96,18 +101,13 @@ def create_app() -> Flask:
                     "error": "Email too long. Expected 120 characters or less"
                 }), 400
 
-            username_exists = db.session.execute(select(User.id).filter_by(username=normalized_username)).scalar_one_or_none()
-            if username_exists is not None:
+            account_exists = db.session.execute(
+                select(User.id).where(or_(User.username == normalized_username, User.email == normalized_email))
+            ).first()
+            if account_exists is not None:
                 return jsonify({  # type: ignore
                     "success": False,
-                    "error": "username already registered"
-                }), 409
-
-            email_exists = db.session.execute(select(User.id).filter_by(email=normalized_email)).scalar_one_or_none()
-            if email_exists is not None:
-                return jsonify({  # type: ignore
-                    "success": False,
-                    "error": "email already registered"
+                    "error": "Username or email already registered"
                 }), 409
 
             new_user = User(
@@ -147,12 +147,24 @@ def create_app() -> Flask:
                 expires=absolute_expire_time
             )
             return response, 201
-        except Exception as e:
+        except (KeyError, TypeError, HTTPException):
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": "Invalid request data"
+            }), 400
+        except IntegrityError:
             db.session.rollback()
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e)
-            }), 400
+                "error": "Username or email already registered"
+            }), 409
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not register")
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": "Could not register"
+            }), 500
 
     @app.route("/api/login", methods=["POST"])
     def login() -> tuple[Any, int]:
@@ -212,12 +224,18 @@ def create_app() -> Flask:
             )
 
             return response, 200
-        except Exception as e:
-            db.session.rollback()
+        except (KeyError, TypeError, HTTPException):
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e),
+                "error": "Invalid request data"
             }), 400
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not log in")
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": "Could not log in"
+            }), 500
 
     @app.route("/api/refresh", methods=["POST"])
     @jwt_required(refresh=True)
@@ -270,12 +288,13 @@ def create_app() -> Flask:
             )
 
             return response, 200
-        except Exception as e:
+        except Exception:
             db.session.rollback()
+            app.logger.exception("Could not refresh session")
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e)
-            }), 400
+                "error": "Could not refresh session"
+            }), 500
 
     @app.route("/api/logout", methods=["POST"])
     @jwt_required()
@@ -304,12 +323,13 @@ def create_app() -> Flask:
             )
 
             return response, 200
-        except Exception as e:
+        except Exception:
             db.session.rollback()
+            app.logger.exception("Could not log out")
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e)
-            }), 400
+                "error": "Could not log out"
+            }), 500
 
     from models import Session  # noqa: F401
 
@@ -377,10 +397,12 @@ def create_app() -> Flask:
                 "error": str(e),
             }), 400
 
-        except Exception as e:
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not load streak")
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e),
+                "error": "Could not load streak"
             }), 500
 
     @app.route("/api/dashboard", methods=["GET"])
@@ -417,10 +439,12 @@ def create_app() -> Flask:
                 "error": str(e),
             }), 400
 
-        except Exception as e:
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not load dashboard")
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e),
+                "error": "Could not load dashboard"
             }), 500
 
     @app.route("/api/get-sessions", methods=["GET"])
@@ -480,10 +504,12 @@ def create_app() -> Flask:
                 "error": str(e),
             }), 400
 
-        except Exception as e:
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not load sessions")
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e),
+                "error": "Could not load sessions"
             }), 500
 
     @app.route("/api/save-session", methods=["POST"])
@@ -576,12 +602,13 @@ def create_app() -> Flask:
                 "message": "Session deleted",
                 "session_id": session_id
             }), 200
-        except Exception as e:
+        except Exception:
             db.session.rollback()
+            app.logger.exception("Could not delete session")
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e)
-            }), 400
+                "error": "Could not delete session"
+            }), 500
 
     
     from models import Feedback  # noqa: F401
@@ -638,11 +665,17 @@ def create_app() -> Flask:
                 "message": "Feedback submitted",
                 "feedback_id": new_feedback.id
             }), 201
-        except Exception as e:
-            db.session.rollback()
+        except HTTPException:
             return jsonify({  # type: ignore
                 "success": False,
-                "error": str(e)
+                "error": "Invalid request data"
+            }), 400
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Could not submit feedback")
+            return jsonify({  # type: ignore
+                "success": False,
+                "error": "Could not submit feedback"
             }), 500
 
     from room_service import (
