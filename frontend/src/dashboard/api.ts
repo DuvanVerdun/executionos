@@ -1,5 +1,3 @@
-// Calls to the backend dashboard routes.
-
 import { apiFetch } from '../auth/http';
 import { getBrowserTimezone } from '../lib/dates';
 import type { ApiResult } from '../types/api';

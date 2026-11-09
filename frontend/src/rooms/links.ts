@@ -1,5 +1,3 @@
-// Room invite links.
-
 import { ROOM_JOIN_FRAGMENT } from '../config';
 
 /** Return the shareable link for a room token. */

@@ -1,5 +1,3 @@
-// Texts used by the Rooms screens.
-
 import type { MemberState, RoomMenuAction } from '../types/rooms';
 
 export const MEMBER_STATE_LABELS: Record<MemberState, string> = {

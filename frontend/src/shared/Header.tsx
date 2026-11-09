@@ -1,0 +1,118 @@
+import { useRef } from 'react';
+import { handleLogout } from '../auth/logout';
+import { authStore } from '../auth/state';
+import { openFeedbackForm } from '../feedback/feedback';
+import { useDocumentEvent } from '../hooks/useDocumentEvent';
+import { useStore } from '../lib/store';
+import { StreakPopup } from '../streak/StreakPopup';
+import { closeStreakPopup, streakStore, toggleStreakPopup } from '../streak/streak';
+import type { HeaderScreenName } from '../types/screens';
+import { closeUserMenu, toggleUserMenu, userMenuStore } from './user-menu';
+
+/** One navigation button of a header. */
+interface HeaderButton {
+    id: string;
+    label: string;
+    onClick: () => void;
+}
+
+interface HeaderProps {
+    screen: HeaderScreenName;
+    /** The classes of the header element. */
+    className: string;
+    navigation: readonly HeaderButton[];
+}
+
+/** Draw a header. The ids follow the screen, because the stylesheet styles them by id. */
+export function Header({ screen, className, navigation }: HeaderProps) {
+    const { openScreen: openMenuScreen } = useStore(userMenuStore);
+    const { openScreen: openStreakScreen, currentStreak } = useStore(streakStore);
+    const { username } = useStore(authStore);
+    const iconRef = useRef<SVGSVGElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const streakButtonRef = useRef<HTMLButtonElement>(null);
+    const streakPopupRef = useRef<HTMLDivElement>(null);
+    const isMenuOpen = openMenuScreen === screen;
+    const isStreakOpen = openStreakScreen === screen;
+
+    useDocumentEvent('click', /** Close the account menu when a click occurs outside its controls. */ (event) => {
+        if (openMenuScreen === null) return;
+        const target = event.target instanceof Node ? event.target : null;
+        if (menuRef.current?.contains(target) || iconRef.current?.contains(target)) return;
+        closeUserMenu();
+    });
+
+    useDocumentEvent('click', /** Close the consistency calendar on outside clicks. */ (event) => {
+        if (openStreakScreen === null) return;
+        const clickPath = event.composedPath();
+        const popup = streakPopupRef.current;
+        const button = streakButtonRef.current;
+        if ((popup && clickPath.includes(popup)) || (button && clickPath.includes(button))) return;
+        closeStreakPopup();
+    });
+
+    return (
+        <header className={className}>
+            <h1 className="wordmark">ExecutionOS</h1>
+            {navigation.map(/** Draw a navigation button. */ (button) => (
+                <button key={button.id} type="button" id={button.id} onClick={button.onClick}>{button.label}</button>
+            ))}
+            <div className="streak-container">
+                <button
+                    ref={streakButtonRef}
+                    type="button"
+                    id={`${screen}-streak-btn`}
+                    className="streak-btn"
+                    aria-label="Open consistency calendar"
+                    onClick={() => { toggleStreakPopup(screen); }}
+                >
+                    {`🔥 ${currentStreak ?? '—'}`}
+                </button>
+
+                <div
+                    ref={streakPopupRef}
+                    id={`${screen}-streak-popup`}
+                    className="streak-popup"
+                    style={{ display: isStreakOpen ? 'block' : 'none' }}
+                >
+                    <StreakPopup screen={screen} />
+                </div>
+            </div>
+            <svg
+                ref={iconRef}
+                id={`${screen}-user-icon`}
+                className="user-icon"
+                viewBox="0 0 48 48"
+                aria-label="Open user menu"
+                onClick={() => { toggleUserMenu(screen); }}
+            >
+                <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="2.5" />
+
+                <circle cx="24" cy="17" r="7" fill="currentColor" />
+
+                <path
+                    d="M9.5 38
+                    C11.5 29.5 17 25.5 24 25.5
+                    C31 25.5 36.5 29.5 38.5 38
+                    C34.7 42.3 29.7 44.5 24 44.5
+                    C18.3 44.5 13.3 42.3 9.5 38Z"
+                    fill="currentColor"
+                />
+            </svg>
+            <div ref={menuRef} id={`${screen}-user-menu`} style={isMenuOpen ? { display: 'flex' } : undefined}>
+                <div id={`${screen}-user-menu-information`}>
+                    <p id={`${screen}-user-menu-username`}>{username}</p>
+                </div>
+                <button
+                    type="button"
+                    id={`${screen}-user-menu-feedback-btn`}
+                    data-feedback-screen={screen}
+                    onClick={() => { openFeedbackForm(screen); }}
+                >
+                    Send Feedback
+                </button>
+                <button id={`${screen}-user-menu-logout-btn`} onClick={() => { void handleLogout(screen); }}>Logout</button>
+            </div>
+        </header>
+    );
+}

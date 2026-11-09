@@ -7,10 +7,22 @@
     "dev": "vite --port 5500 --strictPort",
     "build": "tsc && vite build",
     "preview": "vite preview --port 5500 --strictPort",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "lint": "eslint"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.7"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

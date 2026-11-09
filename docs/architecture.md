@@ -14,8 +14,8 @@ it.
 
 ### Frontend
 
-- TypeScript (strict), built with Vite (`<script type="module">`).
-- HTML and CSS without a frontend framework.
+- React and TypeScript (strict), built with Vite.
+- One global stylesheet, `style.css`.
 - Hosted on Netlify.
 - Build: `npm run build`, output `frontend/dist`.
 - See Frontend Structure below.
@@ -70,42 +70,46 @@ Do not move responsibilities between layers without a concrete reason.
 
 ## Frontend Structure
 
-`frontend/index.html` loads `src/main.ts`. `style.css` and `sounds/` stay in `frontend/`.
-All code lives in `frontend/src/`, one folder per feature, like the backend.
+`frontend/index.html` has one `<div id="root">` and loads `src/main.tsx`, which imports `style.css`.
+`sounds/` lives in `frontend/public/`. All code lives in `frontend/src/`, one folder per feature, like the backend.
 
 ```
 src/
-  main.ts        connects every feature in a fixed order, then starts the app
+  main.tsx       connects the screen-change steps, starts React, then starts the app
+  App.tsx        shows the screen that is active, and the parts above every screen
   config.ts      backend address and timing constants
-  app/           startup.ts (restore sign-in, first screen), hooks.ts (steps around screen changes)
-  lib/           pure helpers: durations, dates, validation, timing, dom, errors, arrays
+  app/           startup.ts (restore sign-in, first screen), hooks.ts (steps around screen changes), LoadingScreen
+  lib/           pure helpers (durations, dates, validation, timing, errors, arrays, css), store.ts, dom.ts
+  hooks/         shared React hooks: useDocumentEvent, useInView
   types/         backend response shapes and shared types
-  shared/        dom, screens, navigation, floating message, progress ring, account menu, session cards
-  auth/          dom, state, http (token refresh), api, identity, forms
-  session/       dom, state, api, timer, views, storage (active session + offline queue), sync, plan, focus, review
-  dashboard/     dom, state, api, chart, history, back-to-stats, dashboard
-  streak/        state, api, calendar
-  feedback/      dom, state, api, feedback
-  rooms/         dom, state, copy, api, links, menu, clock, checkin-sound,
-                 rooms-screen, room-screen, room-session
+  shared/        navigation (which screen shows), floating message, account menu, Header, Screen, ProgressRing, SessionCard
+  auth/          state, http (token refresh), api, identity, logout, Register and Login screens
+  session/       state, ui-state, api, timer, storage (active session + offline queue), sync, plan, focus, review,
+                 MissionCard, Plan, Focus and Review screens
+  dashboard/     api, dashboard (state and loading flows), chart-math, TrendChart, SessionHistory, DashboardScreen
+  streak/        api, streak (state and loading flows), StreakPopup
+  feedback/      api, feedback (state and send flow), FeedbackForm
+  rooms/         api, state, room-session-state, rooms, room, room-session, menu, copy, links, clock,
+                 checkin-sound, and the Rooms and Room screens with their cards, menus and modals
 ```
 
 - **Arrows go down.** `main` → `app` → features → `shared` → `lib` and `config`.
-- **Same file names in each feature.** `dom.ts` holds element references, `state.ts` the
-  state, `api.ts` the backend calls (it mirrors that feature's `routes.py`).
-- **No shared `let` variables.** An imported variable cannot be reassigned by the importer,
-  so shared values are fields of objects: `authState`, `sessionRuntime`, `userMenuState`.
+- **Logic and screens are separate.** A feature's logic (`dashboard.ts`, `room-session.ts`, ...) is plain
+  TypeScript with no React. Its components (`*.tsx`) only draw what the logic holds.
+- **State outside React.** State that must survive a screen change, or that async flows read after
+  an `await`, lives in a small store (`lib/store.ts`). Components read it with `useStore`.
+  State that belongs to one visit of a screen (form errors, open menus) is `useState`.
+- **Same file names in each feature.** `api.ts` holds the backend calls (it mirrors that feature's
+  `routes.py`) and `state.ts` the stores.
+- **Only the active screen is rendered.** `Screen` gives it its layout. Stylesheet rules use ids and
+  classes, so components keep them.
 - **Hooks instead of upward imports.** `navigateTo` runs steps that features add with
-  `addBeforeSwitchHook` / `addAfterSwitchHook` (registered in `app/hooks.ts`). `apiFetch`
-  calls a handler set with `setLoginRequiredHandler`. The auth forms get
-  `routeToInitialScreen` as an argument.
-- **Event wiring is per feature.** Each feature has an `init…` function. `main.ts` calls
-  them in an order that keeps the order of listeners sharing an element (for example the
-  `document` click listeners).
-- **Module code must not call other modules while loading.** Only functions do. Two import
-  loops exist on purpose: `dashboard` ↔ `session/sync.ts`, and `rooms-screen` ↔ `room-screen`.
+  `addBeforeSwitchHook` (registered in `app/hooks.ts`). `apiFetch` calls a handler set with
+  `setLoginRequiredHandler`.
+- **Effects are for the outside world** (listeners, observers, timers) and always clean up.
+  Everything else happens in event handlers.
 - **Strict TypeScript.** No `any`. `as` only where backend JSON and browser storage enter
-  (`auth/http.ts`, `session/storage.ts`). Page elements come from the checked helpers in `lib/dom.ts`.
+  (`auth/http.ts`, `session/storage.ts`). Lint: `npm run lint` (typescript-eslint strict and the React hooks rules).
 
 ## Backend Structure
 

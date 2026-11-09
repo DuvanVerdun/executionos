@@ -1,5 +1,3 @@
-// Fixed settings: the backend address and the timing constants.
-
 export let BACKEND_URL: string = '';
 
 if (window.location.hostname === 'executionos-mvp.netlify.app') {

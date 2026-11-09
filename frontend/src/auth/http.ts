@@ -1,11 +1,9 @@
-// Requests to the backend, with access-token refresh and one retry.
-
 import { BACKEND_URL } from '../config';
 import { StatusError } from '../lib/errors';
 import type { Credentials, RequestOptions } from '../types/api';
 import type { ScreenName } from '../types/screens';
 import { setAuthenticatedUser } from './identity';
-import { authState } from './state';
+import { authStore } from './state';
 
 /** What to do when a request shows the user must sign in again. */
 type LoginRequiredHandler = (currentScreen: ScreenName | undefined) => void;
@@ -31,9 +29,6 @@ async function readResult<R extends { status: number }>(response: Response): Pro
 
 /** Send a cookie-enabled unauthenticated JSON request and include its HTTP status. */
 export async function unauthFetch<R extends { status: number }>(options: RequestOptions): Promise<R> {
-    if (!options.path || !options.method) {
-        throw new Error('Missing required options: path and method');
-    }
     const response = await fetch(`${BACKEND_URL}/api/${options.path}`, {
         method: options.method,
         headers: { 'Content-Type': 'application/json' },
@@ -73,10 +68,7 @@ function sendAuthenticatedRequest(options: RequestOptions, token: string | null)
 
 /** Send an authenticated request and retry once after token refresh. */
 export async function apiFetch<R extends { status: number }>(options: RequestOptions): Promise<R> {
-    if (!options.path || !options.method) {
-        throw new Error('Missing required options: path and method');
-    }
-    const response = await sendAuthenticatedRequest(options, authState.accessToken);
+    const response = await sendAuthenticatedRequest(options, authStore.get().accessToken);
     if (response.status === 401) {
         const result = await refreshAccessToken();
         if (!result || (options.userId != null && result.user_id !== options.userId)) {

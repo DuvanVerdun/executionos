@@ -1,0 +1,133 @@
+import { useState } from 'react';
+import { useDocumentEvent } from '../hooks/useDocumentEvent';
+import { closestElement } from '../lib/dom';
+import { useStore } from '../lib/store';
+import { Header } from '../shared/Header';
+import { Screen } from '../shared/Screen';
+import { RoomCard } from './RoomCard';
+import { CreateRoomModal, JoinRoomModal, RoomCreatedModal } from './RoomModals';
+import { setRoomMenuState } from './room';
+import {
+    handleRoomsToDashboard,
+    handleRoomsToPlan,
+    isPollingRooms,
+    pollRooms,
+    retryRooms,
+    setRoomMenuOpen
+} from './rooms';
+import { roomStore, roomsStore } from './state';
+
+/** The modal that is open, and what it needs. */
+type OpenModal =
+    | { kind: 'create' }
+    | { kind: 'join' }
+    | { kind: 'created'; link: { full: string; display: string } };
+
+/** Draw the Rooms screen. */
+export function RoomsScreen() {
+    const { shownRooms, surface, openMenuRoomId, busyAction } = useStore(roomsStore);
+    const [modal, setModal] = useState<OpenModal | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    useDocumentEvent('click', /** Close the open room menu when clicking outside it. */ (event) => {
+        if (openMenuRoomId === null || busyAction !== null) return;
+        if (closestElement(event.target, '.room-menu, .room-menu-toggle', Element)) return;
+        setRoomMenuOpen(null);
+    });
+
+    useDocumentEvent('keydown', /** Close the open modal or room menu with Escape. */ (event) => {
+        if (event.key !== 'Escape') return;
+        if (modal && !isSubmitting) {
+            setModal(null);
+        } else if (openMenuRoomId !== null && busyAction === null) {
+            setRoomMenuOpen(null);
+        } else if (roomStore.get().menuOpen && roomStore.get().busyAction === null) {
+            setRoomMenuState(false);
+        }
+    });
+
+    useDocumentEvent('visibilitychange', /** Refresh the rooms as soon as the tab is visible again. */ () => {
+        if (!document.hidden && isPollingRooms()) void pollRooms();
+    });
+
+    /** Reload the rooms after a failed first load. */
+    async function handleRetry(): Promise<void> {
+        if (isRetrying) return;
+        setIsRetrying(true);
+        try {
+            await retryRooms();
+        } finally {
+            setIsRetrying(false);
+        }
+    }
+
+    return (
+        <Screen name="rooms" className="rooms-screen">
+
+            <Header
+                screen="rooms"
+                className="plan-header rooms-header"
+                navigation={[
+                    { id: 'rooms-new-mission-btn', label: 'New Mission', onClick: handleRoomsToPlan },
+                    { id: 'rooms-dashboard-btn', label: 'Dashboard', onClick: () => { void handleRoomsToDashboard(); } }
+                ]}
+            />
+
+            <section className="rooms-content">
+
+                <div className="rooms-title-row">
+                    <h1 className="rooms-title">Rooms</h1>
+                    <div className="rooms-actions">
+                        <button type="button" id="rooms-create-btn" className="white-filled-button" onClick={() => { setModal({ kind: 'create' }); }}>Create</button>
+                        <button type="button" id="rooms-join-btn" className="normal-button" onClick={() => { setModal({ kind: 'join' }); }}>Join</button>
+                    </div>
+                </div>
+
+                <div id="rooms-loading" className="rooms-grid" role="status" aria-label="Loading rooms" style={{ display: surface === 'loading' ? 'grid' : 'none' }}>
+                    <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                    <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                    <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                    <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                    <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
+                </div>
+
+                <div id="rooms-grid" className="rooms-grid" style={{ display: surface === 'rooms' ? 'grid' : 'none' }}>
+                    {shownRooms.map(/** Draw a room card. */ (room) => <RoomCard key={room.id} room={room} />)}
+                </div>
+
+                <div id="rooms-empty" className="empty-dashboard-cta-container" style={{ display: surface === 'empty' ? 'flex' : 'none' }}>
+                    <h2 className="empty-dashboard-cta-title">No rooms yet</h2>
+                    <p className="empty-dashboard-cta-paragraph">Create a room with friends or coworkers, or join one and work together.</p>
+                    <button type="button" id="rooms-empty-create-btn" className="empty-dashboard-start-mission-btn white-filled-button" onClick={() => { setModal({ kind: 'create' }); }}>
+                        Create Room
+                    </button>
+                </div>
+
+                <div id="rooms-error" className="dashboard-error" role="alert" style={{ display: surface === 'error' ? 'flex' : 'none' }}>
+                    <p className="dashboard-error-message">Couldn't reach the server.<br />Please try again in a moment.</p>
+                    <button type="button" id="rooms-retry-btn" disabled={isRetrying} onClick={() => { void handleRetry(); }}>
+                        {isRetrying ? 'Retrying…' : 'Retry'}
+                    </button>
+                </div>
+
+            </section>
+
+            {modal?.kind === 'create' && (
+                <CreateRoomModal
+                    isSubmitting={isSubmitting}
+                    setIsSubmitting={setIsSubmitting}
+                    onClose={() => { setModal(null); }}
+                    onCreated={(link) => { setModal({ kind: 'created', link }); }}
+                />
+            )}
+            {modal?.kind === 'join' && (
+                <JoinRoomModal isSubmitting={isSubmitting} setIsSubmitting={setIsSubmitting} onClose={() => { setModal(null); }} />
+            )}
+            {modal?.kind === 'created' && (
+                <RoomCreatedModal link={modal.link} isSubmitting={isSubmitting} onClose={() => { setModal(null); }} />
+            )}
+
+        </Screen>
+    );
+}

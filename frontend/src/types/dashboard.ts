@@ -1,5 +1,3 @@
-// Dashboard and streak data from the backend.
-
 export type DashboardPeriod = 'week' | 'month' | 'year' | 'all_time';
 
 export type DashboardMetric = 'time' | 'sessions' | 'completion';

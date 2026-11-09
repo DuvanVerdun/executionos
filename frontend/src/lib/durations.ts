@@ -1,5 +1,3 @@
-// Pure helpers that turn seconds into text and back.
-
 /** Convert an HH:MM duration to seconds. */
 export function parseHHMMToSeconds(timeString: string): number {
     const [hours, minutes] = timeString.split(':');
@@ -8,9 +6,9 @@ export function parseHHMMToSeconds(timeString: string): number {
 
 /** Format elapsed seconds for the timer display. */
 export function formatDuration(totalSeconds: number): string {
-    const hours = Math.floor(Number(totalSeconds) / 3600);
-    const minutes = Math.floor((Number(totalSeconds) % 3600) / 60);
-    const seconds = Number(totalSeconds) % 60;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
     if (hours >= 1) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     if (minutes >= 1) return `${minutes}:${String(seconds).padStart(2, '0')}`;
     return String(seconds);

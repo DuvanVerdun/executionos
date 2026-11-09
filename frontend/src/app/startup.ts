@@ -1,44 +1,37 @@
-// Start the app: restore the sign-in and choose the first screen.
-
 import { refreshAccessToken } from '../auth/http';
 import { setAuthenticatedUser } from '../auth/identity';
-import { authState } from '../auth/state';
+import { authStore } from '../auth/state';
 import { initializeDashboardState } from '../dashboard/dashboard';
+import { errorStatus } from '../lib/errors';
+import { createStore } from '../lib/store';
 import { fetchRoomSession, postJoinRoom } from '../rooms/api';
 import { clearJoinHash, getJoinTokenFromHash } from '../rooms/links';
-import { openRoom, showUnavailableRoom } from '../rooms/room-screen';
+import { openRoom, showUnavailableRoom } from '../rooms/room';
 import {
     applyRoomSessionEnvelope,
     enterRoomSessionFocus,
     isRoomSessionEnvelope,
     timeRoomRequest
 } from '../rooms/room-session';
-import { focusDom } from '../session/dom';
 import { handleFinishWork } from '../session/review';
-import { activeSessionState, sessionRuntime } from '../session/state';
+import { sessionStore } from '../session/state';
 import { loadActiveSession } from '../session/storage';
 import { syncOfflineWork } from '../session/sync';
-import { errorStatus } from '../lib/errors';
-import { loadingDom } from '../shared/dom';
+import { focusStore } from '../session/ui-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { navigateTo } from '../shared/navigation';
-import { initializeStreakState, loadStreak } from '../streak/calendar';
+import { initializeStreakState, loadStreak } from '../streak/streak';
 import type { ScreenName } from '../types/screens';
+
+/** What the Loading screen shows: the spinner, or the error with its Retry button. */
+export const loadingStore = createStore<{ hasError: boolean; isRetrying: boolean }>({
+    hasError: false,
+    isRetrying: false
+});
 
 /** Replace the startup spinner with error feedback and Retry. */
 function showLoadingScreenError(): void {
-    loadingDom.screen.classList.add('has-loading-error');
-    loadingDom.spinner.style.display = 'none';
-    loadingDom.error.style.display = 'flex';
-    loadingDom.retryButton.style.display = 'flex';
-}
-
-/** Show the startup spinner and hide previous error feedback. */
-function showLoadingSpinner(): void {
-    loadingDom.screen.classList.remove('has-loading-error');
-    loadingDom.spinner.style.display = 'flex';
-    loadingDom.error.style.display = 'none';
-    loadingDom.retryButton.style.display = loadingDom.retryButton.disabled ? 'flex' : 'none';
+    loadingStore.update({ hasError: true });
 }
 
 /** Restore authentication and route to the appropriate initial screen. */
@@ -48,16 +41,27 @@ export async function initializeApp(): Promise<void> {
         if (result) setAuthenticatedUser(result);
         initializeDashboardState();
         initializeStreakState();
-    } catch (error) {
+    } catch {
         showLoadingScreenError();
         return;
     }
     await routeToInitialScreen();
 }
 
+/** Retry application initialization from the Loading screen. */
+export async function retryInitialization(): Promise<void> {
+    if (loadingStore.get().isRetrying) return;
+    loadingStore.set({ hasError: false, isRetrying: true });
+    try {
+        await initializeApp();
+    } finally {
+        loadingStore.update({ isRetrying: false });
+    }
+}
+
 /** Restore work or retry a pending Finish after authentication. */
 export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'): Promise<void> {
-    if (!authState.accessToken) {
+    if (!authStore.get().accessToken) {
         navigateTo('register', 'loading');
         return;
     }
@@ -67,7 +71,7 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
     if (joinToken !== null) {
         try {
             const joinResult = await postJoinRoom(joinToken, currentScreen);
-            if (joinResult.success === true) {
+            if (joinResult.success) {
                 joinedRoomId = joinResult.room.id;
             } else if (joinResult.status === 400 || joinResult.status === 404) {
                 joinUnavailable = true;
@@ -104,12 +108,12 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
     }
     let restoredSession = false;
     try {
-        restoredSession = loadActiveSession(activeSessionState);
+        restoredSession = loadActiveSession();
     } catch (error) {
         console.error('Could not restore the active session:', error);
         setFloatingMessage('Couldn’t restore browser saves. Please reload to try again.');
     }
-    if (restoredSession && sessionRuntime.pendingSubmission) {
+    if (restoredSession && sessionStore.get().pendingSubmission) {
         navigateTo('review', currentScreen);
         await handleFinishWork();
         return;
@@ -129,21 +133,5 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
         return;
     }
     navigateTo('focus', currentScreen);
-    focusDom.pauseButton.textContent = 'Resume';
-}
-
-/** Connect the Loading screen retry button. */
-export function initStartup(): void {
-    loadingDom.retryButton.addEventListener('click', /** Retry application initialization. */ async () => {
-        if (loadingDom.retryButton.disabled) return;
-        loadingDom.retryButton.disabled = true;
-        loadingDom.retryButton.textContent = 'Retrying…';
-        showLoadingSpinner();
-        try {
-            await initializeApp();
-        } finally {
-            loadingDom.retryButton.disabled = false;
-            loadingDom.retryButton.textContent = 'Retry';
-        }
-    });
+    focusStore.set({ pauseLabel: 'Resume' });
 }

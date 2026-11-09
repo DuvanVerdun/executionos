@@ -1,5 +1,3 @@
-// Small timing helpers.
-
 /** Wait until feedback has been visible for at least two seconds. */
 export async function waitForMinimumFeedback(startedAt: number): Promise<void> {
     const remaining = 2000 - (performance.now() - startedAt);

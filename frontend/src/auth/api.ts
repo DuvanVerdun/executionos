@@ -1,5 +1,3 @@
-// Calls to the backend auth routes.
-
 import type { ApiResult, Credentials } from '../types/api';
 import { apiFetch, unauthFetch } from './http';
 

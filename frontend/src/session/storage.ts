@@ -1,8 +1,6 @@
-// The active session saved in this browser, and the offline queue.
-
-import { authState } from '../auth/state';
+import { authStore } from '../auth/state';
 import type { ActiveSession, SessionSubmission, StoredActiveSession } from '../types/session';
-import { sessionRuntime } from './state';
+import { sessionStore, updateActiveSession } from './state';
 
 const ACTIVE_SESSION_STORAGE_KEY = 'executionOS_activeSession';
 
@@ -12,12 +10,11 @@ export const sessionQueue = {
     storageKey(userId: number): string {
         return `executionOS_sessionQueue:${userId}`;
     },
-    /** Read and validate the account's queued submissions. */
+    /** Read the account's queued submissions. Only this app writes the queue, so its items are trusted. */
     load(userId: number): SessionSubmission[] {
         const stored = localStorage.getItem(this.storageKey(userId));
         const items: unknown = stored ? JSON.parse(stored) : [];
         if (!Array.isArray(items)) throw new Error('Invalid saved session queue');
-        // Browser storage boundary: the queue is only ever written by this app, so its items are trusted.
         return items as SessionSubmission[];
     },
     /** Queue a submission under a cross-tab storage lock. */
@@ -47,35 +44,36 @@ export function saveActiveSession(session: ActiveSession): void {
         startTimestamp: session.startTimestamp,
         pauseStartTimestamp: session.pauseStartTimestamp,
         pausedTimeSeconds: session.pausedTimeSeconds,
-        userId: authState.userId,
-        pendingSubmission: sessionRuntime.pendingSubmission
+        userId: authStore.get().userId,
+        pendingSubmission: sessionStore.get().pendingSubmission
     };
     localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, JSON.stringify(activeSession));
 }
 
-/** Restore an eligible active session in a paused state. */
-export function loadActiveSession(session: ActiveSession): boolean {
+/** Restore an eligible active session in a paused state. Only this app writes it, so its shape is trusted. */
+export function loadActiveSession(): boolean {
     const stored = localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
     if (!stored) return false;
-
-    // Browser storage boundary: the saved session is only ever written by this app, so its shape is trusted.
     const activeSession = JSON.parse(stored) as StoredActiveSession;
-    if (activeSession.userId != null && activeSession.userId !== authState.userId) return false;
-    sessionRuntime.pendingSubmission = activeSession.pendingSubmission ?? null;
-    session.currentMission = activeSession.mission;
-    session.targetTimeSeconds = activeSession.targetTimeSeconds;
-    session.actualTimeSeconds = activeSession.actualTimeSeconds;
-    session.startTimestamp = activeSession.startTimestamp;
-    session.pauseStartTimestamp = activeSession.pauseStartTimestamp;
-    session.pausedTimeSeconds = activeSession.pausedTimeSeconds;
-    session.percentageCompleted = Math.floor(session.actualTimeSeconds / session.targetTimeSeconds * 100);
-    session.completionStatus = session.actualTimeSeconds >= session.targetTimeSeconds ? 'completed' : 'partial';
-
-    if (!session.pauseStartTimestamp) {
-        const startTime = new Date(session.startTimestamp).getTime();
-        const lastActiveTime = startTime + (session.actualTimeSeconds + session.pausedTimeSeconds) * 1000;
-        session.pauseStartTimestamp = new Date(lastActiveTime).toISOString();
-        saveActiveSession(session);
+    if (activeSession.userId != null && activeSession.userId !== authStore.get().userId) return false;
+    sessionStore.update({ pendingSubmission: activeSession.pendingSubmission ?? null });
+    const actualTimeSeconds = activeSession.actualTimeSeconds;
+    const targetTimeSeconds = activeSession.targetTimeSeconds;
+    updateActiveSession({
+        currentMission: activeSession.mission,
+        targetTimeSeconds,
+        actualTimeSeconds,
+        startTimestamp: activeSession.startTimestamp,
+        pauseStartTimestamp: activeSession.pauseStartTimestamp,
+        pausedTimeSeconds: activeSession.pausedTimeSeconds,
+        percentageCompleted: Math.floor(actualTimeSeconds / targetTimeSeconds * 100),
+        completionStatus: actualTimeSeconds >= targetTimeSeconds ? 'completed' : 'partial'
+    });
+    if (!activeSession.pauseStartTimestamp) {
+        const startTime = new Date(activeSession.startTimestamp).getTime();
+        const lastActiveTime = startTime + (actualTimeSeconds + activeSession.pausedTimeSeconds) * 1000;
+        updateActiveSession({ pauseStartTimestamp: new Date(lastActiveTime).toISOString() });
+        saveActiveSession(sessionStore.get().active);
     }
     return true;
 }

@@ -1,28 +1,38 @@
-// The floating message.
+import { createStore } from '../lib/store';
 
-import { floatingMessage } from './dom';
+interface FloatingMessageState {
+    message: string;
+    saved: boolean;
+    error: boolean;
+    isFading: boolean;
+    isHidden: boolean;
+}
 
-let saveMessageFadeTimeout: ReturnType<typeof setTimeout> | null = null;
+export const floatingMessageStore = createStore<FloatingMessageState>({
+    message: '',
+    saved: false,
+    error: false,
+    isFading: false,
+    isHidden: true
+});
 
-let saveMessageHideTimeout: ReturnType<typeof setTimeout> | null = null;
+let fadeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /** Show temporary floating feedback with a five-second hold and one-second fade. */
 export function setFloatingMessage(
     message: string,
     { saved = false, error = false }: { saved?: boolean; error?: boolean } = {}
 ): void {
-    clearTimeout(saveMessageFadeTimeout ?? undefined);
-    clearTimeout(saveMessageHideTimeout ?? undefined);
-    floatingMessage.textContent = message;
-    floatingMessage.classList.toggle('session-save-success', saved);
-    floatingMessage.classList.toggle('session-save-error', error);
-    floatingMessage.classList.remove('is-fading');
-    floatingMessage.hidden = !message;
+    clearTimeout(fadeTimeout ?? undefined);
+    clearTimeout(hideTimeout ?? undefined);
+    floatingMessageStore.set({ message, saved, error, isFading: false, isHidden: !message });
     if (!message) return;
-    saveMessageFadeTimeout = setTimeout(/** Begin fading the message after its display interval. */ () => {
-        floatingMessage.classList.add('is-fading');
-        saveMessageHideTimeout = setTimeout(/** Hide the message after its fade completes. */ () => {
-            floatingMessage.hidden = true;
+    fadeTimeout = setTimeout(/** Begin fading the message after its display interval. */ () => {
+        floatingMessageStore.update({ isFading: true });
+        hideTimeout = setTimeout(/** Hide the message after its fade completes. */ () => {
+            floatingMessageStore.update({ isHidden: true });
         }, 1000);
     }, 5000);
 }

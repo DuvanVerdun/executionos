@@ -1,5 +1,3 @@
-// Errors that carry an HTTP status, and a safe way to read the status of any caught value.
-
 /** A request failed with this HTTP status. */
 export class StatusError extends Error {
     readonly status: number;

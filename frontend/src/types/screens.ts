@@ -1,5 +1,3 @@
-// Screen names, shared by navigation, DOM lookup and every screen's code.
-
 export const SCREEN_NAMES = [
     'loading', 'register', 'login', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'
 ] as const;
@@ -18,3 +16,6 @@ export function isScreenName(value: string | undefined): value is ScreenName {
 export function isHeaderScreenName(value: string | undefined): value is HeaderScreenName {
     return value === 'plan' || value === 'dashboard' || value === 'rooms';
 }
+
+/** The screens that show the account menu and the streak button in their header. */
+export const HEADER_SCREENS: readonly HeaderScreenName[] = ['plan', 'dashboard', 'rooms'];

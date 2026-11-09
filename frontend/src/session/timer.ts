@@ -1,79 +1,69 @@
-// The timestamp-based session timer.
-
 import type { ActiveSession } from '../types/session';
-import { activeSessionState } from './state';
+import { createEmptyActiveSession, sessionStore, updateActiveSession } from './state';
 import { saveActiveSession } from './storage';
-import { renderFocusTimer } from './views';
 
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 
-/** Update elapsed time from timestamps and return exact completion percentage. */
-function updateElapsedSessionTime(session: ActiveSession): number {
+/** Return the session with its elapsed time and completion percentage updated from timestamps. */
+function withElapsedTime(session: ActiveSession): ActiveSession {
+    let pausedTimeSeconds = session.pausedTimeSeconds;
     if (session.pauseStartTimestamp) {
         const elapsed = (Date.now() - new Date(session.pauseStartTimestamp).getTime()) / 1000;
-        session.pausedTimeSeconds += elapsed;
-        session.pauseStartTimestamp = '';
+        pausedTimeSeconds += elapsed;
     }
-    session.actualTimeSeconds = Math.floor(
-        (Date.now() - new Date(session.startTimestamp).getTime()) / 1000 - session.pausedTimeSeconds
+    const actualTimeSeconds = Math.floor(
+        (Date.now() - new Date(session.startTimestamp).getTime()) / 1000 - pausedTimeSeconds
     );
-    const exactPercentage = session.actualTimeSeconds / session.targetTimeSeconds * 100;
-    session.percentageCompleted = Math.floor(exactPercentage);
-    return exactPercentage;
+    return {
+        ...session,
+        pausedTimeSeconds,
+        pauseStartTimestamp: '',
+        actualTimeSeconds,
+        percentageCompleted: Math.floor(actualTimeSeconds / session.targetTimeSeconds * 100)
+    };
 }
 
 /** Start periodic display updates for a running session. */
-export function startTimer(session: ActiveSession): void {
-    session.isTimerRunning = true;
+export function startTimer(): void {
+    updateActiveSession({ isTimerRunning: true });
     timerInterval = setInterval(updateTimer, 1000);
 }
 
 /** Refresh and persist the running session's elapsed time. */
 function updateTimer(): void {
-    if (!activeSessionState.isTimerRunning) return;
-    const exactPercentage = updateElapsedSessionTime(activeSessionState);
-    renderFocusTimer(activeSessionState, exactPercentage);
-    saveActiveSession(activeSessionState);
+    const session = sessionStore.get().active;
+    if (!session.isTimerRunning) return;
+    const updated = withElapsedTime(session);
+    updateActiveSession(updated);
+    saveActiveSession(updated);
 }
 
 /** Pause display updates and record when the pause began. */
-export function pauseSession(session: ActiveSession): void {
+export function pauseSession(): void {
     clearInterval(timerInterval ?? undefined);
-    session.isTimerRunning = false;
-    session.pauseStartTimestamp = new Date().toISOString();
+    updateActiveSession({ isTimerRunning: false, pauseStartTimestamp: new Date().toISOString() });
 }
 
 /** Account for paused time and restart display updates. */
-export function resumeSession(session: ActiveSession): void {
+export function resumeSession(): void {
+    const session = sessionStore.get().active;
     const elapsed = (Date.now() - new Date(session.pauseStartTimestamp).getTime()) / 1000;
-    session.pausedTimeSeconds += elapsed;
-    session.pauseStartTimestamp = '';
-    startTimer(session);
+    updateActiveSession({ pausedTimeSeconds: session.pausedTimeSeconds + elapsed, pauseStartTimestamp: '' });
+    startTimer();
 }
 
 /** Stop the timer and capture the session's final elapsed time. */
-export function stopSession(session: ActiveSession): void {
+export function stopSession(): void {
     clearInterval(timerInterval ?? undefined);
-    session.isTimerRunning = false;
-    const exactPercentage = updateElapsedSessionTime(session);
-    renderFocusTimer(session, exactPercentage);
-    if (session.actualTimeSeconds >= session.targetTimeSeconds) {
-        session.completionStatus = 'completed';
-    }
-    if (!session.pauseStartTimestamp) {
-        session.pauseStartTimestamp = new Date().toISOString();
-    }
+    const updated = withElapsedTime({ ...sessionStore.get().active, isTimerRunning: false });
+    updateActiveSession({
+        ...updated,
+        completionStatus: updated.actualTimeSeconds >= updated.targetTimeSeconds ? 'completed' : updated.completionStatus,
+        pauseStartTimestamp: new Date().toISOString()
+    });
 }
 
 /** Clear the current mission and timing state. */
-export function resetSessionState(session: ActiveSession): void {
-    session.currentMission = '';
-    session.targetTimeSeconds = 0;
-    session.actualTimeSeconds = 0;
-    session.completionStatus = 'partial';
-    session.percentageCompleted = 0;
-    session.isTimerRunning = false;
-    session.startTimestamp = '';
-    session.pauseStartTimestamp = '';
-    session.pausedTimeSeconds = 0;
+export function resetSessionState(): void {
+    sessionStore.update({ active: createEmptyActiveSession() });
 }

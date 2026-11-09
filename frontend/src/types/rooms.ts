@@ -1,5 +1,3 @@
-// Rooms and room sessions, as the backend sends them.
-
 import type { ApiFailure } from './api';
 import type { ScreenName } from './screens';
 import type { DailySummary, HistoryCursor, HistorySession } from './session';
@@ -67,7 +65,7 @@ export type SessionEndReason = 'disconnected' | 'missed_checkin' | 'paused_timeo
 export interface RoomSessionNotice {
     reason: SessionEndReason;
     saved: boolean;
-    actual_time_seconds: number;
+    actual_time_seconds: number | null;
 }
 
 /** The running room session, as the server holds it. */
@@ -127,6 +125,8 @@ export interface RoomMenuHooks {
     screen: ScreenName;
     isBusy(): boolean;
     setBusy(action: RoomMenuAction | null): void;
+    /** Update the show-missions setting of a room in the screen state. */
+    setShowMissions(roomId: number, value: boolean): void;
     onRemoved(): Promise<void>;
 }
 

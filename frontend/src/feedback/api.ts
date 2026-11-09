@@ -1,5 +1,3 @@
-// Calls to the backend feedback route.
-
 import { apiFetch } from '../auth/http';
 import type { ApiResult } from '../types/api';
 import type { ScreenName } from '../types/screens';

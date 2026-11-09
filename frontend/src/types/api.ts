@@ -1,6 +1,3 @@
-// What the backend sends back. Every response is JSON with a `success` flag.
-// The HTTP status is added by the frontend, so callers can branch on it.
-
 import type { ScreenName } from './screens';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

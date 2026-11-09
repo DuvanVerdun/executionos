@@ -1,5 +1,3 @@
-// Pure helpers for dates, periods and server timestamps.
-
 import type { DashboardPeriod } from '../types/dashboard';
 
 /** Return the browser's resolved time zone. */

@@ -1,126 +1,120 @@
-// Review screen: continue, finish and save.
-
-import { authState } from '../auth/state';
+import { authStore } from '../auth/state';
 import { loadDashboard } from '../dashboard/dashboard';
 import { errorStatus } from '../lib/errors';
 import { waitForMinimumFeedback } from '../lib/timing';
 import { handleRoomContinue, handleRoomFinish } from '../rooms/room-session';
-import { roomSessionState } from '../rooms/state';
+import { roomSessionStore } from '../rooms/room-session-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { navigateTo } from '../shared/navigation';
 import { postSession } from './api';
-import { focusDom, planDom, reviewDom } from './dom';
-import { activeSessionState, sessionRuntime } from './state';
+import { planDraftStore, sessionStore } from './state';
 import { clearActiveSession, saveActiveSession, sessionQueue } from './storage';
 import { resetSessionState, resumeSession } from './timer';
+import { focusStore, reviewStore } from './ui-state';
 
 /** Resume reviewed work when no submission is pending. */
-function handleContinueWork(): void {
-    if (roomSessionState.active) {
+export function handleContinueWork(): void {
+    if (roomSessionStore.get().active) {
         void handleRoomContinue();
         return;
     }
-    if (sessionRuntime.isFinishing || sessionRuntime.pendingSubmission) return;
-    reviewDom.saveMessage.textContent = '';
+    const { isFinishing, pendingSubmission } = sessionStore.get();
+    if (isFinishing || pendingSubmission) return;
+    reviewStore.update({ saveMessage: '' });
     navigateTo('focus', 'review');
-    focusDom.pauseButton.textContent = 'Pause';
-    resumeSession(activeSessionState);
+    focusStore.set({ pauseLabel: 'Pause' });
+    resumeSession();
 }
 
 /** Clear completed work state and reset mission controls. */
 function resetApp(): void {
-    sessionRuntime.pendingSubmission = null;
-    resetSessionState(activeSessionState);
-    planDom.mission.value = '';
-    planDom.targetTime.value = '00:00';
-    focusDom.currentTime.textContent = '00:00:00';
-    focusDom.timerRing.style.setProperty('--pct', '0%');
+    sessionStore.update({ pendingSubmission: null });
+    resetSessionState();
+    planDraftStore.set({ mission: '', targetTime: '00:00' });
     try {
         clearActiveSession();
     } catch (error) {
         console.error('Could not clear the saved active session:', error);
     }
-    reviewDom.continueButton.classList.replace('normal-button', 'cta-button');
 }
 
 /** Save or queue the exact submission and show its outcome on Dashboard. */
 export async function handleFinishWork(): Promise<void> {
-    if (roomSessionState.active) {
+    if (roomSessionStore.get().active) {
         await handleRoomFinish();
         return;
     }
-    if (sessionRuntime.isFinishing) return;
-    const userId = authState.userId;
+    if (sessionStore.get().isFinishing) return;
+    const userId = authStore.get().userId;
     if (userId == null) {
-        reviewDom.saveMessage.textContent = 'Please sign in before saving this session.';
+        reviewStore.update({ saveMessage: 'Please sign in before saving this session.' });
         return;
     }
-    sessionRuntime.isFinishing = true;
+    sessionStore.update({ isFinishing: true });
     const feedbackStartedAt = performance.now();
-    reviewDom.finishButton.disabled = true;
-    reviewDom.continueButton.disabled = true;
-    reviewDom.finishButton.textContent = sessionRuntime.pendingSubmission ? 'Retrying…' : 'Saving…';
-    reviewDom.screen.setAttribute('aria-busy', 'true');
-    reviewDom.saveMessage.textContent = '';
-    sessionRuntime.pendingSubmission ??= {
+    reviewStore.update({
+        finishLabel: sessionStore.get().pendingSubmission ? 'Retrying…' : 'Saving…',
+        saveMessage: ''
+    });
+    const active = sessionStore.get().active;
+    const submission = sessionStore.get().pendingSubmission ?? {
         submissionId: crypto.randomUUID(),
         date: new Date().toISOString(),
-        mission: activeSessionState.currentMission,
-        targetTimeSeconds: activeSessionState.targetTimeSeconds,
-        actualTimeSeconds: activeSessionState.actualTimeSeconds
+        mission: active.currentMission,
+        targetTimeSeconds: active.targetTimeSeconds,
+        actualTimeSeconds: active.actualTimeSeconds
     };
+    sessionStore.update({ pendingSubmission: submission });
     let queued = false;
     let saved = false;
     try {
-
         try {
-            saveActiveSession(activeSessionState);
+            saveActiveSession(sessionStore.get().active);
         } catch (error) {
             console.error('Could not persist the active session:', error);
         }
         try {
-            await sessionQueue.add(userId, sessionRuntime.pendingSubmission);
+            await sessionQueue.add(userId, submission);
             queued = true;
         } catch (error) {
             console.error('Could not queue session:', error);
         }
-        if (authState.userId !== userId) return;
+        if (authStore.get().userId !== userId) return;
         try {
-            await postSession(sessionRuntime.pendingSubmission, userId);
-            if (authState.userId !== userId) return;
+            await postSession(submission, userId);
+            if (authStore.get().userId !== userId) return;
             saved = true;
         } catch (error) {
-            if (authState.userId !== userId) return;
+            if (authStore.get().userId !== userId) return;
             console.error('Save error:', error);
             const status = errorStatus(error);
             const rejected = status !== undefined && status >= 400 && status < 500
                 && ![401, 403, 408, 429].includes(status);
             if (rejected) {
-                if (queued) await sessionQueue.remove(userId, sessionRuntime.pendingSubmission.submissionId);
-                sessionRuntime.pendingSubmission = null;
+                if (queued) await sessionQueue.remove(userId, submission.submissionId);
+                sessionStore.update({ pendingSubmission: null });
                 try {
-                    saveActiveSession(activeSessionState);
+                    saveActiveSession(sessionStore.get().active);
                 } catch (storageError) {
                     console.error('Could not update active session:', storageError);
                 }
-                reviewDom.saveMessage.textContent = 'The server rejected this session. Your work is still here. Try again.';
+                reviewStore.update({ saveMessage: 'The server rejected this session. Your work is still here. Try again.' });
                 return;
             }
             if (!queued) {
-                reviewDom.saveMessage.textContent = 'Couldn’t save to the server or browser queue. Your work is still here. Try again.';
+                reviewStore.update({ saveMessage: 'Couldn’t save to the server or browser queue. Your work is still here. Try again.' });
                 return;
             }
         }
         if (saved && queued) {
             try {
-                await sessionQueue.remove(userId, sessionRuntime.pendingSubmission.submissionId);
+                await sessionQueue.remove(userId, submission.submissionId);
             } catch (error) {
-
                 console.error('Could not remove synced session:', error);
             }
         }
         await waitForMinimumFeedback(feedbackStartedAt);
-        if (authState.userId !== userId) return;
+        if (authStore.get().userId !== userId) return;
         resetApp();
         navigateTo('dashboard', 'review');
         setFloatingMessage(saved
@@ -129,19 +123,10 @@ export async function handleFinishWork(): Promise<void> {
         await loadDashboard();
     } catch (error) {
         console.error('Could not finish session:', error);
-        reviewDom.saveMessage.textContent = 'Couldn’t finish saving. Your work is still here. Try again.';
+        reviewStore.update({ saveMessage: 'Couldn’t finish saving. Your work is still here. Try again.' });
     } finally {
         await waitForMinimumFeedback(feedbackStartedAt);
-        sessionRuntime.isFinishing = false;
-        reviewDom.finishButton.disabled = false;
-        reviewDom.continueButton.disabled = sessionRuntime.pendingSubmission !== null;
-        reviewDom.finishButton.textContent = sessionRuntime.pendingSubmission ? 'Try again' : 'Finish';
-        reviewDom.screen.removeAttribute('aria-busy');
+        sessionStore.update({ isFinishing: false });
+        reviewStore.update({ finishLabel: sessionStore.get().pendingSubmission ? 'Try again' : 'Finish' });
     }
-}
-
-/** Connect the Review screen controls. */
-export function initReview(): void {
-    reviewDom.continueButton.addEventListener('click', handleContinueWork);
-    reviewDom.finishButton.addEventListener('click', handleFinishWork);
 }

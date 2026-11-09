@@ -80,7 +80,7 @@ If you notice an unrelated issue, mention it instead of silently fixing it.
 
 Preserve established ExecutionOS patterns:
 
-- TypeScript (strict), HTML, and CSS frontend, built with Vite.
+- React, TypeScript (strict), and CSS frontend, built with Vite.
 - Flask backend using the app-factory architecture.
 - SQLAlchemy 2.0 query style.
 - Prefer `select()` + explicit execution/scalar result patterns.

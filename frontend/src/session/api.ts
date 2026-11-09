@@ -1,7 +1,5 @@
-// Calls to the backend session routes.
-
 import { apiFetch } from '../auth/http';
-import { authState } from '../auth/state';
+import { authStore } from '../auth/state';
 import { StatusError } from '../lib/errors';
 import type { ApiResult } from '../types/api';
 import type { ScreenName } from '../types/screens';
@@ -9,13 +7,13 @@ import type { SessionSubmission } from '../types/session';
 
 /** Submit a session for its owner and require confirmed server acceptance. */
 export async function postSession(sessionData: SessionSubmission, userId: number): Promise<ApiResult<{ message: string; session_id: number }>> {
-    if (userId !== authState.userId) throw new Error('Session account changed');
+    if (userId !== authStore.get().userId) throw new Error('Session account changed');
     const result = await apiFetch<ApiResult<{ message: string; session_id: number }>>({
         path: 'save-session', method: 'POST', body: sessionData,
         currentScreen: 'review', keepScreen: true, userId,
         signal: AbortSignal.timeout(20000)
     });
-    if (result.status < 200 || result.status >= 300 || result.success !== true) {
+    if (result.status < 200 || result.status >= 300 || !result.success) {
         throw new StatusError((!result.success && result.error) || 'The server did not save this session', result.status);
     }
     return result;

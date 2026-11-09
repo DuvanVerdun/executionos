@@ -1,7 +1,14 @@
-// Who is signed in: the access token lives in memory only.
+import { createStore } from '../lib/store';
 
-/** Who is signed in. The access token lives in JavaScript memory only. */
-export const authState: { accessToken: string | null; userId: number | null } = {
+interface AuthState {
+    accessToken: string | null;
+    userId: number | null;
+    /** The name shown in the account menus. */
+    username: string;
+}
+
+export const authStore = createStore<AuthState>({
     accessToken: null,
-    userId: null
-};
+    userId: null,
+    username: ''
+});

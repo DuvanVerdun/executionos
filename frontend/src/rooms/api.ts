@@ -1,9 +1,7 @@
-// Calls to the backend rooms and room-session routes.
-
 import { apiFetch } from '../auth/http';
 import { ROOM_REQUEST_TIMEOUT_MS } from '../config';
 import { getBrowserTimezone } from '../lib/dates';
-import { getCurrentScreenName } from '../shared/screens';
+
 import type { ApiResult, HttpMethod } from '../types/api';
 import type {
     RoomCard, RoomHistoryPage, RoomSessionResult, RoomSnapshot, RoomSummary
@@ -75,7 +73,7 @@ export function fetchRoomSessions(roomId: number, cursor: HistoryCursor | null =
 }
 
 /** Request the user's running room session and any pending notice. */
-export function fetchRoomSession(currentScreen: ScreenName = getCurrentScreenName()): Promise<RoomSessionResult> {
+export function fetchRoomSession(currentScreen: ScreenName): Promise<RoomSessionResult> {
     return roomFetch<RoomSessionResult>('room-session', 'GET', undefined, currentScreen);
 }
 
@@ -85,8 +83,8 @@ export function postStartRoomSession(roomId: number, mission: string, targetTime
 }
 
 /** Send a room session event: pause, resume, checkin, or heartbeat. */
-export function postRoomSessionEvent(event: 'pause' | 'resume' | 'checkin' | 'heartbeat'): Promise<RoomSessionResult> {
-    return roomFetch<RoomSessionResult>(`room-session/${event}`, 'POST', undefined, getCurrentScreenName());
+export function postRoomSessionEvent(event: 'pause' | 'resume' | 'checkin' | 'heartbeat', currentScreen: ScreenName): Promise<RoomSessionResult> {
+    return roomFetch<RoomSessionResult>(`room-session/${event}`, 'POST', undefined, currentScreen);
 }
 
 /** Request that the paused room session be saved and ended. */

@@ -1,41 +1,33 @@
-// Focus screen: pause, resume and stop.
-
 import { handleRoomPauseResume, handleRoomStop } from '../rooms/room-session';
-import { roomSessionState } from '../rooms/state';
+import { roomSessionStore } from '../rooms/room-session-state';
 import { navigateTo } from '../shared/navigation';
-import { focusDom } from './dom';
-import { activeSessionState } from './state';
+import { sessionStore } from './state';
 import { saveActiveSession } from './storage';
+import { focusStore } from './ui-state';
 import { pauseSession, resumeSession, stopSession } from './timer';
 
 /** Toggle the active session between paused and running states. */
-function handlePauseResume(): void {
-    if (roomSessionState.active) {
+export function handlePauseResume(): void {
+    if (roomSessionStore.get().active) {
         void handleRoomPauseResume();
         return;
     }
-    if (activeSessionState.isTimerRunning) {
-        pauseSession(activeSessionState);
-        focusDom.pauseButton.textContent = 'Resume';
-        saveActiveSession(activeSessionState);
+    if (sessionStore.get().active.isTimerRunning) {
+        pauseSession();
+        focusStore.set({ pauseLabel: 'Resume' });
+        saveActiveSession(sessionStore.get().active);
     } else {
-        focusDom.pauseButton.textContent = 'Pause';
-        resumeSession(activeSessionState);
+        focusStore.set({ pauseLabel: 'Pause' });
+        resumeSession();
     }
 }
 
 /** Stop the active session and open Review. */
-function handleStopWork(): void {
-    if (roomSessionState.active) {
+export function handleStopWork(): void {
+    if (roomSessionStore.get().active) {
         void handleRoomStop();
         return;
     }
-    stopSession(activeSessionState);
+    stopSession();
     navigateTo('review', 'focus');
-}
-
-/** Connect the Focus screen controls. */
-export function initFocus(): void {
-    focusDom.pauseButton.addEventListener('click', handlePauseResume);
-    focusDom.stopButton.addEventListener('click', handleStopWork);
 }

@@ -1,15 +1,16 @@
-// The check-in sound.
-
 import { CHECKIN_SOUND_URL } from '../config';
 import { getServerNowMs } from './clock';
-import { checkinAudio, roomSessionState } from './state';
+import { roomSessionStore } from './room-session-state';
+import { checkinAudio } from './state';
 
-/** Create the audio context on a user gesture, load the sound, and schedule it. */
+/** Create the audio context on a user gesture, load the sound, and schedule it. Old Safari only has the prefixed context name. */
 export async function unlockCheckinAudio(): Promise<void> {
     if (checkinAudio.failed) return;
     try {
         if (!checkinAudio.context) {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (!AudioContextClass) return;
             checkinAudio.context = new AudioContextClass();
         }
@@ -45,9 +46,10 @@ export function cancelCheckinSound(): void {
 export function armCheckinSound(): void {
     cancelCheckinSound();
     const { context, buffer } = checkinAudio;
-    const { dueAtMs } = roomSessionState.checkin;
+    const { checkin, active, isPaused } = roomSessionStore.get();
+    const { dueAtMs } = checkin;
     if (!context || !buffer || context.state !== 'running') return;
-    if (!roomSessionState.active || roomSessionState.isPaused || dueAtMs === null) return;
+    if (!active || isPaused || dueAtMs === null) return;
     const delayMs = dueAtMs - getServerNowMs();
     if (delayMs < 0) return;
     const source = context.createBufferSource();
@@ -59,5 +61,5 @@ export function armCheckinSound(): void {
 
 /** Try to unlock the sound on any click or key press while a room session runs. */
 export function handleRoomSessionGesture(): void {
-    if (roomSessionState.active) void unlockCheckinAudio();
+    if (roomSessionStore.get().active) void unlockCheckinAudio();
 }

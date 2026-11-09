@@ -1,5 +1,3 @@
-// Sessions: the one being worked on, the one being saved, and saved ones from the server.
-
 export type CompletionStatus = 'completed' | 'partial';
 
 /** The personal session being worked on now (Plan, Focus, Review). */
