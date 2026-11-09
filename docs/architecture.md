@@ -14,10 +14,11 @@ it.
 
 ### Frontend
 
-- Vanilla JavaScript.
+- Vanilla JavaScript, split into ES modules (`<script type="module">`).
 - HTML and CSS without a frontend framework.
 - Hosted on Netlify.
 - No build pipeline currently required.
+- See Frontend Structure below.
 
 Frontend responsibilities include:
 
@@ -66,6 +67,42 @@ Single repository with explicit boundaries:
 - `/docs`
 
 Do not move responsibilities between layers without a concrete reason.
+
+## Frontend Structure
+
+`frontend/index.html` loads `src/main.js`. `style.css` and `sounds/` stay in `frontend/`.
+All code lives in `frontend/src/`, one folder per feature, like the backend.
+
+```
+src/
+  main.js        connects every feature in a fixed order, then starts the app
+  config.js      backend address and timing constants
+  app/           startup.js (restore sign-in, first screen), hooks.js (steps around screen changes)
+  lib/           pure helpers: durations, dates, validation, timing
+  shared/        dom, screens, navigation, floating message, progress ring, account menu, session cards
+  auth/          dom, state, http (token refresh), api, identity, forms
+  session/       dom, state, api, timer, views, storage (active session + offline queue), sync, plan, focus, review
+  dashboard/     dom, state, api, chart, history, back-to-stats, dashboard
+  streak/        state, api, calendar
+  feedback/      dom, state, api, feedback
+  rooms/         dom, state, copy, api, links, menu, clock, checkin-sound,
+                 rooms-screen, room-screen, room-session
+```
+
+- **Arrows go down.** `main` → `app` → features → `shared` → `lib` and `config`.
+- **Same file names in each feature.** `dom.js` holds element references, `state.js` the
+  state, `api.js` the backend calls (it mirrors that feature's `routes.py`).
+- **No shared `let` variables.** An imported variable cannot be reassigned by the importer,
+  so shared values are fields of objects: `authState`, `sessionRuntime`, `userMenuState`.
+- **Hooks instead of upward imports.** `navigateTo` runs steps that features add with
+  `addBeforeSwitchHook` / `addAfterSwitchHook` (registered in `app/hooks.js`). `apiFetch`
+  calls a handler set with `setLoginRequiredHandler`. The auth forms get
+  `routeToInitialScreen` as an argument.
+- **Event wiring is per feature.** Each feature has an `init…` function. `main.js` calls
+  them in an order that keeps the order of listeners sharing an element (for example the
+  `document` click listeners).
+- **Module code must not call other modules while loading.** Only functions do. Two import
+  loops exist on purpose: `dashboard` ↔ `session/sync.js`, and `rooms-screen` ↔ `room-screen`.
 
 ## Backend Structure
 

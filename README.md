@@ -29,7 +29,7 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 
 ## Stack
 
-**Frontend:** Vanilla JavaScript, HTML, CSS  
+**Frontend:** Vanilla JavaScript (ES modules), HTML, CSS  
 **Backend:** Flask  
 **Database:** Turso / SQLite  
 **ORM:** SQLAlchemy  
@@ -43,7 +43,11 @@ Frontend → Flask API → Turso / SQLite
 
 The frontend is deployed separately from the backend and database.
 
-The backend is one Python package with a folder per feature (`auth`, `sessions`, `dashboard`, `rooms`). See `docs/architecture.md`.
+The frontend is ES modules in `frontend/src/`, a folder per feature.
+
+The backend is one Python package with a folder per feature (`auth`, `sessions`, `dashboard`, `rooms`).
+
+Both structures are explained in `docs/architecture.md`.
 
 ## Version history
 
