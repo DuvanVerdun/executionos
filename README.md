@@ -29,12 +29,12 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 
 ## Stack
 
-**Frontend:** Vanilla JavaScript (ES modules), HTML, CSS  
+**Frontend:** TypeScript (strict), Vite, HTML, CSS  
 **Backend:** Flask  
 **Database:** Turso / SQLite  
 **ORM:** SQLAlchemy  
 **Authentication:** JWT access + refresh tokens  
-**Quality:** pytest and strict pyright, run by GitHub Actions on every push  
+**Quality:** pytest and strict pyright, strict TypeScript, run by GitHub Actions on every push  
 **Deployment:** Netlify + Render
 
 ## Architecture
@@ -43,7 +43,7 @@ Frontend → Flask API → Turso / SQLite
 
 The frontend is deployed separately from the backend and database.
 
-The frontend is ES modules in `frontend/src/`, a folder per feature.
+The frontend is TypeScript in `frontend/src/`, a folder per feature.
 
 The backend is one Python package with a folder per feature (`auth`, `sessions`, `dashboard`, `rooms`).
 

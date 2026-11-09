@@ -141,13 +141,13 @@ A passing test suite does not replace understanding or manual verification when 
 
 ## Type Safety
 
-Python code should maintain strict Pylance compliance.
+Python code should maintain strict Pylance compliance. Frontend code should maintain strict TypeScript compliance.
 
 Zero type errors is the baseline.
 
 Types should clarify the system rather than silence the checker.
 
-Use `cast()` only when crossing genuine typing boundaries or compensating for known limitations in external type information.
+Use `cast()` (or `as`) only when crossing genuine typing boundaries or compensating for known limitations in external type information.
 
 Do not use typing tools to hide unclear application logic.
 

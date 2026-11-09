@@ -8,3 +8,5 @@ cookies.txt
 ui-design/
 organization/
 .claude/settings.local.json
+node_modules/
+dist/

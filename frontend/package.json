@@ -1,0 +1,16 @@
+{
+  "name": "executionos-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5500 --strictPort",
+    "build": "tsc && vite build",
+    "preview": "vite preview --port 5500 --strictPort",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7"
+  }
+}

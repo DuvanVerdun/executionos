@@ -14,10 +14,10 @@ it.
 
 ### Frontend
 
-- Vanilla JavaScript, split into ES modules (`<script type="module">`).
+- TypeScript (strict), built with Vite (`<script type="module">`).
 - HTML and CSS without a frontend framework.
 - Hosted on Netlify.
-- No build pipeline currently required.
+- Build: `npm run build`, output `frontend/dist`.
 - See Frontend Structure below.
 
 Frontend responsibilities include:
@@ -70,15 +70,16 @@ Do not move responsibilities between layers without a concrete reason.
 
 ## Frontend Structure
 
-`frontend/index.html` loads `src/main.js`. `style.css` and `sounds/` stay in `frontend/`.
+`frontend/index.html` loads `src/main.ts`. `style.css` and `sounds/` stay in `frontend/`.
 All code lives in `frontend/src/`, one folder per feature, like the backend.
 
 ```
 src/
-  main.js        connects every feature in a fixed order, then starts the app
-  config.js      backend address and timing constants
-  app/           startup.js (restore sign-in, first screen), hooks.js (steps around screen changes)
-  lib/           pure helpers: durations, dates, validation, timing
+  main.ts        connects every feature in a fixed order, then starts the app
+  config.ts      backend address and timing constants
+  app/           startup.ts (restore sign-in, first screen), hooks.ts (steps around screen changes)
+  lib/           pure helpers: durations, dates, validation, timing, dom, errors, arrays
+  types/         backend response shapes and shared types
   shared/        dom, screens, navigation, floating message, progress ring, account menu, session cards
   auth/          dom, state, http (token refresh), api, identity, forms
   session/       dom, state, api, timer, views, storage (active session + offline queue), sync, plan, focus, review
@@ -90,19 +91,21 @@ src/
 ```
 
 - **Arrows go down.** `main` → `app` → features → `shared` → `lib` and `config`.
-- **Same file names in each feature.** `dom.js` holds element references, `state.js` the
-  state, `api.js` the backend calls (it mirrors that feature's `routes.py`).
+- **Same file names in each feature.** `dom.ts` holds element references, `state.ts` the
+  state, `api.ts` the backend calls (it mirrors that feature's `routes.py`).
 - **No shared `let` variables.** An imported variable cannot be reassigned by the importer,
   so shared values are fields of objects: `authState`, `sessionRuntime`, `userMenuState`.
 - **Hooks instead of upward imports.** `navigateTo` runs steps that features add with
-  `addBeforeSwitchHook` / `addAfterSwitchHook` (registered in `app/hooks.js`). `apiFetch`
+  `addBeforeSwitchHook` / `addAfterSwitchHook` (registered in `app/hooks.ts`). `apiFetch`
   calls a handler set with `setLoginRequiredHandler`. The auth forms get
   `routeToInitialScreen` as an argument.
-- **Event wiring is per feature.** Each feature has an `init…` function. `main.js` calls
+- **Event wiring is per feature.** Each feature has an `init…` function. `main.ts` calls
   them in an order that keeps the order of listeners sharing an element (for example the
   `document` click listeners).
 - **Module code must not call other modules while loading.** Only functions do. Two import
-  loops exist on purpose: `dashboard` ↔ `session/sync.js`, and `rooms-screen` ↔ `room-screen`.
+  loops exist on purpose: `dashboard` ↔ `session/sync.ts`, and `rooms-screen` ↔ `room-screen`.
+- **Strict TypeScript.** No `any`. `as` only where backend JSON and browser storage enter
+  (`auth/http.ts`, `session/storage.ts`). Page elements come from the checked helpers in `lib/dom.ts`.
 
 ## Backend Structure
 
@@ -243,15 +246,15 @@ Keep database access patterns consistent across the backend.
 
 ## Type Boundaries
 
-Python uses strict Pylance typing.
+Python uses strict Pylance typing. The frontend uses strict TypeScript (`npm run typecheck`).
 
-Use `cast()` only at genuine boundaries such as:
+Use `cast()` (Python) or `as` (TypeScript) only at genuine boundaries such as:
 
 - Raw JSON.
 - Weak third-party type information.
 - Runtime-validated values static analysis cannot infer.
 
-Do not use `cast()` to hide unclear application logic.
+Do not use `cast()` or `as` to hide unclear application logic.
 
 ## Frontend State
 

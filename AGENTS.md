@@ -80,13 +80,13 @@ If you notice an unrelated issue, mention it instead of silently fixing it.
 
 Preserve established ExecutionOS patterns:
 
-- Vanilla JavaScript, HTML, and CSS frontend.
+- TypeScript (strict), HTML, and CSS frontend, built with Vite.
 - Flask backend using the app-factory architecture.
 - SQLAlchemy 2.0 query style.
 - Prefer `select()` + explicit execution/scalar result patterns.
 - Do not introduce legacy `.query`.
-- Strict Pylance typing with zero type errors as the baseline.
-- Use `cast()` only at genuine data or weak typing boundaries.
+- Strict Pylance and strict TypeScript typing with zero type errors as the baseline.
+- Use `cast()` (or `as`) only at genuine data or weak typing boundaries.
 - Keep application state separate from DOM state.
 - Timer correctness is timestamp-based, not tick-based.
 - The backend remains authoritative for persisted execution history.
