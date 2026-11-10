@@ -111,6 +111,22 @@ src/
 - **Strict TypeScript.** No `any`. `as` only where backend JSON and browser storage enter
   (`auth/http.ts`, `session/storage.ts`). Lint: `npm run lint` (typescript-eslint strict and the React hooks rules).
 
+## Frontend Tests
+
+- `npm test` from `frontend/` runs Vitest once (`npm run test:watch` re-runs on save). The
+  environment is jsdom, with Testing Library for components.
+- A test sits next to the file it tests (`timer.ts` and `timer.test.ts`). Test files are also
+  covered by `npm run typecheck` and `npm run lint`.
+- Shared test setup is in `src/test/`. Before every test it puts every store back to its first
+  state and clears `localStorage`. It also stubs what jsdom lacks (`navigator.locks`,
+  `IntersectionObserver`). `network.ts` fakes `fetch`, so no server runs.
+- Dates run in the fixed timezone `America/Argentina/Buenos_Aires` (set in `vite.config.ts`).
+  Timer tests use fake timers and a fake clock.
+- Tests aim at behavior where a failure would hurt: formatting and validation, the timer, the
+  saved session and offline queue, token refresh and retry, the finish flow, and the focus-time
+  box. Layout and most display-only components are not tested.
+- GitHub Actions runs them in the `frontend` job (`.github/workflows/tests.yml`).
+
 ## Backend Structure
 
 `backend/main.py` only builds the app, so `gunicorn main:app` and `FLASK_APP=main.py`

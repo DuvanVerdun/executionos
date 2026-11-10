@@ -1,6 +1,13 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    plugins: [react()]
+    plugins: [react()],
+    test: {
+        environment: 'jsdom',
+        env: { TZ: 'America/Argentina/Buenos_Aires' },
+        setupFiles: ['./src/test/setup.ts'],
+        include: ['src/**/*.test.{ts,tsx}'],
+        restoreMocks: true
+    }
 });

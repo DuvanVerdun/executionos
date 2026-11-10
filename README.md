@@ -34,7 +34,7 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 **Database:** Turso / SQLite  
 **ORM:** SQLAlchemy  
 **Authentication:** JWT access + refresh tokens  
-**Quality:** pytest and strict pyright, strict TypeScript and ESLint, run by GitHub Actions on every push  
+**Quality:** pytest and strict pyright, Vitest and Testing Library, strict TypeScript and ESLint, run by GitHub Actions on every push  
 **Deployment:** Netlify + Render
 
 ## Architecture
