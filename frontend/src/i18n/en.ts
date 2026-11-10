@@ -10,7 +10,7 @@ export const en = {
 
     'nav.plan': 'Plan',
     'nav.dashboard': 'Dashboard',
-    'nav.rooms': 'Focus Rooms',
+    'nav.rooms': 'Rooms',
 
     'header.openStreak': 'Open consistency calendar',
     'header.openUserMenu': 'Open user menu',
