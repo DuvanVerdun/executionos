@@ -20,6 +20,8 @@ import { loadActiveSession } from '../session/storage';
 import { syncOfflineWork } from '../session/sync';
 import { focusStore } from '../session/ui-state';
 import { setFloatingMessage } from '../shared/floating-message';
+import { goToHeaderScreen } from '../shared/header-navigation';
+import { loadLastScreen } from '../shared/last-screen';
 import { navigateTo } from '../shared/navigation';
 import { initializeStreakState, loadStreak } from '../streak/streak';
 import type { ScreenName } from '../types/screens';
@@ -60,9 +62,23 @@ export async function retryInitialization(): Promise<void> {
     }
 }
 
+/** Open the screen or room that the user had before a reload. Open Plan when there is none. */
+async function openLastScreen(userId: number, currentScreen: ScreenName): Promise<void> {
+    const place = loadLastScreen(userId);
+    if (place?.screen === 'room') {
+        await openRoom(place.roomId, currentScreen);
+    } else if (place !== null && place.screen !== 'plan') {
+        await goToHeaderScreen(place.screen, currentScreen);
+    } else {
+        navigateTo('plan', currentScreen);
+        await loadStreak('plan');
+    }
+}
+
 /** Restore work or retry a pending Finish after authentication. */
 export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'): Promise<void> {
-    if (!authStore.get().accessToken) {
+    const { accessToken, userId } = authStore.get();
+    if (!accessToken || userId === null) {
         navigateTo('register', 'loading');
         return;
     }
@@ -129,8 +145,7 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
             showUnavailableRoom(currentScreen);
             return;
         }
-        navigateTo('plan', currentScreen);
-        await loadStreak('plan');
+        await openLastScreen(userId, currentScreen);
         return;
     }
     navigateTo('focus', currentScreen);

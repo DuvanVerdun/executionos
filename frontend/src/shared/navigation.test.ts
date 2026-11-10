@@ -21,6 +21,12 @@ describe('navigateTo', () => {
         expect(getCurrentScreenName()).toBe(current);
     });
 
+    it.each(['loading', 'register', 'login'] as const)('opens the Dashboard from %s, for a user who returns after a reload', (current) => {
+        screenStore.set({ screen: current });
+        navigateTo('dashboard', current);
+        expect(getCurrentScreenName()).toBe('dashboard');
+    });
+
     it('runs the steps added by features before the screen changes, in order', () => {
         const calls: string[] = [];
         addBeforeSwitchHook(/** Record the first step. */ (next, current) => {

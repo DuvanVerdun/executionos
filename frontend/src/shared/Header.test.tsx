@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeStreakState } from '../streak/streak';
 import { fakeBackendByPath, requestedPaths } from '../test/network';
 import type { HeaderScreenName } from '../types/screens';
@@ -8,6 +8,7 @@ import { Header } from './Header';
 import { screenStore } from './navigation';
 
 beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     initializeStreakState();
 });
 

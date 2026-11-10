@@ -17,7 +17,7 @@ const ALLOWED_SCREEN_TRANSITIONS: Record<ScreenName, readonly ScreenName[]> = {
     plan: ['loading', 'register', 'login', 'dashboard', 'rooms'],
     focus: ['loading', 'login', 'register', 'plan', 'review', 'room'],
     review: ['loading', 'login', 'register', 'focus'],
-    dashboard: ['plan', 'review', 'rooms'],
+    dashboard: ['loading', 'register', 'login', 'plan', 'review', 'rooms'],
     rooms: ['loading', 'register', 'login', 'plan', 'dashboard', 'room'],
     room: ['loading', 'register', 'login', 'rooms', 'review', 'focus']
 };

@@ -1,5 +1,6 @@
 import { authFormStore } from '../auth/forms-state';
 import { setLoginRequiredHandler } from '../auth/http';
+import { authStore } from '../auth/state';
 import { leaveDashboardScreen } from '../dashboard/dashboard';
 import { t } from '../i18n/i18n';
 import { closeFeedbackForm } from '../feedback/feedback';
@@ -7,8 +8,9 @@ import { leaveRoomScreen } from '../rooms/room';
 import { resetRoomSessionClient, setReviewRoomMode } from '../rooms/room-session';
 import { roomSessionStore } from '../rooms/room-session-state';
 import { leaveRoomsScreen, resetRoomsData } from '../rooms/rooms';
-import { roomSnapshotCache } from '../rooms/state';
+import { roomSnapshotCache, roomStore } from '../rooms/state';
 import { focusStore } from '../session/ui-state';
+import { saveLastScreen } from '../shared/last-screen';
 import { addBeforeSwitchHook, navigateTo } from '../shared/navigation';
 import { closeUserMenu, userMenuStore } from '../shared/user-menu';
 import { isHeaderScreenName } from '../types/screens';
@@ -18,6 +20,16 @@ export function registerNavigationHooks(): void {
     setLoginRequiredHandler(/** Send the user to Login when a request needs a new sign-in. */ (currentScreen) => {
         if (currentScreen !== undefined) navigateTo('login', currentScreen);
         authFormStore.update({ loginError: t('auth.signInAgain') });
+    });
+    addBeforeSwitchHook(/** Remember the screen or room that the user opens, so a reload can return to it. */ (nextScreen) => {
+        const userId = authStore.get().userId;
+        if (userId === null) return;
+        if (isHeaderScreenName(nextScreen)) {
+            saveLastScreen(userId, { screen: nextScreen });
+            return;
+        }
+        const roomId = roomStore.get().roomId;
+        if (nextScreen === 'room' && roomId !== null) saveLastScreen(userId, { screen: 'room', roomId });
     });
     addBeforeSwitchHook(/** Close the feedback form on every screen change. */ () => {
         closeFeedbackForm();

@@ -1,4 +1,5 @@
 import { t } from '../i18n/i18n';
+import { clearLastScreen } from '../shared/last-screen';
 import { navigateTo } from '../shared/navigation';
 import type { ScreenName } from '../types/screens';
 import { logout } from './api';
@@ -10,6 +11,7 @@ export async function handleLogout(currentScreen: ScreenName): Promise<void> {
     try {
         await logout();
         clearAuthenticatedUser();
+        clearLastScreen();
         navigateTo('login', currentScreen);
     } catch {
         alert(t('auth.logoutFailed'));
