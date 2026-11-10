@@ -174,12 +174,6 @@ export function retryPagination(): void {
     void loadMoreSessions();
 }
 
-/** Open Dashboard from Plan and load its data. */
-export async function handleOpenDashboard(): Promise<void> {
-    navigateTo('dashboard', 'plan');
-    await loadDashboard();
-}
-
 /** Return from Dashboard to mission planning. */
 export function handleDashboardToPlan(): void {
     navigateTo('plan', 'dashboard');

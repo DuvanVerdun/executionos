@@ -557,12 +557,7 @@ button {
     font-size: clamp(20px, 1.875vw, 44px);
 }
 
-#plan-dashboard-btn,
-#plan-rooms-btn,
-#dashboard-new-mission-btn,
-#dashboard-rooms-btn,
-#rooms-new-mission-btn,
-#rooms-dashboard-btn {
+.header-nav-btn {
     padding: 0;
     border: none;
     background: none;
@@ -572,13 +567,13 @@ button {
     cursor: pointer;
 }
 
-#plan-dashboard-btn:hover,
-#plan-rooms-btn:hover,
-#dashboard-new-mission-btn:hover,
-#dashboard-rooms-btn:hover,
-#rooms-new-mission-btn:hover,
-#rooms-dashboard-btn:hover {
+.header-nav-btn:hover {
     filter: brightness(1.1);
+}
+
+.header-nav-btn[aria-current='page'] {
+    color: var(--color-white);
+    cursor: default;
 }
 
 #plan-streak-btn,

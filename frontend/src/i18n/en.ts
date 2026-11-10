@@ -8,6 +8,7 @@ export const en = {
     'common.moreSessionsFailed': "Couldn't load more sessions.",
     'common.serverUnreachable': "Couldn't reach the server. Try again.",
 
+    'nav.plan': 'Plan',
     'nav.dashboard': 'Dashboard',
     'nav.rooms': 'Focus Rooms',
 
@@ -102,7 +103,6 @@ export const en = {
     'sync.signIn': 'Sessions are saved on this browser. Sign in again to sync them.',
     'sync.needsAttention': 'A saved session needs attention before it can sync. It is still on this browser.',
 
-    'dashboard.newMission': 'New Mission',
     'dashboard.week': 'Week',
     'dashboard.month': 'Month',
     'dashboard.year': 'Year',

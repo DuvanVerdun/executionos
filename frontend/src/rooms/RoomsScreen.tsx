@@ -8,14 +8,7 @@ import { Screen } from '../shared/Screen';
 import { RoomCard } from './RoomCard';
 import { CreateRoomModal, JoinRoomModal, RoomCreatedModal } from './RoomModals';
 import { setRoomMenuState } from './room';
-import {
-    handleRoomsToDashboard,
-    handleRoomsToPlan,
-    isPollingRooms,
-    pollRooms,
-    retryRooms,
-    setRoomMenuOpen
-} from './rooms';
+import { isPollingRooms, pollRooms, retryRooms, setRoomMenuOpen } from './rooms';
 import { roomStore, roomsStore } from './state';
 
 /** The modal that is open, and what it needs. */
@@ -67,14 +60,7 @@ export function RoomsScreen() {
     return (
         <Screen name="rooms" className="rooms-screen">
 
-            <Header
-                screen="rooms"
-                className="plan-header rooms-header"
-                navigation={[
-                    { id: 'rooms-new-mission-btn', label: t('dashboard.newMission'), onClick: handleRoomsToPlan },
-                    { id: 'rooms-dashboard-btn', label: t('nav.dashboard'), onClick: () => { void handleRoomsToDashboard(); } }
-                ]}
-            />
+            <Header screen="rooms" className="plan-header rooms-header" />
 
             <section className="rooms-content">
 

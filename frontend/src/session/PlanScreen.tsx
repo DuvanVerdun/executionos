@@ -1,8 +1,5 @@
 import { useRef, useState } from 'react';
-import { handleOpenDashboard } from '../dashboard/dashboard';
-import { useT } from '../i18n/i18n';
 import { useStore } from '../lib/store';
-import { handleOpenRooms } from '../rooms/rooms';
 import { Header } from '../shared/Header';
 import { Screen } from '../shared/Screen';
 import { MissionCard } from './MissionCard';
@@ -11,7 +8,6 @@ import { planDraftStore } from './state';
 
 /** Draw the Plan screen. */
 export function PlanScreen() {
-    const t = useT();
     const { mission, targetTime } = useStore(planDraftStore);
     const [error, setError] = useState<MissionValidationError | null>(null);
     const missionInputRef = useRef<HTMLInputElement>(null);
@@ -31,14 +27,7 @@ export function PlanScreen() {
     return (
         <Screen name="plan" className="plan-screen">
             <div className="plan-container">
-                <Header
-                    screen="plan"
-                    className="plan-header"
-                    navigation={[
-                        { id: 'plan-dashboard-btn', label: t('nav.dashboard'), onClick: () => { void handleOpenDashboard(); } },
-                        { id: 'plan-rooms-btn', label: t('nav.rooms'), onClick: () => { void handleOpenRooms('plan'); } }
-                    ]}
-                />
+                <Header screen="plan" className="plan-header" />
 
                 <section className="plan-content">
                     <MissionCard

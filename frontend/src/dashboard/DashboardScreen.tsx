@@ -5,7 +5,6 @@ import { formatLocalDate, formatPeriodDate, parseLocalDate } from '../lib/dates'
 import { formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { waitForMinimumFeedback } from '../lib/timing';
-import { handleOpenRooms } from '../rooms/rooms';
 import { syncOfflineWork } from '../session/sync';
 import { Header } from '../shared/Header';
 import { Screen } from '../shared/Screen';
@@ -109,14 +108,7 @@ export function DashboardScreen() {
 
             <div className="dashboard-container">
 
-                <Header
-                    screen="dashboard"
-                    className="dashboard-header"
-                    navigation={[
-                        { id: 'dashboard-new-mission-btn', label: t('dashboard.newMission'), onClick: handleDashboardToPlan },
-                        { id: 'dashboard-rooms-btn', label: t('nav.rooms'), onClick: () => { void handleOpenRooms('dashboard'); } }
-                    ]}
-                />
+                <Header screen="dashboard" className="dashboard-header" />
 
                 <section id="dashboard-content" className="dashboard-content">
 

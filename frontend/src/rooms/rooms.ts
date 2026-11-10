@@ -1,9 +1,6 @@
 import { ROOM_POLL_INTERVAL_MS } from '../config';
-import { loadDashboard } from '../dashboard/dashboard';
-import { navigateTo } from '../shared/navigation';
 import { loadStreak } from '../streak/streak';
 import type { RoomCard, RoomMenuHooks } from '../types/rooms';
-import type { ScreenName } from '../types/screens';
 import { fetchRooms } from './api';
 import { roomsStore, type RoomsSurface } from './state';
 
@@ -99,23 +96,6 @@ export async function enterRoomsScreen(): Promise<void> {
     startRoomsPolling();
     void loadStreak('rooms');
     await loadRooms();
-}
-
-/** Open Rooms from a header screen. */
-export async function handleOpenRooms(currentScreen: ScreenName): Promise<void> {
-    navigateTo('rooms', currentScreen);
-    await enterRoomsScreen();
-}
-
-/** Go from Rooms to mission planning. */
-export function handleRoomsToPlan(): void {
-    navigateTo('plan', 'rooms');
-}
-
-/** Go from Rooms to the Dashboard and load it. */
-export async function handleRoomsToDashboard(): Promise<void> {
-    navigateTo('dashboard', 'rooms');
-    await loadDashboard();
 }
 
 /** Reload the rooms after a failed first load. */

@@ -3,29 +3,28 @@ import { handleLogout } from '../auth/logout';
 import { authStore } from '../auth/state';
 import { openFeedbackForm } from '../feedback/feedback';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
-import { useT } from '../i18n/i18n';
+import { useT, type TranslationKey } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { StreakPopup } from '../streak/StreakPopup';
 import { closeStreakPopup, streakStore, toggleStreakPopup } from '../streak/streak';
-import type { HeaderScreenName } from '../types/screens';
+import { HEADER_SCREENS, type HeaderScreenName } from '../types/screens';
+import { goToHeaderScreen } from './header-navigation';
 import { closeUserMenu, toggleUserMenu, userMenuStore } from './user-menu';
 
-/** One navigation button of a header. */
-interface HeaderButton {
-    id: string;
-    label: string;
-    onClick: () => void;
-}
+const NAVIGATION_LABELS = {
+    plan: 'nav.plan',
+    dashboard: 'nav.dashboard',
+    rooms: 'nav.rooms'
+} as const satisfies Record<HeaderScreenName, TranslationKey>;
 
 interface HeaderProps {
     screen: HeaderScreenName;
     /** The classes of the header element. */
     className: string;
-    navigation: readonly HeaderButton[];
 }
 
-/** Draw a header. The ids follow the screen, because the stylesheet styles them by id. */
-export function Header({ screen, className, navigation }: HeaderProps) {
+/** Draw the header of a screen: the wordmark, the three navigation buttons, the streak and the account menu. */
+export function Header({ screen, className }: HeaderProps) {
     const t = useT();
     const { openScreen: openMenuScreen } = useStore(userMenuStore);
     const { openScreen: openStreakScreen, currentStreak } = useStore(streakStore);
@@ -56,8 +55,16 @@ export function Header({ screen, className, navigation }: HeaderProps) {
     return (
         <header className={className}>
             <h1 className="wordmark">ExecutionOS</h1>
-            {navigation.map(/** Draw a navigation button. */ (button) => (
-                <button key={button.id} type="button" id={button.id} onClick={button.onClick}>{button.label}</button>
+            {HEADER_SCREENS.map(/** Draw a navigation button. The one of the current screen is marked. */ (target) => (
+                <button
+                    key={target}
+                    type="button"
+                    className="header-nav-btn"
+                    aria-current={target === screen ? 'page' : undefined}
+                    onClick={() => { void goToHeaderScreen(target, screen); }}
+                >
+                    {t(NAVIGATION_LABELS[target])}
+                </button>
             ))}
             <div className="streak-container">
                 <button
