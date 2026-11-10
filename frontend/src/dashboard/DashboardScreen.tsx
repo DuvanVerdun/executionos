@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
+import { useT, type TranslationKey } from '../i18n/i18n';
 import { getElement } from '../lib/dom';
 import { formatLocalDate, formatPeriodDate, parseLocalDate } from '../lib/dates';
 import { formatDurationHoursMinutes } from '../lib/durations';
@@ -21,18 +22,18 @@ import {
 import { SessionHistory } from './SessionHistory';
 import { TrendChart } from './TrendChart';
 
-const PERIODS: readonly { value: DashboardPeriod; label: string }[] = [
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-    { value: 'year', label: 'Year' },
-    { value: 'all_time', label: 'All Time' }
-];
+const PERIODS = [
+    { value: 'week', label: 'dashboard.week' },
+    { value: 'month', label: 'dashboard.month' },
+    { value: 'year', label: 'dashboard.year' },
+    { value: 'all_time', label: 'dashboard.allTime' }
+] as const satisfies readonly { value: DashboardPeriod; label: TranslationKey }[];
 
-const METRICS: readonly { value: DashboardMetric; label: string }[] = [
-    { value: 'time', label: 'Time' },
-    { value: 'completion', label: 'Completion' },
-    { value: 'sessions', label: 'Sessions' }
-];
+const METRICS = [
+    { value: 'time', label: 'dashboard.metricTime' },
+    { value: 'completion', label: 'dashboard.metricCompletion' },
+    { value: 'sessions', label: 'dashboard.metricSessions' }
+] as const satisfies readonly { value: DashboardMetric; label: TranslationKey }[];
 
 /** Return the text of the period label: a month, a year, a range of days, or nothing for all time. */
 function getPeriodLabel(period: DashboardPeriod, range: PeriodRange): string {
@@ -58,6 +59,7 @@ function scrollBackToStats(summary: HTMLElement | null): void {
 
 /** Draw the Dashboard screen. */
 export function DashboardScreen() {
+    const t = useT();
     const { period, metric, periodRange, surface, data } = useStore(dashboardStore);
     const [isRetrying, setIsRetrying] = useState(false);
     const [isBackDisabled, setIsBackDisabled] = useState(true);
@@ -111,8 +113,8 @@ export function DashboardScreen() {
                     screen="dashboard"
                     className="dashboard-header"
                     navigation={[
-                        { id: 'dashboard-new-mission-btn', label: 'New Mission', onClick: handleDashboardToPlan },
-                        { id: 'dashboard-rooms-btn', label: 'Focus Rooms', onClick: () => { void handleOpenRooms('dashboard'); } }
+                        { id: 'dashboard-new-mission-btn', label: t('dashboard.newMission'), onClick: handleDashboardToPlan },
+                        { id: 'dashboard-rooms-btn', label: t('nav.rooms'), onClick: () => { void handleOpenRooms('dashboard'); } }
                     ]}
                 />
 
@@ -129,7 +131,7 @@ export function DashboardScreen() {
                                     className={period === option.value ? 'active' : undefined}
                                     onClick={() => { void changeDashboardPeriod(option.value); }}
                                 >
-                                    {option.label}
+                                    {t(option.label)}
                                 </button>
                             ))}
                         </div>
@@ -138,7 +140,7 @@ export function DashboardScreen() {
                             <button
                                 type="button"
                                 id="dashboard-previous-period-btn"
-                                aria-label="Previous period"
+                                aria-label={t('dashboard.previousPeriod')}
                                 disabled={isAllTime}
                                 onClick={() => { void moveDashboardPeriod(-1); }}
                             >
@@ -150,7 +152,7 @@ export function DashboardScreen() {
                             <button
                                 type="button"
                                 id="dashboard-next-period-btn"
-                                aria-label="Next period"
+                                aria-label={t('dashboard.nextPeriod')}
                                 disabled={isAllTime || periodRange.end_date >= today}
                                 onClick={() => { void moveDashboardPeriod(1); }}
                             >
@@ -160,14 +162,14 @@ export function DashboardScreen() {
 
                     </section>
 
-                    <div id="dashboard-loading" className="dashboard-loading" role="status" aria-label="Loading dashboard" style={{ display: surface === 'loading' ? 'flex' : 'none' }}>
+                    <div id="dashboard-loading" className="dashboard-loading" role="status" aria-label={t('dashboard.loading')} style={{ display: surface === 'loading' ? 'flex' : 'none' }}>
                         <section className="dashboard-loading-summary" aria-hidden="true">
-                            <h2 className="dashboard-content-title">Stats</h2>
+                            <h2 className="dashboard-content-title">{t('dashboard.stats')}</h2>
                             <div className="dashboard-skeleton dashboard-skeleton-summary"></div>
                         </section>
                         <div className="dashboard-skeleton dashboard-skeleton-chart" aria-hidden="true"></div>
                         <section className="dashboard-loading-history" aria-hidden="true">
-                            <h2 className="dashboard-content-title">Session History</h2>
+                            <h2 className="dashboard-content-title">{t('dashboard.sessionHistory')}</h2>
                             <div className="dashboard-skeleton dashboard-skeleton-session"></div>
                         </section>
                     </div>
@@ -182,7 +184,7 @@ export function DashboardScreen() {
                                     tabIndex={-1}
                                 >
                                     <h2 className="dashboard-content-title">
-                                        Stats
+                                        {t('dashboard.stats')}
                                     </h2>
 
                                     <div className="dashboard-summary-grid">
@@ -190,25 +192,25 @@ export function DashboardScreen() {
                                             <p id="dashboard-total-time-display" className="dashboard-summary-value">
                                                 {formatDurationHoursMinutes(data.summary.total_time_seconds)}
                                             </p>
-                                            <p className="dashboard-summary-label">Focused</p>
+                                            <p className="dashboard-summary-label">{t('review.focused')}</p>
                                         </div>
                                         <div className="dashboard-summary-card">
                                             <p id="dashboard-amount-of-sessions-display" className="dashboard-summary-value">
                                                 {String(data.summary.total_sessions)}
                                             </p>
-                                            <p className="dashboard-summary-label">Sessions</p>
+                                            <p className="dashboard-summary-label">{t('review.sessions')}</p>
                                         </div>
                                         <div className="dashboard-summary-card">
                                             <p id="dashboard-average-percentage-display" className="dashboard-summary-value">
                                                 {data.summary.average_completion_percentage === null ? '—' : `${Math.round(data.summary.average_completion_percentage)}%`}
                                             </p>
-                                            <p className="dashboard-summary-label">Avg. Completion</p>
+                                            <p className="dashboard-summary-label">{t('dashboard.averageCompletion')}</p>
                                         </div>
                                         <div className="dashboard-summary-card">
                                             <p id="dashboard-average-session-time-display" className="dashboard-summary-value">
                                                 {data.summary.average_session_time_seconds === null ? '—' : formatDurationHoursMinutes(data.summary.average_session_time_seconds)}
                                             </p>
-                                            <p className="dashboard-summary-label">Avg. Session Time</p>
+                                            <p className="dashboard-summary-label">{t('review.averageSessionTime')}</p>
                                         </div>
                                     </div>
                                 </section>
@@ -224,7 +226,7 @@ export function DashboardScreen() {
                                                 className={metric === option.value ? 'active' : undefined}
                                                 onClick={() => { changeDashboardMetric(option.value); }}
                                             >
-                                                {option.label}
+                                                {t(option.label)}
                                             </button>
                                         ))}
                                     </div>
@@ -241,16 +243,16 @@ export function DashboardScreen() {
                     </div>
 
                     <div id="dashboard-error" className="dashboard-error" role="alert" style={{ display: surface === 'error' ? 'flex' : 'none' }}>
-                        <p className="dashboard-error-message">Couldn't reach the server.<br />Please try again in a moment.</p>
+                        <p className="dashboard-error-message">{t('dashboard.unreachable')}<br />{t('dashboard.tryAgainSoon')}</p>
                         <button type="button" id="dashboard-retry-btn" disabled={isRetrying} onClick={() => { void handleRetry(); }}>
-                            {isRetrying ? 'Retrying…' : 'Retry'}
+                            {isRetrying ? t('loading.retrying') : t('common.retry')}
                         </button>
                     </div>
                     <div id="empty-dashboard-cta-container" className="empty-dashboard-cta-container" style={{ display: surface === 'empty' ? 'flex' : 'none' }}>
-                        <h2 className="empty-dashboard-cta-title">No sessions during this period</h2>
-                        <p className="empty-dashboard-cta-paragraph">Start a mission and build your consistency.</p>
+                        <h2 className="empty-dashboard-cta-title">{t('dashboard.emptyTitle')}</h2>
+                        <p className="empty-dashboard-cta-paragraph">{t('dashboard.emptyText')}</p>
                         <button id="empty-dashboard-start-mission-btn" className="empty-dashboard-start-mission-btn white-filled-button" onClick={handleDashboardToPlan}>
-                            Start Mission
+                            {t('dashboard.startMission')}
                         </button>
                     </div>
 
@@ -262,8 +264,8 @@ export function DashboardScreen() {
                 type="button"
                 id="dashboard-back-to-stats-btn"
                 className="normal-button dashboard-back-to-stats"
-                aria-label="Back to stats"
-                title="Back to stats"
+                aria-label={t('dashboard.backToStats')}
+                title={t('dashboard.backToStats')}
                 aria-hidden={isBackDisabled}
                 disabled={isBackDisabled}
                 onClick={() => { scrollBackToStats(summaryRef.current); }}

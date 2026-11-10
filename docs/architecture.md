@@ -127,6 +127,22 @@ src/
   box. Layout and most display-only components are not tested.
 - GitHub Actions runs them in the `frontend` job (`.github/workflows/tests.yml`).
 
+## Frontend Texts (i18n)
+
+- Every text the user sees goes through `t('feature.name')`. No screen holds its own text.
+  Our own small module, no library (`src/i18n/`).
+- `en.ts` holds the English texts and decides which keys exist. Keys are grouped by feature.
+  `es.ts` holds the Spanish texts. A text missing there falls back to English.
+- Keys are typed. A wrong key fails `npm run typecheck`. A text with a `{slot}` needs its
+  value: `t('review.target', { time })`.
+- Components call `useT()`, so they redraw when the language changes. Plain code (logic
+  files) imports `t`. `setLanguage` changes the language.
+- Plurals use two keys (`membersOne`, `membersOther`) and the code picks one.
+- Not through `t()` yet: dates (`Intl` with `en-US`), duration units, and messages that
+  the backend sends. Developer messages (`console.error`, thrown errors) stay English.
+- Store values that a screen turns into text (`pauseLabel`, `finishLabel`) stay as typed
+  values. The screen calls `t()`.
+
 ## Backend Structure
 
 `backend/main.py` only builds the app, so `gunicorn main:app` and `FLASK_APP=main.py`

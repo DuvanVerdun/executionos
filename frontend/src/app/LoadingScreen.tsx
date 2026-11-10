@@ -1,9 +1,11 @@
+import { useT } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { Screen } from '../shared/Screen';
 import { loadingStore, retryInitialization } from './startup';
 
 /** Draw the Loading screen. */
 export function LoadingScreen() {
+    const t = useT();
     const { hasError, isRetrying } = useStore(loadingStore);
 
     return (
@@ -14,7 +16,7 @@ export function LoadingScreen() {
                     <div className="loading-spinner"></div>
                 </div>
                 <p id="loading-error-message" style={{ display: hasError ? 'flex' : 'none' }}>
-                    Couldn't reach the server. Try again in a moment.
+                    {t('loading.unreachable')}
                 </p>
                 <button
                     id="loading-retry-btn"
@@ -23,7 +25,7 @@ export function LoadingScreen() {
                     disabled={isRetrying}
                     onClick={() => { void retryInitialization(); }}
                 >
-                    {isRetrying ? 'Retrying…' : 'Retry'}
+                    {isRetrying ? t('loading.retrying') : t('loading.retry')}
                 </button>
             </div>
         </Screen>

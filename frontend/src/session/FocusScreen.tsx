@@ -1,3 +1,4 @@
+import { useT } from '../i18n/i18n';
 import { formatDuration } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { roomSessionStore } from '../rooms/room-session-state';
@@ -9,6 +10,7 @@ import { focusStore } from './ui-state';
 
 /** Draw the Focus screen. A room session shows its own session and its room name. */
 export function FocusScreen() {
+    const t = useT();
     const personal = useStore(sessionStore).active;
     const room = useStore(roomSessionStore);
     const { pauseLabel } = useStore(focusStore);
@@ -36,10 +38,10 @@ export function FocusScreen() {
 
                 <div className="focus-button-container">
                     <button id="focus-pause-btn" className="normal-button" disabled={room.isBusy} onClick={handlePauseResume}>
-                        {pauseLabel}
+                        {pauseLabel === 'Pause' ? t('focus.pause') : t('focus.resume')}
                     </button>
                     <button id="focus-stop-btn" className="normal-button" disabled={room.isBusy} onClick={handleStopWork}>
-                        Stop
+                        {t('focus.stop')}
                     </button>
                 </div>
             </ProgressRing>

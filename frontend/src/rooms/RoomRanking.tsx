@@ -1,3 +1,4 @@
+import { useT } from '../i18n/i18n';
 import { withCssVariables } from '../lib/css';
 import { formatDurationHoursMinutes } from '../lib/durations';
 import type { RankingEntry } from '../types/rooms';
@@ -10,11 +11,12 @@ function RoomPill({ text }: { text: string }) {
 
 /** Draw the ring that shows a member's state. */
 function MemberRing({ member }: { member: RankingEntry }) {
+    const t = useT();
     return (
         <span
             className={`member-ring member-ring-${member.state.replace('_', '-')}`}
             role="img"
-            aria-label={MEMBER_STATE_LABELS[member.state]}
+            aria-label={t(MEMBER_STATE_LABELS[member.state])}
             style={member.state === 'working' ? withCssVariables({}, { '--ring-pct': `${member.ring_percentage ?? 0}%` }) : undefined}
         ></span>
     );
@@ -22,17 +24,18 @@ function MemberRing({ member }: { member: RankingEntry }) {
 
 /** Draw one row of the ranking. */
 function RankingRow({ member }: { member: RankingEntry }) {
+    const t = useT();
     return (
         <div className={member.is_you ? 'room-ranking-row is-you' : 'room-ranking-row'}>
             <span className="room-ranking-position">{String(member.position)}</span>
             <MemberRing member={member} />
             <span className="room-ranking-identity">
                 <span className="room-ranking-name">{member.username}</span>
-                {member.is_owner && <RoomPill text="Owner" />}
-                {member.is_you && <RoomPill text="You" />}
+                {member.is_owner && <RoomPill text={t('rooms.owner')} />}
+                {member.is_you && <RoomPill text={t('rooms.you')} />}
             </span>
             <span className="room-ranking-total">{formatDurationHoursMinutes(member.total_time_seconds)}</span>
-            <span className="room-ranking-sessions">{`${member.sessions_count} ${member.sessions_count === 1 ? 'session' : 'sessions'}`}</span>
+            <span className="room-ranking-sessions">{member.sessions_count === 1 ? t('rooms.sessionsOne') : t('rooms.sessionsOther', { count: member.sessions_count })}</span>
         </div>
     );
 }

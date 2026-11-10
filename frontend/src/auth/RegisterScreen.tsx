@@ -1,5 +1,6 @@
 import { useRef, useState, type SubmitEvent } from 'react';
 import { routeToInitialScreen } from '../app/startup';
+import { useT } from '../i18n/i18n';
 import { getPasswordError } from '../lib/validation';
 import { useStore } from '../lib/store';
 import { Screen } from '../shared/Screen';
@@ -15,6 +16,7 @@ const NO_ERRORS: Record<FieldName, string> = { email: '', username: '', password
 
 /** Draw the Register screen. */
 export function RegisterScreen() {
+    const t = useT();
     const { registerEmail, registerUsername, registerPassword } = useStore(authFormStore);
     const [fieldErrors, setFieldErrors] = useState(NO_ERRORS);
     const [generalError, setGeneralError] = useState('');
@@ -36,11 +38,11 @@ export function RegisterScreen() {
         setGeneralError('');
         const errors = { ...NO_ERRORS };
         const email = registerEmail;
-        if (!email) errors.email = 'Enter your email.';
-        else if (!email.includes('@')) errors.email = 'Include @ in your email.';
-        else if (!email.split('@')[1]) errors.email = 'Add the address after @.';
-        else if (emailRef.current?.validity.typeMismatch) errors.email = 'Enter a valid email, like name@example.com.';
-        if (!registerUsername) errors.username = 'Enter your username.';
+        if (!email) errors.email = t('auth.register.emailRequired');
+        else if (!email.includes('@')) errors.email = t('auth.register.emailMissingAt');
+        else if (!email.split('@')[1]) errors.email = t('auth.register.emailMissingDomain');
+        else if (emailRef.current?.validity.typeMismatch) errors.email = t('auth.register.emailInvalid');
+        if (!registerUsername) errors.username = t('auth.register.usernameRequired');
         const passwordError = getPasswordError(registerPassword);
         if (passwordError) errors.password = passwordError;
         setFieldErrors(errors);
@@ -56,12 +58,12 @@ export function RegisterScreen() {
                 setAuthenticatedUser(result);
                 await routeToInitialScreen('register');
             } else if (result.status === 409) {
-                setGeneralError('Email or username is already in use.');
+                setGeneralError(t('auth.register.alreadyInUse'));
             } else {
-                setGeneralError("Couldn't create your account. Please try again.");
+                setGeneralError(t('auth.register.failed'));
             }
         } catch {
-            setGeneralError("Couldn't reach the server. Try again.");
+            setGeneralError(t('common.serverUnreachable'));
         } finally {
             setIsSubmitting(false);
         }
@@ -71,11 +73,11 @@ export function RegisterScreen() {
         <Screen name="register" className="wordmark-centered-layout register-screen">
             <h1 className="wordmark">ExecutionOS</h1>
             <div className="register-card">
-                <h2 className="card-header">Register</h2>
+                <h2 className="card-header">{t('auth.register.title')}</h2>
 
                 <form id="register-form" noValidate aria-busy={isSubmitting ? true : undefined} onSubmit={(event) => { void handleRegister(event); }}>
                     <AuthField
-                        id="register-email-input" label="Email" type="email" autoComplete="email"
+                        id="register-email-input" label={t('auth.register.emailLabel')} type="email" autoComplete="email"
                         containerClass="register-email-input-container"
                         value={registerEmail}
                         onChange={(value) => { authFormStore.update({ registerEmail: value }); clearErrorsOf('email'); }}
@@ -83,7 +85,7 @@ export function RegisterScreen() {
                         describedBy="register-email-error-message" inputRef={emailRef}
                     />
                     <AuthField
-                        id="register-username-input" label="Username" type="text" autoComplete="username"
+                        id="register-username-input" label={t('auth.register.usernameLabel')} type="text" autoComplete="username"
                         containerClass="register-username-input-container"
                         value={registerUsername}
                         onChange={(value) => { authFormStore.update({ registerUsername: value }); clearErrorsOf('username'); }}
@@ -91,22 +93,22 @@ export function RegisterScreen() {
                         describedBy="register-username-error-message" inputRef={usernameRef}
                     />
                     <AuthField
-                        id="register-password-input" label="Password" type="password" autoComplete="new-password"
+                        id="register-password-input" label={t('auth.passwordLabel')} type="password" autoComplete="new-password"
                         containerClass="register-password-input-container"
                         value={registerPassword}
                         onChange={(value) => { authFormStore.update({ registerPassword: value }); clearErrorsOf('password'); }}
                         error={fieldErrors.password} errorId="register-password-error-message"
                         describedBy="register-password-guidance register-password-error-message" inputRef={passwordRef}
-                        guidance={<p className="auth-password-guidance" id="register-password-guidance">12+ characters: uppercase, lowercase, number and symbol.</p>}
+                        guidance={<p className="auth-password-guidance" id="register-password-guidance">{t('auth.register.passwordGuidance')}</p>}
                     />
                     <div className="register-error-and-button-container">
                         <p className="form-error-message auth-general-error" id="register-error-message" aria-live="polite">{generalError}</p>
                         <button type="submit" className="cta-button" id="register-submit-btn" disabled={isSubmitting}>
-                            {isSubmitting ? 'Creating account...' : 'Register'}
+                            {isSubmitting ? t('auth.register.submitting') : t('auth.register.submit')}
                         </button>
                         <div className="switch-btn-container">
                             <button type="button" className="switch-btn" id="register-switch-to-login-btn" onClick={() => { navigateTo('login', 'register'); }}>
-                                <span>Already have an account?</span> <span className="auth-switch-action">Log in</span>
+                                <span>{t('auth.register.switchPrompt')}</span> <span className="auth-switch-action">{t('auth.register.switchToLogin')}</span>
                             </button>
                         </div>
                     </div>

@@ -5,11 +5,12 @@ import {
     ROOM_RETRY_DELAY_MS,
     ROOM_RETRY_WINDOW_MS
 } from '../config';
+import { t } from '../i18n/i18n';
 import { parseServerTime } from '../lib/dates';
 import { formatCountdown, formatDurationHoursMinutes, parseHHMMToSeconds } from '../lib/durations';
 import { errorStatus } from '../lib/errors';
 import { delay, waitForMinimumFeedback } from '../lib/timing';
-import { reviewStore, focusStore } from '../session/ui-state';
+import { reviewStore, focusStore, type FinishLabel } from '../session/ui-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { getCurrentScreenName, navigateTo } from '../shared/navigation';
 import type { RoomSessionEnvelope, RoomSessionNotice, RoomSessionResult } from '../types/rooms';
@@ -23,7 +24,6 @@ import {
 } from './api';
 import { armCheckinSound, cancelCheckinSound, unlockCheckinAudio } from './checkin-sound';
 import { getServerNowMs, updateClockOffset } from './clock';
-import { ROOM_COPY } from './copy';
 import { loadRoom, openRoom, showUnavailableRoom, startRoomPolling } from './room';
 import {
     createInitialRoomSessionState, patchRoomDisplay, roomSessionStore
@@ -55,7 +55,7 @@ type LockedOutcome<R> =
     | ({ failed: true } & Without<'result' | 'skipped' | 'unauthorized'>);
 
 /** The Finish label to bring back when the room session request ends. */
-let restoreFinishLabel: string | null = null;
+let restoreFinishLabel: FinishLabel | null = null;
 
 /** Report whether a response is a room-session envelope. */
 export function isRoomSessionEnvelope(result: RoomSessionResult | undefined): result is RoomSessionEnvelope {
@@ -86,14 +86,14 @@ function refreshRoomDisplay(): number {
 function getSessionEndMessage(notice: RoomSessionNotice): { text: string; error?: boolean } {
     const time = formatDurationHoursMinutes(notice.actual_time_seconds ?? 0);
     const messages: Partial<Record<string, { text: string; error?: boolean }>> = {
-        'missed_checkin:true': { text: `You didn't check in. Session saved up to ${time}.` },
-        'missed_checkin:false': { text: "You didn't check in and there was no activity. Session not saved.", error: true },
-        'paused_timeout:true': { text: `You left your session paused. Saved at ${time}.` },
-        'disconnected:true': { text: `Your session ended when the app closed. Saved up to ${time}.` },
-        'disconnected:false': { text: 'Your session ended when the app closed, with no activity. Not saved.', error: true }
+        'missed_checkin:true': { text: t('rooms.endMissedSaved', { time }) },
+        'missed_checkin:false': { text: t('rooms.endMissedNotSaved'), error: true },
+        'paused_timeout:true': { text: t('rooms.endPausedSaved', { time }) },
+        'disconnected:true': { text: t('rooms.endDisconnectedSaved', { time }) },
+        'disconnected:false': { text: t('rooms.endDisconnectedNotSaved'), error: true }
     };
     return messages[`${notice.reason}:${notice.saved}`]
-        ?? { text: ROOM_COPY.sessionEndedGeneric, error: !notice.saved };
+        ?? { text: t('rooms.endGeneric'), error: !notice.saved };
 }
 
 /** Copy a room-session envelope into the client state. Return whether a session is active. */
@@ -263,7 +263,7 @@ function scheduleCheckin(): void {
 }
 
 /** Lock or unlock the room session controls while a server-confirmed request (Finish) is in flight. */
-function setRoomSessionBusy(isBusy: boolean, busyLabel: string | null = null): void {
+function setRoomSessionBusy(isBusy: boolean, busyLabel: FinishLabel | null = null): void {
     roomSessionStore.update({ isBusy });
     if (isBusy && busyLabel !== null) {
         restoreFinishLabel = reviewStore.get().finishLabel;
@@ -276,7 +276,7 @@ function setRoomSessionBusy(isBusy: boolean, busyLabel: string | null = null): v
 
 /** Send one server-confirmed room session request under the single in-flight lock. */
 async function performRoomSessionRequest<R>(
-    busyLabel: string,
+    busyLabel: FinishLabel,
     request: () => Promise<R>,
     minimumFeedbackStartedAt: number | null = null
 ): Promise<LockedOutcome<R>> {
@@ -409,7 +409,7 @@ async function endRoomSession({ saved = false }: { saved?: boolean } = {}): Prom
     resetRoomSessionClient();
     reviewStore.update({ finishLabel: 'Finish', saveMessage: '' });
     if (saved) {
-        setFloatingMessage(ROOM_COPY.sessionSaved, { saved: true });
+        setFloatingMessage(t('session.saved'), { saved: true });
         if (roomId !== null) addSavedSessionToCachedSummary(roomId, savedSeconds);
     }
     if (roomId !== null && (screen === 'focus' || screen === 'review')) await openRoom(roomId, screen);
@@ -482,10 +482,10 @@ async function settleRoomStart(outcome: QueuedOutcome): Promise<void> {
         return;
     }
     if (outcome.failed || !isRoomSessionEnvelope(outcome.result)) {
-        rollbackRoomStart(ROOM_COPY.sessionErrors.start);
+        rollbackRoomStart(t('rooms.errorStart'));
         return;
     }
-    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.start);
+    await settleRoomSessionOutcome(outcome, t('rooms.errorStart'));
 }
 
 /** Show Focus at once and start the room session on the server. The mission card is already valid. */
@@ -514,7 +514,7 @@ export async function handleRoomPauseResume(): Promise<void> {
         /** Send the pause or resume event. */
         () => postRoomSessionEvent(pausing ? 'pause' : 'resume', getCurrentScreenName())
     );
-    await settleRoomSessionOutcome(outcome, pausing ? ROOM_COPY.sessionErrors.pause : ROOM_COPY.sessionErrors.resume);
+    await settleRoomSessionOutcome(outcome, pausing ? t('rooms.errorPause') : t('rooms.errorResume'));
 }
 
 /** Fill the Review summary cards at once from the last known room summary plus this session. Return whether it could. */
@@ -564,7 +564,7 @@ export async function handleRoomStop(): Promise<void> {
         /** Send the pause event that Stop uses. */
         () => postRoomSessionEvent('pause', getCurrentScreenName())
     );
-    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.stop);
+    await settleRoomSessionOutcome(outcome, t('rooms.errorStop'));
 }
 
 /** Resume reviewed work: return to Focus at once and resume on the server. */
@@ -579,7 +579,7 @@ export async function handleRoomContinue(): Promise<void> {
         /** Send the resume event that Continue uses. */
         () => postRoomSessionEvent('resume', getCurrentScreenName())
     );
-    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.continue);
+    await settleRoomSessionOutcome(outcome, t('rooms.errorContinue'));
 }
 
 /** Save the room session on the server. A failed Finish retries with the same submission ID. */
@@ -602,7 +602,7 @@ export async function handleRoomFinish(): Promise<void> {
     if (outcome.failed || !isRoomSessionEnvelope(result)) {
         roomSessionStore.update({ finishFailed: true });
         reviewStore.update({ finishLabel: 'Try again' });
-        showReviewRoomError(ROOM_COPY.finishFailed);
+        showReviewRoomError(t('session.finishFailed'));
         return;
     }
     if (applyRoomSessionEnvelope(result)) {
@@ -635,7 +635,7 @@ export async function handleCheckinConfirm(): Promise<void> {
         /** Send the check-in event. */
         () => postRoomSessionEvent('checkin', getCurrentScreenName())
     );
-    await settleRoomSessionOutcome(outcome, ROOM_COPY.sessionErrors.checkin);
+    await settleRoomSessionOutcome(outcome, t('rooms.errorCheckin'));
 }
 
 /** Set the Finish label for the room version of the Review screen. */

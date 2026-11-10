@@ -1,4 +1,5 @@
 import { useState, type ReactNode, type RefObject } from 'react';
+import { useT } from '../i18n/i18n';
 
 interface AuthFieldProps {
     id: string;
@@ -22,6 +23,7 @@ interface AuthFieldProps {
 export function AuthField({
     id, label, type, autoComplete, containerClass, value, onChange, error, errorId, describedBy, inputRef, guidance
 }: AuthFieldProps) {
+    const t = useT();
     const [isVisible, setIsVisible] = useState(false);
     const isPassword = type === 'password';
 
@@ -45,7 +47,7 @@ export function AuthField({
                     <button
                         type="button"
                         className="password-visibility-btn"
-                        aria-label={isVisible ? 'Hide password' : 'Show password'}
+                        aria-label={isVisible ? t('auth.hidePassword') : t('auth.showPassword')}
                         onClick={() => { setIsVisible(!isVisible); }}
                     >
                         <svg

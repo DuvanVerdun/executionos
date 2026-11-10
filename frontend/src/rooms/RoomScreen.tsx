@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { BEAT_AVERAGE_INCREMENT_SECONDS } from '../config';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
+import { useT } from '../i18n/i18n';
 import { closestElement } from '../lib/dom';
 import { formatAverageSessionTime, formatDurationHoursMinutes, formatSecondsAsHHMM } from '../lib/durations';
 import { useStore } from '../lib/store';
@@ -18,6 +19,7 @@ import { roomStore } from './state';
 
 /** Draw the Room screen. */
 export function RoomScreen() {
+    const t = useT();
     const { view, snapshot, menuOpen, busyAction } = useStore(roomStore);
     const { isBusy: isSessionBusy } = useStore(roomSessionStore);
     const [mission, setMission] = useState('');
@@ -81,7 +83,7 @@ export function RoomScreen() {
             <div className="room-container">
 
                 <div className="room-topbar">
-                    <button type="button" id="room-back-btn" className="room-icon-btn" aria-label="Back to rooms" onClick={() => { void handleRoomBack(); }}>
+                    <button type="button" id="room-back-btn" className="room-icon-btn" aria-label={t('rooms.back')} onClick={() => { void handleRoomBack(); }}>
                         <span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>
                     </button>
                     <h1 id="room-title" className="room-title" hidden={view !== 'ready'}>{snapshot?.room.name}</h1>
@@ -91,7 +93,7 @@ export function RoomScreen() {
                             type="button"
                             id="room-menu-btn"
                             className="room-icon-btn"
-                            aria-label="Open room menu"
+                            aria-label={t('rooms.openRoomMenu')}
                             aria-haspopup="menu"
                             aria-expanded={menuOpen}
                             onClick={() => { setRoomMenuState(!menuOpen); }}
@@ -110,15 +112,15 @@ export function RoomScreen() {
                     </div>
                 </div>
 
-                <div id="room-loading" className="room-loading" role="status" aria-label="Loading room" style={{ display: view === 'loading' ? 'flex' : 'none' }}>
+                <div id="room-loading" className="room-loading" role="status" aria-label={t('rooms.loadingRoom')} style={{ display: view === 'loading' ? 'flex' : 'none' }}>
                     <div className="dashboard-skeleton room-skeleton-summary" aria-hidden="true"></div>
                     <div className="dashboard-skeleton room-skeleton-mission" aria-hidden="true"></div>
                     <section className="room-section" aria-hidden="true">
-                        <h2 className="dashboard-content-title">Ranking</h2>
+                        <h2 className="dashboard-content-title">{t('rooms.ranking')}</h2>
                         <div className="dashboard-skeleton room-skeleton-ranking"></div>
                     </section>
                     <section className="room-section" aria-hidden="true">
-                        <h2 className="dashboard-content-title">Room history</h2>
+                        <h2 className="dashboard-content-title">{t('rooms.history')}</h2>
                         <div className="dashboard-skeleton room-skeleton-history"></div>
                     </section>
                 </div>
@@ -131,26 +133,26 @@ export function RoomScreen() {
                                 <p id="room-total-time" className="dashboard-summary-value">
                                     {snapshot ? formatDurationHoursMinutes(snapshot.summary.total_time_seconds) : ''}
                                 </p>
-                                <p className="dashboard-summary-label">Focused</p>
+                                <p className="dashboard-summary-label">{t('review.focused')}</p>
                             </div>
                             <div className="dashboard-summary-card">
                                 <p id="room-session-count" className="dashboard-summary-value">
                                     {snapshot ? String(snapshot.summary.total_sessions) : ''}
                                 </p>
-                                <p className="dashboard-summary-label">Sessions</p>
+                                <p className="dashboard-summary-label">{t('review.sessions')}</p>
                             </div>
                             <div className="dashboard-summary-card">
                                 <p id="room-people-count" className="dashboard-summary-value">
                                     {snapshot ? String(snapshot.summary.members_count) : ''}
                                 </p>
-                                <p className="dashboard-summary-label">People</p>
+                                <p className="dashboard-summary-label">{t('review.people')}</p>
                             </div>
                             <div className="dashboard-summary-card">
                                 <p id="room-average-time" className="dashboard-summary-value">
                                     {snapshot ? formatAverageSessionTime(snapshot.summary.average_session_time_seconds) : ''}
                                 </p>
-                                <p className="dashboard-summary-label">Avg. Session Time</p>
-                                <button type="button" id="room-beat-btn" className="room-beat-btn" onClick={handleBeatAverage}>Can you beat it?</button>
+                                <p className="dashboard-summary-label">{t('review.averageSessionTime')}</p>
+                                <button type="button" id="room-beat-btn" className="room-beat-btn" onClick={handleBeatAverage}>{t('rooms.beatIt')}</button>
                             </div>
                         </div>
                     </div>
@@ -179,30 +181,30 @@ export function RoomScreen() {
 
                     <section className="room-section">
                         <h2 id="room-ranking-title" className="dashboard-content-title">
-                            {snapshot ? `Ranking — Members of this room (${snapshot.summary.members_count})` : ''}
+                            {snapshot ? t('rooms.rankingTitle', { count: snapshot.summary.members_count }) : ''}
                         </h2>
                         <RoomRanking ranking={snapshot?.ranking ?? []} />
                     </section>
 
                     <section className="room-section">
-                        <h2 className="dashboard-content-title">Room history</h2>
+                        <h2 className="dashboard-content-title">{t('rooms.history')}</h2>
                         <RoomHistory />
                     </section>
 
                 </div>
 
                 <div id="room-error" className="dashboard-error" role="alert" style={{ display: view === 'error' ? 'flex' : 'none' }}>
-                    <p className="dashboard-error-message">Couldn't reach the server.<br />Please try again in a moment.</p>
+                    <p className="dashboard-error-message">{t('dashboard.unreachable')}<br />{t('dashboard.tryAgainSoon')}</p>
                     <button type="button" id="room-retry-btn" disabled={isRetrying} onClick={() => { void handleRetry(); }}>
-                        {isRetrying ? 'Retrying…' : 'Retry'}
+                        {isRetrying ? t('loading.retrying') : t('common.retry')}
                     </button>
                 </div>
 
                 <div id="room-unavailable" className="empty-dashboard-cta-container" style={{ display: view === 'unavailable' ? 'flex' : 'none' }}>
-                    <h2 className="empty-dashboard-cta-title">This room isn't available</h2>
-                    <p className="empty-dashboard-cta-paragraph">It may have been deleted, or the link may no longer be valid.</p>
+                    <h2 className="empty-dashboard-cta-title">{t('rooms.unavailableTitle')}</h2>
+                    <p className="empty-dashboard-cta-paragraph">{t('rooms.unavailableText')}</p>
                     <button type="button" id="room-unavailable-back-btn" className="empty-dashboard-start-mission-btn white-filled-button" onClick={() => { void handleRoomBack(); }}>
-                        Back to rooms
+                        {t('rooms.back')}
                     </button>
                 </div>
 

@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n';
 import { createStore } from '../lib/store';
 import { closeUserMenu, userMenuStore } from '../shared/user-menu';
 import type { HeaderScreenName } from '../types/screens';
@@ -49,8 +50,8 @@ export async function sendFeedback(text: string): Promise<SendOutcome> {
     if (!text.trim() || text.length > 2000) {
         feedbackStore.update({
             message: !text.trim()
-                ? 'Write a message before sending.'
-                : 'Keep your message to 2,000 characters or fewer.',
+                ? t('feedback.empty')
+                : t('feedback.tooLong'),
             isInvalid: true
         });
         return 'empty';
@@ -62,15 +63,15 @@ export async function sendFeedback(text: string): Promise<SendOutcome> {
         if (!result.success) {
             feedbackStore.update({
                 message: result.status === 400
-                    ? 'Check your message and try sending it again.'
-                    : 'Couldn’t send your feedback. Please try again.'
+                    ? t('feedback.checkMessage')
+                    : t('feedback.failed')
             });
             return 'rejected';
         }
-        feedbackStore.update({ message: 'Feedback sent. Thank you!', messageIsSuccess: true });
+        feedbackStore.update({ message: t('feedback.sent'), messageIsSuccess: true });
         return 'sent';
     } catch {
-        feedbackStore.update({ message: 'Couldn’t reach the server. Your message is still here—try again.' });
+        feedbackStore.update({ message: t('feedback.unreachable') });
         return 'rejected';
     } finally {
         feedbackStore.update({ isSending: false });

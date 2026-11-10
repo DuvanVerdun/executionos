@@ -1,5 +1,6 @@
 import { authStore } from '../auth/state';
 import { loadDashboard } from '../dashboard/dashboard';
+import { t } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { waitForMinimumFeedback } from '../lib/timing';
 import { handleRoomContinue, handleRoomFinish } from '../rooms/room-session';
@@ -47,7 +48,7 @@ export async function handleFinishWork(): Promise<void> {
     if (sessionStore.get().isFinishing) return;
     const userId = authStore.get().userId;
     if (userId == null) {
-        reviewStore.update({ saveMessage: 'Please sign in before saving this session.' });
+        reviewStore.update({ saveMessage: t('review.signInFirst') });
         return;
     }
     sessionStore.update({ isFinishing: true });
@@ -98,11 +99,11 @@ export async function handleFinishWork(): Promise<void> {
                 } catch (storageError) {
                     console.error('Could not update active session:', storageError);
                 }
-                reviewStore.update({ saveMessage: 'The server rejected this session. Your work is still here. Try again.' });
+                reviewStore.update({ saveMessage: t('review.rejected') });
                 return;
             }
             if (!queued) {
-                reviewStore.update({ saveMessage: 'Couldn’t save to the server or browser queue. Your work is still here. Try again.' });
+                reviewStore.update({ saveMessage: t('review.notSaved') });
                 return;
             }
         }
@@ -118,12 +119,12 @@ export async function handleFinishWork(): Promise<void> {
         resetApp();
         navigateTo('dashboard', 'review');
         setFloatingMessage(saved
-            ? 'Session saved. Nice work.'
-            : 'Saved on this browser. Waiting to sync. Dashboard totals update after syncing.', { saved });
+            ? t('session.saved')
+            : t('session.savedOffline'), { saved });
         await loadDashboard();
     } catch (error) {
         console.error('Could not finish session:', error);
-        reviewStore.update({ saveMessage: 'Couldn’t finish saving. Your work is still here. Try again.' });
+        reviewStore.update({ saveMessage: t('session.finishFailed') });
     } finally {
         await waitForMinimumFeedback(feedbackStartedAt);
         sessionStore.update({ isFinishing: false });

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { useT } from '../i18n/i18n';
 import type { MissionValidationError } from './plan';
 
 interface MissionCardProps {
@@ -24,6 +25,7 @@ export function MissionCard({
     idPrefix, className, mission, targetTime, error, missionInputRef, targetTimeInputRef,
     onMissionChange, onTargetTimeChange, onStart, startDisabled = false, children
 }: MissionCardProps) {
+    const t = useT();
     const pendingCaret = useRef<number | null>(null);
 
     useLayoutEffect(() => {
@@ -59,7 +61,7 @@ export function MissionCard({
     return (
         <section className={className}>
             <div className="plan-mission-container">
-                <h3>What matters today?</h3>
+                <h3>{t('mission.heading')}</h3>
                 <div className="input-container plan-mission-input-container">
                     <input
                         ref={missionInputRef}
@@ -73,14 +75,14 @@ export function MissionCard({
                         value={mission}
                         onChange={(event) => { onMissionChange(event.target.value); }}
                     />
-                    <p className="input-placeholder">Today's Mission</p>
+                    <p className="input-placeholder">{t('mission.label')}</p>
                 </div>
                 <p id={`${idPrefix}-mission-error`} className="form-error-message plan-field-error" role="alert">
                     {error?.field === 'mission' ? error.message : ''}
                 </p>
             </div>
             <div className="plan-time-container">
-                <h3>How long will you focus?</h3>
+                <h3>{t('mission.timeHeading')}</h3>
                 <div className="input-container plan-time-input-container">
                     <input
                         ref={targetTimeInputRef}
@@ -95,14 +97,14 @@ export function MissionCard({
                         onChange={(event) => { onTargetTimeChange(event.target.value); }}
                         onKeyDown={handleTargetTimeKeydown}
                     />
-                    <p className="input-placeholder">HH:MM</p>
+                    <p className="input-placeholder">{t('mission.timeLabel')}</p>
                 </div>
                 <p id={`${idPrefix}-time-error`} className="form-error-message plan-field-error" role="alert">
                     {error?.field === 'targetTime' ? error.message : ''}
                 </p>
             </div>
             <button type="button" id={`${idPrefix}-start-work-btn`} className="cta-button" disabled={startDisabled} onClick={onStart}>
-                Start Work
+                {t('mission.start')}
             </button>
             {children}
         </section>

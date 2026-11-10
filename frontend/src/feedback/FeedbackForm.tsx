@@ -1,11 +1,13 @@
 import { useLayoutEffect, useRef, useState, type SubmitEvent } from 'react';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
+import { useT } from '../i18n/i18n';
 import { closestElement } from '../lib/dom';
 import { useStore } from '../lib/store';
 import { closeFeedbackForm, feedbackStore, sendFeedback } from './feedback';
 
 /** Draw the feedback form. */
 export function FeedbackForm() {
+    const t = useT();
     const { isOpen, isSending, message, messageIsSuccess, isInvalid } = useStore(feedbackStore);
     const [text, setText] = useState('');
     const formRef = useRef<HTMLFormElement>(null);
@@ -53,8 +55,8 @@ export function FeedbackForm() {
         >
 
             <div className="dashboard-feedback-form-header">
-                <h2>Send Feedback</h2>
-                <button type="button" id="dashboard-close-feedback-form-btn" aria-label="Close feedback form" onClick={closeFeedbackForm}>
+                <h2>{t('feedback.title')}</h2>
+                <button type="button" id="dashboard-close-feedback-form-btn" aria-label={t('feedback.close')} onClick={closeFeedbackForm}>
                     <svg
                         viewBox="0 0 24 24"
                         width="24"
@@ -78,7 +80,7 @@ export function FeedbackForm() {
                 className="input"
                 id="dashboard-feedback-input"
                 maxLength={2000}
-                aria-label="Your feedback"
+                aria-label={t('feedback.inputLabel')}
                 aria-describedby="feedback-message"
                 aria-invalid={isInvalid ? true : undefined}
                 readOnly={isSending}
@@ -92,7 +94,7 @@ export function FeedbackForm() {
                 {message}
             </p>
             <button type="submit" className="white-filled-button" id="dashboard-send-feedback-btn" disabled={isSending}>
-                {isSending ? 'Sending…' : 'Send Feedback'}
+                {isSending ? t('feedback.sending') : t('feedback.send')}
             </button>
         </form>
     );

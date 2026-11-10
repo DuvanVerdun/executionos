@@ -1,9 +1,9 @@
 import { ROOM_POLL_INTERVAL_MS } from '../config';
+import { t } from '../i18n/i18n';
 import { navigateTo } from '../shared/navigation';
 import type { HistoryFailure, RoomMenuHooks } from '../types/rooms';
 import type { ScreenName } from '../types/screens';
 import { fetchRoomSessions, fetchRoomSnapshot } from './api';
-import { ROOM_COPY } from './copy';
 import { enterRoomsScreen } from './rooms';
 import { roomSnapshotCache, roomStore, type RoomView } from './state';
 
@@ -29,7 +29,7 @@ function showRoomView(view: RoomView): void {
 function showRoomHistoryFailure(kind: HistoryFailure): void {
     roomStore.update({
         historyFailure: kind,
-        historyMessage: kind === 'first' ? ROOM_COPY.historyFailed : ROOM_COPY.moreSessionsFailed
+        historyMessage: kind === 'first' ? t('rooms.historyFailed') : t('common.moreSessionsFailed')
     });
 }
 
@@ -68,7 +68,7 @@ export async function loadMoreRoomSessions(): Promise<void> {
     if (roomId === null) return;
     if (state.isLoading || state.isLoadingMore || state.historyFailure || !state.nextCursor) return;
     const generation = historyGeneration;
-    roomStore.update({ isLoadingMore: true, historyMessage: 'Loading more...' });
+    roomStore.update({ isLoadingMore: true, historyMessage: t('common.loadingMore') });
 
     try {
         const result = await fetchRoomSessions(roomId, state.nextCursor);

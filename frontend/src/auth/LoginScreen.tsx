@@ -1,5 +1,6 @@
 import { useRef, useState, type SubmitEvent } from 'react';
 import { routeToInitialScreen } from '../app/startup';
+import { useT } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { Screen } from '../shared/Screen';
 import { navigateTo } from '../shared/navigation';
@@ -10,6 +11,7 @@ import { setAuthenticatedUser } from './identity';
 
 /** Draw the Login screen. */
 export function LoginScreen() {
+    const t = useT();
     const { loginIdentifier, loginPassword, loginError } = useStore(authFormStore);
     const [identifierError, setIdentifierError] = useState('');
     const [passwordError, setPasswordError] = useState('');
@@ -24,8 +26,8 @@ export function LoginScreen() {
         authFormStore.update({ loginError: '' });
         const missingIdentifier = !loginIdentifier;
         const missingPassword = !loginPassword;
-        setIdentifierError(missingIdentifier ? 'Enter your username or email.' : '');
-        setPasswordError(missingPassword ? 'Enter your password.' : '');
+        setIdentifierError(missingIdentifier ? t('auth.login.identifierRequired') : '');
+        setPasswordError(missingPassword ? t('auth.login.passwordRequired') : '');
         if (missingIdentifier || missingPassword) {
             (missingIdentifier ? identifierRef : passwordRef).current?.focus();
             return;
@@ -37,12 +39,12 @@ export function LoginScreen() {
                 setAuthenticatedUser(result);
                 await routeToInitialScreen('login');
             } else if (result.status === 401) {
-                authFormStore.update({ loginError: 'Username, email or password is incorrect.' });
+                authFormStore.update({ loginError: t('auth.login.wrongCredentials') });
             } else {
-                authFormStore.update({ loginError: "Couldn't log in. Please try again." });
+                authFormStore.update({ loginError: t('auth.login.failed') });
             }
         } catch {
-            authFormStore.update({ loginError: "Couldn't reach the server. Try again." });
+            authFormStore.update({ loginError: t('common.serverUnreachable') });
         } finally {
             setIsSubmitting(false);
         }
@@ -52,11 +54,11 @@ export function LoginScreen() {
         <Screen name="login" className="wordmark-centered-layout login-screen">
             <h1 className="wordmark">ExecutionOS</h1>
             <div className="login-card">
-                <h2 className="card-header">Login</h2>
+                <h2 className="card-header">{t('auth.login.title')}</h2>
 
                 <form id="login-form" noValidate aria-busy={isSubmitting ? true : undefined} onSubmit={(event) => { void handleLogin(event); }}>
                     <AuthField
-                        id="login-username-or-email-input" label="Username or Email" type="text" autoComplete="username"
+                        id="login-username-or-email-input" label={t('auth.login.identifierLabel')} type="text" autoComplete="username"
                         containerClass="login-username-or-email-input-container"
                         value={loginIdentifier}
                         onChange={(value) => { authFormStore.update({ loginIdentifier: value, loginError: '' }); setIdentifierError(''); }}
@@ -64,7 +66,7 @@ export function LoginScreen() {
                         describedBy="login-identifier-error-message" inputRef={identifierRef}
                     />
                     <AuthField
-                        id="login-password-input" label="Password" type="password" autoComplete="current-password"
+                        id="login-password-input" label={t('auth.passwordLabel')} type="password" autoComplete="current-password"
                         containerClass="login-password-input-container"
                         value={loginPassword}
                         onChange={(value) => { authFormStore.update({ loginPassword: value, loginError: '' }); setPasswordError(''); }}
@@ -74,14 +76,14 @@ export function LoginScreen() {
                     <div className="login-error-and-button-container">
                         <p className="form-error-message auth-general-error" id="login-error-message" aria-live="polite">{loginError}</p>
                         <button type="submit" className="cta-button" id="login-submit-btn" disabled={isSubmitting}>
-                            {isSubmitting ? 'Logging in...' : 'Login'}
+                            {isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}
                         </button>
                         <div className="switch-btn-container">
                             <button
                                 type="button" className="switch-btn" id="login-switch-to-register-btn"
                                 onClick={() => { authFormStore.update({ loginError: '' }); navigateTo('register', 'login'); }}
                             >
-                                <span className="auth-switch-action">Create an account</span>
+                                <span className="auth-switch-action">{t('auth.login.switchToRegister')}</span>
                             </button>
                         </div>
                     </div>

@@ -1,8 +1,8 @@
 import { useRef, useState, type SubmitEvent } from 'react';
+import { useT } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { setFloatingMessage } from '../shared/floating-message';
 import { postJoinRoom, postRoom } from './api';
-import { ROOM_COPY } from './copy';
 import { buildRoomDisplayLink, buildRoomLink, extractRoomLinkToken } from './links';
 import { ModalOverlay } from './ModalOverlay';
 import { openRoom } from './room';
@@ -27,6 +27,7 @@ interface RoomFormModalProps {
 
 /** Validate the room name, create the room, and show its link. */
 export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitting }: RoomFormModalProps) {
+    const t = useT();
     const [name, setName] = useState('');
     const [error, setError] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -38,7 +39,7 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
         setError('');
         const roomName = name.trim();
         if (!roomName) {
-            setError(ROOM_COPY.roomNameRequired);
+            setError(t('rooms.nameRequired'));
             inputRef.current?.focus();
             return;
         }
@@ -46,7 +47,7 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
         try {
             const result = await postRoom(roomName);
             if (!result.success) {
-                setError(ROOM_COPY.createFailed);
+                setError(t('rooms.createFailed'));
                 return;
             }
             onCreated({
@@ -57,7 +58,7 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
         } catch (caught) {
             if (errorStatus(caught) === 401) return;
             console.error('Could not create the room:', caught);
-            setError(ROOM_COPY.serverUnreachable);
+            setError(t('common.serverUnreachable'));
         } finally {
             setIsSubmitting(false);
         }
@@ -69,10 +70,10 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
                 id="create-room-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-room-title" noValidate
                 onSubmit={(event) => { void handleSubmit(event); }}
             >
-                <button type="button" id="create-room-close-btn" className="modal-close-btn" aria-label="Close create room form" onClick={() => { if (!isSubmitting) onClose(); }}>
+                <button type="button" id="create-room-close-btn" className="modal-close-btn" aria-label={t('rooms.closeCreate')} onClick={() => { if (!isSubmitting) onClose(); }}>
                     <CloseIcon />
                 </button>
-                <h2 id="create-room-title" className="modal-title">Create Room</h2>
+                <h2 id="create-room-title" className="modal-title">{t('rooms.createTitle')}</h2>
                 <div className="modal-field">
                     <div className="input-container">
                         <input
@@ -83,12 +84,12 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
                             value={name}
                             onChange={(event) => { setName(event.target.value); setError(''); }}
                         />
-                        <label className="input-placeholder" htmlFor="create-room-input">Room name</label>
+                        <label className="input-placeholder" htmlFor="create-room-input">{t('rooms.nameLabel')}</label>
                     </div>
                     <p id="create-room-error" className="form-error-message modal-field-error" role="alert">{error}</p>
                 </div>
                 <button type="submit" id="create-room-submit-btn" className="modal-submit-btn" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating Room…' : 'Create Room'}
+                    {isSubmitting ? t('rooms.creating') : t('rooms.createTitle')}
                 </button>
             </form>
         </ModalOverlay>
@@ -97,6 +98,7 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
 
 /** Validate the pasted link and join the room. */
 export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<RoomFormModalProps, 'onCreated'>) {
+    const t = useT();
     const [link, setLink] = useState('');
     const [error, setError] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +110,7 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
         setError('');
         const linkToken = extractRoomLinkToken(link);
         if (!linkToken) {
-            setError(ROOM_COPY.roomLinkRequired);
+            setError(t('rooms.linkRequired'));
             inputRef.current?.focus();
             return;
         }
@@ -121,11 +123,11 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
                 return;
             }
             const invalid = result.status === 400 || result.status === 404;
-            setError(invalid ? ROOM_COPY.invalidLink : ROOM_COPY.joinFailed);
+            setError(invalid ? t('rooms.invalidLink') : t('rooms.joinFailed'));
         } catch (caught) {
             if (errorStatus(caught) === 401) return;
             console.error('Could not join the room:', caught);
-            setError(ROOM_COPY.serverUnreachable);
+            setError(t('common.serverUnreachable'));
         } finally {
             setIsSubmitting(false);
         }
@@ -137,10 +139,10 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
                 id="join-room-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="join-room-title" noValidate
                 onSubmit={(event) => { void handleSubmit(event); }}
             >
-                <button type="button" id="join-room-close-btn" className="modal-close-btn" aria-label="Close join room form" onClick={() => { if (!isSubmitting) onClose(); }}>
+                <button type="button" id="join-room-close-btn" className="modal-close-btn" aria-label={t('rooms.closeJoin')} onClick={() => { if (!isSubmitting) onClose(); }}>
                     <CloseIcon />
                 </button>
-                <h2 id="join-room-title" className="modal-title">Join Room</h2>
+                <h2 id="join-room-title" className="modal-title">{t('rooms.joinTitle')}</h2>
                 <div className="modal-field">
                     <div className="input-container">
                         <input
@@ -151,12 +153,12 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
                             value={link}
                             onChange={(event) => { setLink(event.target.value); setError(''); }}
                         />
-                        <label className="input-placeholder" htmlFor="join-room-input">Room link</label>
+                        <label className="input-placeholder" htmlFor="join-room-input">{t('rooms.linkLabel')}</label>
                     </div>
                     <p id="join-room-error" className="form-error-message modal-field-error" role="alert">{error}</p>
                 </div>
                 <button type="submit" id="join-room-submit-btn" className="modal-submit-btn" disabled={isSubmitting}>
-                    {isSubmitting ? 'Joining Room…' : 'Join Room'}
+                    {isSubmitting ? t('rooms.joining') : t('rooms.joinTitle')}
                 </button>
             </form>
         </ModalOverlay>
@@ -165,33 +167,34 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
 
 /** Show the new room's link, with a button to copy it. */
 export function RoomCreatedModal({ link, onClose, isSubmitting }: { link: { full: string; display: string }; onClose: () => void; isSubmitting: boolean }) {
+    const t = useT();
     const copyButtonRef = useRef<HTMLButtonElement>(null);
 
     /** Copy the new room's link and confirm it. */
     async function handleCopy(): Promise<void> {
         try {
             await navigator.clipboard.writeText(link.full);
-            setFloatingMessage(ROOM_COPY.linkCopied);
+            setFloatingMessage(t('rooms.linkCopied'));
         } catch (error) {
             console.error('Could not copy the room link:', error);
-            setFloatingMessage(ROOM_COPY.copyFailed, { error: true });
+            setFloatingMessage(t('rooms.copyFailed'), { error: true });
         }
     }
 
     return (
         <ModalOverlay id="room-created-overlay" canClose={!isSubmitting} onClose={onClose} initialFocusRef={copyButtonRef}>
             <div id="room-created-modal" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="room-created-title">
-                <button type="button" id="room-created-close-btn" className="modal-close-btn" aria-label="Close room created message" onClick={() => { if (!isSubmitting) onClose(); }}>
+                <button type="button" id="room-created-close-btn" className="modal-close-btn" aria-label={t('rooms.closeCreated')} onClick={() => { if (!isSubmitting) onClose(); }}>
                     <CloseIcon />
                 </button>
-                <h2 id="room-created-title" className="modal-title">Room Created</h2>
+                <h2 id="room-created-title" className="modal-title">{t('rooms.createdTitle')}</h2>
                 <input
-                    type="text" className="input modal-link-display" id="room-created-link" readOnly aria-label="Room link"
+                    type="text" className="input modal-link-display" id="room-created-link" readOnly aria-label={t('rooms.linkLabel')}
                     value={link.display}
                     onFocus={(event) => { event.currentTarget.select(); }}
                 />
                 <button ref={copyButtonRef} type="button" id="room-created-copy-btn" className="modal-submit-btn" onClick={() => { void handleCopy(); }}>
-                    Copy link
+                    {t('rooms.copyLink')}
                 </button>
             </div>
         </ModalOverlay>

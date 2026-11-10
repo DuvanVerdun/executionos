@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
+import { useT } from '../i18n/i18n';
 import { closestElement } from '../lib/dom';
 import { useStore } from '../lib/store';
 import { Header } from '../shared/Header';
@@ -25,6 +26,7 @@ type OpenModal =
 
 /** Draw the Rooms screen. */
 export function RoomsScreen() {
+    const t = useT();
     const { shownRooms, surface, openMenuRoomId, busyAction } = useStore(roomsStore);
     const [modal, setModal] = useState<OpenModal | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,22 +71,22 @@ export function RoomsScreen() {
                 screen="rooms"
                 className="plan-header rooms-header"
                 navigation={[
-                    { id: 'rooms-new-mission-btn', label: 'New Mission', onClick: handleRoomsToPlan },
-                    { id: 'rooms-dashboard-btn', label: 'Dashboard', onClick: () => { void handleRoomsToDashboard(); } }
+                    { id: 'rooms-new-mission-btn', label: t('dashboard.newMission'), onClick: handleRoomsToPlan },
+                    { id: 'rooms-dashboard-btn', label: t('nav.dashboard'), onClick: () => { void handleRoomsToDashboard(); } }
                 ]}
             />
 
             <section className="rooms-content">
 
                 <div className="rooms-title-row">
-                    <h1 className="rooms-title">Rooms</h1>
+                    <h1 className="rooms-title">{t('rooms.title')}</h1>
                     <div className="rooms-actions">
-                        <button type="button" id="rooms-create-btn" className="white-filled-button" onClick={() => { setModal({ kind: 'create' }); }}>Create</button>
-                        <button type="button" id="rooms-join-btn" className="normal-button" onClick={() => { setModal({ kind: 'join' }); }}>Join</button>
+                        <button type="button" id="rooms-create-btn" className="white-filled-button" onClick={() => { setModal({ kind: 'create' }); }}>{t('rooms.create')}</button>
+                        <button type="button" id="rooms-join-btn" className="normal-button" onClick={() => { setModal({ kind: 'join' }); }}>{t('rooms.join')}</button>
                     </div>
                 </div>
 
-                <div id="rooms-loading" className="rooms-grid" role="status" aria-label="Loading rooms" style={{ display: surface === 'loading' ? 'grid' : 'none' }}>
+                <div id="rooms-loading" className="rooms-grid" role="status" aria-label={t('rooms.loading')} style={{ display: surface === 'loading' ? 'grid' : 'none' }}>
                     <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
                     <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
                     <div className="dashboard-skeleton rooms-skeleton-card" aria-hidden="true"></div>
@@ -97,17 +99,17 @@ export function RoomsScreen() {
                 </div>
 
                 <div id="rooms-empty" className="empty-dashboard-cta-container" style={{ display: surface === 'empty' ? 'flex' : 'none' }}>
-                    <h2 className="empty-dashboard-cta-title">No rooms yet</h2>
-                    <p className="empty-dashboard-cta-paragraph">Create a room with friends or coworkers, or join one and work together.</p>
+                    <h2 className="empty-dashboard-cta-title">{t('rooms.emptyTitle')}</h2>
+                    <p className="empty-dashboard-cta-paragraph">{t('rooms.emptyText')}</p>
                     <button type="button" id="rooms-empty-create-btn" className="empty-dashboard-start-mission-btn white-filled-button" onClick={() => { setModal({ kind: 'create' }); }}>
-                        Create Room
+                        {t('rooms.createTitle')}
                     </button>
                 </div>
 
                 <div id="rooms-error" className="dashboard-error" role="alert" style={{ display: surface === 'error' ? 'flex' : 'none' }}>
-                    <p className="dashboard-error-message">Couldn't reach the server.<br />Please try again in a moment.</p>
+                    <p className="dashboard-error-message">{t('dashboard.unreachable')}<br />{t('dashboard.tryAgainSoon')}</p>
                     <button type="button" id="rooms-retry-btn" disabled={isRetrying} onClick={() => { void handleRetry(); }}>
-                        {isRetrying ? 'Retrying…' : 'Retry'}
+                        {isRetrying ? t('loading.retrying') : t('common.retry')}
                     </button>
                 </div>
 

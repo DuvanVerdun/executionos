@@ -1,3 +1,4 @@
+import { useT } from '../i18n/i18n';
 import { formatAverageSessionTime, formatDurationHoursMinutes, formatDurationHoursMinutesSeconds } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { roomSessionStore } from '../rooms/room-session-state';
@@ -5,15 +6,22 @@ import { ProgressRing } from '../shared/ProgressRing';
 import { Screen } from '../shared/Screen';
 import { handleContinueWork, handleFinishWork } from './review';
 import { sessionStore } from './state';
-import { reviewStore } from './ui-state';
+import { reviewStore, type FinishLabel } from './ui-state';
 
 /** Draw the Review screen. */
 export function ReviewScreen() {
+    const t = useT();
     const { active: personal, isFinishing, pendingSubmission } = useStore(sessionStore);
     const room = useStore(roomSessionStore);
     const { saveMessage, finishLabel, roomSummary } = useStore(reviewStore);
     const session = room.active ? room.display : personal;
-    const status = session.completionStatus.charAt(0).toUpperCase() + session.completionStatus.slice(1);
+    const status = session.completionStatus === 'completed' ? t('review.completed') : t('review.partial');
+    const finishTexts: Record<FinishLabel, string> = {
+        'Finish': t('review.finish'),
+        'Saving…': t('review.saving'),
+        'Retrying…': t('review.retrying'),
+        'Try again': t('review.tryAgain')
+    };
 
     return (
         <Screen name="review" className="wordmark-centered-layout review-screen" busy={isFinishing}>
@@ -29,25 +37,25 @@ export function ReviewScreen() {
                             <p id="review-room-total-time" className="dashboard-summary-value">
                                 {roomSummary ? formatDurationHoursMinutes(roomSummary.total_time_seconds) : '—'}
                             </p>
-                            <p className="dashboard-summary-label">Focused</p>
+                            <p className="dashboard-summary-label">{t('review.focused')}</p>
                         </div>
                         <div className="dashboard-summary-card">
                             <p id="review-room-session-count" className="dashboard-summary-value">
                                 {roomSummary ? String(roomSummary.total_sessions) : '—'}
                             </p>
-                            <p className="dashboard-summary-label">Sessions</p>
+                            <p className="dashboard-summary-label">{t('review.sessions')}</p>
                         </div>
                         <div className="dashboard-summary-card">
                             <p id="review-room-people-count" className="dashboard-summary-value">
                                 {roomSummary ? String(roomSummary.members_count) : '—'}
                             </p>
-                            <p className="dashboard-summary-label">People</p>
+                            <p className="dashboard-summary-label">{t('review.people')}</p>
                         </div>
                         <div className="dashboard-summary-card">
                             <p id="review-room-average-time" className="dashboard-summary-value">
                                 {roomSummary ? formatAverageSessionTime(roomSummary.average_session_time_seconds) : '—'}
                             </p>
-                            <p className="dashboard-summary-label">Avg. Session Time</p>
+                            <p className="dashboard-summary-label">{t('review.averageSessionTime')}</p>
                         </div>
                     </div>
                 </div>
@@ -55,7 +63,7 @@ export function ReviewScreen() {
                 <div className="review-container">
                     <div className="review-display-container">
                         <p id="review-mission-display">{session.currentMission}</p>
-                        <p id="review-target-time-display">{`Target: ${formatDurationHoursMinutesSeconds(session.targetTimeSeconds)}`}</p>
+                        <p id="review-target-time-display">{t('review.target', { time: formatDurationHoursMinutesSeconds(session.targetTimeSeconds) })}</p>
                     </div>
                     <div className="review-summary">
                         <div className="review-progress-container">
@@ -71,7 +79,7 @@ export function ReviewScreen() {
                             </ProgressRing>
                         </div>
                         <div className="review-time-container">
-                            <p className="review-time-label">Focused</p>
+                            <p className="review-time-label">{t('review.focused')}</p>
                             <p id="review-actual-time-display">{formatDurationHoursMinutesSeconds(session.actualTimeSeconds)}</p>
                         </div>
                     </div>
@@ -83,7 +91,7 @@ export function ReviewScreen() {
                             disabled={isFinishing || pendingSubmission !== null || room.isBusy}
                             onClick={handleContinueWork}
                         >
-                            Continue
+                            {t('review.continue')}
                         </button>
                         <button
                             id="review-finish-btn"
@@ -91,7 +99,7 @@ export function ReviewScreen() {
                             disabled={isFinishing || room.isBusy}
                             onClick={() => { void handleFinishWork(); }}
                         >
-                            {finishLabel}
+                            {finishTexts[finishLabel]}
                         </button>
                     </div>
                     <p id="review-save-message" className="session-save-message" role="status" aria-live="polite">{saveMessage}</p>

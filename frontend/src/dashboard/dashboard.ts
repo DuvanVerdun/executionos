@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n';
 import { formatLocalDate, normalizePeriodAnchor, parseLocalDate, shiftPeriodAnchor } from '../lib/dates';
 import { createStore } from '../lib/store';
 import { waitForMinimumFeedback } from '../lib/timing';
@@ -80,7 +81,7 @@ export async function loadMoreSessions(): Promise<void> {
     const state = dashboardStore.get();
     if (state.isLoading || state.paginationFailed || state.isLoadingMore || !state.nextCursor) return;
     const generation = loadGeneration;
-    dashboardStore.update({ isLoadingMore: true, paginationMessage: 'Loading more...' });
+    dashboardStore.update({ isLoadingMore: true, paginationMessage: t('common.loadingMore') });
     try {
         const result = await fetchSessionsPage(state.period, state.anchorDates[state.period], state.nextCursor);
         if (generation !== loadGeneration) return;
@@ -97,7 +98,7 @@ export async function loadMoreSessions(): Promise<void> {
     } catch (error) {
         if (generation !== loadGeneration) return;
         console.error('Session pagination error:', error);
-        dashboardStore.update({ paginationFailed: true, paginationMessage: "Couldn't load more sessions." });
+        dashboardStore.update({ paginationFailed: true, paginationMessage: t('common.moreSessionsFailed') });
     } finally {
         if (generation === loadGeneration) {
             dashboardStore.update({ isLoadingMore: false });

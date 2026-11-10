@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useT } from '../i18n/i18n';
 import { formatDurationHoursMinutes } from '../lib/durations';
 import { deleteSession } from '../session/api';
 import type { ScreenName } from '../types/screens';
@@ -8,11 +9,12 @@ import type { HistorySession } from '../types/session';
 export function SessionTimeSection({ session }: {
     session: Pick<HistorySession, 'target_time_seconds' | 'actual_time_seconds' | 'percentage_completed'>;
 }) {
+    const t = useT();
     return (
         <div className="dashboard-session-time-and-percentage-container">
-            <p className="dashboard-session-target-time">{`${formatDurationHoursMinutes(session.target_time_seconds)} target`}</p>
-            <p className="dashboard-session-actual-time">{`${formatDurationHoursMinutes(session.actual_time_seconds)} focused`}</p>
-            <p className="dashboard-session-percentage">{`${Math.floor(session.percentage_completed)}% completion`}</p>
+            <p className="dashboard-session-target-time">{t('session.target', { time: formatDurationHoursMinutes(session.target_time_seconds) })}</p>
+            <p className="dashboard-session-actual-time">{t('session.focused', { time: formatDurationHoursMinutes(session.actual_time_seconds) })}</p>
+            <p className="dashboard-session-percentage">{t('session.completion', { percentage: Math.floor(session.percentage_completed) })}</p>
         </div>
     );
 }
@@ -29,12 +31,13 @@ interface SessionMenuProps {
 
 /** Draw the menu icon of a session and its menu with the Delete button. */
 export function SessionMenu({ sessionId, screen, isOpen, onToggle, reload }: SessionMenuProps) {
+    const t = useT();
     const [isDeleting, setIsDeleting] = useState(false);
     const [hasFailed, setHasFailed] = useState(false);
 
     /** Delete the session, then reload the Dashboard or Room data. */
     async function handleDelete(): Promise<void> {
-        if (!confirm('Delete this session?')) return;
+        if (!confirm(t('session.deleteConfirm'))) return;
         setHasFailed(false);
         setIsDeleting(true);
         try {
@@ -63,10 +66,10 @@ export function SessionMenu({ sessionId, screen, isOpen, onToggle, reload }: Ses
                     disabled={isDeleting}
                     onClick={() => { void handleDelete(); }}
                 >
-                    {isDeleting ? 'Deleting…' : 'Delete Session'}
+                    {isDeleting ? t('session.deleting') : t('session.delete')}
                 </button>
                 {hasFailed && (
-                    <p className="form-error-message" role="alert">Couldn’t delete this session. Try again.</p>
+                    <p className="form-error-message" role="alert">{t('session.deleteFailed')}</p>
                 )}
             </div>
         </>

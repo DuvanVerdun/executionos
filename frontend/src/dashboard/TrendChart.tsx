@@ -1,3 +1,4 @@
+import { useT } from '../i18n/i18n';
 import { at } from '../lib/arrays';
 import { formatLocalDate, formatTrendBucketLabel } from '../lib/dates';
 import type { DashboardMetric, DashboardPeriod, TrendBucket } from '../types/dashboard';
@@ -26,6 +27,7 @@ interface TrendChartProps {
 
 /** Draw axes, gridlines, and available trend values. */
 export function TrendChart({ buckets, period, metric }: TrendChartProps) {
+    const t = useT();
     const today = formatLocalDate(new Date());
     const currentMonth = `${today.slice(0, 7)}-01`;
     const trend = period === 'year'
@@ -37,7 +39,7 @@ export function TrendChart({ buckets, period, metric }: TrendChartProps) {
         width: '100%',
         height: '260',
         role: 'img',
-        'aria-label': 'Execution trend',
+        'aria-label': t('dashboard.trendChart'),
         viewBox: '0 0 700 260'
     };
     if (trend.length === 0) return <svg {...svgProps} />;

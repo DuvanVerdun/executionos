@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
 import { useInView } from '../hooks/useInView';
+import { useT } from '../i18n/i18n';
 import { at } from '../lib/arrays';
 import { closestElement } from '../lib/dom';
 import { formatSessionDateLabel, groupSessionsByLocalDate } from '../lib/dates';
@@ -12,13 +13,14 @@ import { dashboardStore, loadDashboard, loadMoreSessions, retryPagination } from
 
 /** Draw the aggregated metrics of a day of sessions. */
 function DailySummarySection({ summary }: { summary: DailySummary }) {
+    const t = useT();
     return (
         <div className="dashboard-daily-summary">
-            <p className="dashboard-daily-summary-title">Daily Summary</p>
+            <p className="dashboard-daily-summary-title">{t('dashboard.dailySummary')}</p>
             <div className="dashboard-daily-summary-metrics">
-                <p>{`${summary.total_sessions} sessions`}</p>
-                <p>{`${formatDurationHoursMinutes(summary.total_time_seconds)} focused`}</p>
-                <p>{`${Math.round(summary.average_completion_percentage)}% avg. completion`}</p>
+                <p>{t('dashboard.dailySessions', { count: summary.total_sessions })}</p>
+                <p>{t('session.focused', { time: formatDurationHoursMinutes(summary.total_time_seconds) })}</p>
+                <p>{t('dashboard.dailyCompletion', { percentage: Math.round(summary.average_completion_percentage) })}</p>
             </div>
         </div>
     );
@@ -51,6 +53,7 @@ function SessionRow({ session, isMenuOpen, onToggleMenu }: SessionRowProps) {
 
 /** Draw the session history, or a message when the period has no sessions. */
 export function SessionHistory() {
+    const t = useT();
     const { sessions, dailySummaries, nextCursor, isLoading, isLoadingMore, paginationFailed, paginationMessage } = useStore(dashboardStore);
     const [openMenuId, setOpenMenuId] = useState<number | null>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
@@ -70,8 +73,8 @@ export function SessionHistory() {
     if (sessions.length === 0) {
         return (
             <div id="dashboard-sessions-list-container">
-                <h2 className="dashboard-content-title">Session History</h2>
-                <p className="dashboard-empty-period-message">No sessions in this period.</p>
+                <h2 className="dashboard-content-title">{t('dashboard.sessionHistory')}</h2>
+                <p className="dashboard-empty-period-message">{t('dashboard.noSessions')}</p>
             </div>
         );
     }
@@ -80,7 +83,7 @@ export function SessionHistory() {
 
     return (
         <div id="dashboard-sessions-list-container">
-            <h2 className="dashboard-content-title">Session History</h2>
+            <h2 className="dashboard-content-title">{t('dashboard.sessionHistory')}</h2>
             {groups.map(/** Draw the card of one local day. */ ([dateKey, daySessions]) => {
                 const dailySummary = dailySummaries[dateKey];
                 const hasSummary = dailySummary !== undefined && dailySummary.total_sessions > 1;
@@ -103,7 +106,7 @@ export function SessionHistory() {
             })}
             <div ref={sentinelRef} id="dashboard-sessions-load-sentinel" style={{ display: !isLoading && nextCursor !== null ? 'flex' : 'none' }}>
                 <p id="dashboard-pagination-message" role="status" aria-live="polite">{paginationMessage}</p>
-                <button type="button" id="dashboard-pagination-retry-btn" hidden={!paginationFailed} onClick={retryPagination}>Retry</button>
+                <button type="button" id="dashboard-pagination-retry-btn" hidden={!paginationFailed} onClick={retryPagination}>{t('common.retry')}</button>
             </div>
         </div>
     );

@@ -1,6 +1,7 @@
 import { authFormStore } from '../auth/forms-state';
 import { setLoginRequiredHandler } from '../auth/http';
 import { leaveDashboardScreen } from '../dashboard/dashboard';
+import { t } from '../i18n/i18n';
 import { closeFeedbackForm } from '../feedback/feedback';
 import { leaveRoomScreen } from '../rooms/room';
 import { resetRoomSessionClient, setReviewRoomMode } from '../rooms/room-session';
@@ -16,7 +17,7 @@ import { isHeaderScreenName } from '../types/screens';
 export function registerNavigationHooks(): void {
     setLoginRequiredHandler(/** Send the user to Login when a request needs a new sign-in. */ (currentScreen) => {
         if (currentScreen !== undefined) navigateTo('login', currentScreen);
-        authFormStore.update({ loginError: 'Please sign in again. Queued sessions remain on this browser.' });
+        authFormStore.update({ loginError: t('auth.signInAgain') });
     });
     addBeforeSwitchHook(/** Close the feedback form on every screen change. */ () => {
         closeFeedbackForm();

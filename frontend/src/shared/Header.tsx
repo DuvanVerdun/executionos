@@ -3,6 +3,7 @@ import { handleLogout } from '../auth/logout';
 import { authStore } from '../auth/state';
 import { openFeedbackForm } from '../feedback/feedback';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
+import { useT } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { StreakPopup } from '../streak/StreakPopup';
 import { closeStreakPopup, streakStore, toggleStreakPopup } from '../streak/streak';
@@ -25,6 +26,7 @@ interface HeaderProps {
 
 /** Draw a header. The ids follow the screen, because the stylesheet styles them by id. */
 export function Header({ screen, className, navigation }: HeaderProps) {
+    const t = useT();
     const { openScreen: openMenuScreen } = useStore(userMenuStore);
     const { openScreen: openStreakScreen, currentStreak } = useStore(streakStore);
     const { username } = useStore(authStore);
@@ -63,7 +65,7 @@ export function Header({ screen, className, navigation }: HeaderProps) {
                     type="button"
                     id={`${screen}-streak-btn`}
                     className="streak-btn"
-                    aria-label="Open consistency calendar"
+                    aria-label={t('header.openStreak')}
                     onClick={() => { toggleStreakPopup(screen); }}
                 >
                     {`🔥 ${currentStreak ?? '—'}`}
@@ -83,7 +85,7 @@ export function Header({ screen, className, navigation }: HeaderProps) {
                 id={`${screen}-user-icon`}
                 className="user-icon"
                 viewBox="0 0 48 48"
-                aria-label="Open user menu"
+                aria-label={t('header.openUserMenu')}
                 onClick={() => { toggleUserMenu(screen); }}
             >
                 <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="2.5" />
@@ -109,9 +111,9 @@ export function Header({ screen, className, navigation }: HeaderProps) {
                     data-feedback-screen={screen}
                     onClick={() => { openFeedbackForm(screen); }}
                 >
-                    Send Feedback
+                    {t('header.sendFeedback')}
                 </button>
-                <button id={`${screen}-user-menu-logout-btn`} onClick={() => { void handleLogout(screen); }}>Logout</button>
+                <button id={`${screen}-user-menu-logout-btn`} onClick={() => { void handleLogout(screen); }}>{t('header.logout')}</button>
             </div>
         </header>
     );

@@ -2,6 +2,7 @@ import { refreshAccessToken } from '../auth/http';
 import { setAuthenticatedUser } from '../auth/identity';
 import { authStore } from '../auth/state';
 import { initializeDashboardState } from '../dashboard/dashboard';
+import { t } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { createStore } from '../lib/store';
 import { fetchRoomSession, postJoinRoom } from '../rooms/api';
@@ -111,7 +112,7 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
         restoredSession = loadActiveSession();
     } catch (error) {
         console.error('Could not restore the active session:', error);
-        setFloatingMessage('Couldn’t restore browser saves. Please reload to try again.');
+        setFloatingMessage(t('startup.restoreFailed'));
     }
     if (restoredSession && sessionStore.get().pendingSubmission) {
         navigateTo('review', currentScreen);

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { handleOpenDashboard } from '../dashboard/dashboard';
+import { useT } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { handleOpenRooms } from '../rooms/rooms';
 import { Header } from '../shared/Header';
@@ -10,6 +11,7 @@ import { planDraftStore } from './state';
 
 /** Draw the Plan screen. */
 export function PlanScreen() {
+    const t = useT();
     const { mission, targetTime } = useStore(planDraftStore);
     const [error, setError] = useState<MissionValidationError | null>(null);
     const missionInputRef = useRef<HTMLInputElement>(null);
@@ -33,8 +35,8 @@ export function PlanScreen() {
                     screen="plan"
                     className="plan-header"
                     navigation={[
-                        { id: 'plan-dashboard-btn', label: 'Dashboard', onClick: () => { void handleOpenDashboard(); } },
-                        { id: 'plan-rooms-btn', label: 'Focus Rooms', onClick: () => { void handleOpenRooms('plan'); } }
+                        { id: 'plan-dashboard-btn', label: t('nav.dashboard'), onClick: () => { void handleOpenDashboard(); } },
+                        { id: 'plan-rooms-btn', label: t('nav.rooms'), onClick: () => { void handleOpenRooms('plan'); } }
                     ]}
                 />
 

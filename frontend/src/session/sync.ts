@@ -1,5 +1,6 @@
 import { authStore } from '../auth/state';
 import { loadDashboard } from '../dashboard/dashboard';
+import { t } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { setFloatingMessage } from '../shared/floating-message';
 import { getCurrentScreenName } from '../shared/navigation';
@@ -29,17 +30,17 @@ export async function syncOfflineWork(): Promise<void> {
             await sessionQueue.remove(userId, item.submissionId);
             synced += 1;
         }
-        setFloatingMessage('Your saved sessions are synced. Nice work.', { saved: true });
+        setFloatingMessage(t('sync.done'), { saved: true });
     } catch (error) {
         console.error('Session sync failed:', error);
         if (authStore.get().userId !== userId) return;
         const status = errorStatus(error);
         const needsSignIn = status === 401 || status === 403;
-        let message = 'Sessions saved on this browser are waiting to sync. Dashboard totals update after syncing.';
-        if (!queueLoaded) message = 'Couldn’t read browser saves. Please reload to try again.';
-        else if (needsSignIn) message = 'Sessions are saved on this browser. Sign in again to sync them.';
+        let message = t('sync.waiting');
+        if (!queueLoaded) message = t('sync.unreadable');
+        else if (needsSignIn) message = t('sync.signIn');
         else if (status === 400 || status === 409) {
-            message = 'A saved session needs attention before it can sync. It is still on this browser.';
+            message = t('sync.needsAttention');
         }
         setFloatingMessage(message);
     } finally {

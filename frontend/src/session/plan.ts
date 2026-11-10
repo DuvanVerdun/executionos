@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n';
 import { parseHHMMToSeconds } from '../lib/durations';
 import { navigateTo } from '../shared/navigation';
 import { updateActiveSession } from './state';
@@ -11,14 +12,14 @@ export interface MissionValidationError {
 
 /** Return a mission or duration validation error, or an empty string. */
 function validatePlan(mission: string, targetTime: string): string {
-    if (!mission.trim()) return 'Enter your mission.';
-    if (mission.length > 50) return 'Keep your mission to 50 characters or fewer.';
+    if (!mission.trim()) return t('mission.required');
+    if (mission.length > 50) return t('mission.tooLong');
     if (!targetTime || !/^\d{2}:\d{2}$/.test(targetTime)) {
-        return 'Enter a focus time as HH:MM, for example 00:25.';
+        return t('mission.timeFormat');
     }
     const [hours = 0, minutes = 0] = targetTime.split(':').map(Number);
-    if (minutes > 59) return 'Enter minutes between 00 and 59.';
-    if (hours === 0 && minutes === 0) return 'Choose a focus time greater than zero.';
+    if (minutes > 59) return t('mission.minutesRange');
+    if (hours === 0 && minutes === 0) return t('mission.timeZero');
     return '';
 }
 
