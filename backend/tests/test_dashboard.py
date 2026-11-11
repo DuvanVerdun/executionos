@@ -1,12 +1,12 @@
 from __future__ import annotations
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
 from flask import Flask
 
 from executionos.dashboard.streak import calculate_streak_states
-from helpers import body, call, dashboard, list_sessions, make_account, save_session
+from helpers import Account, body, call, dashboard, list_sessions, make_account, save_session
 
 # work days, today, expected streak, expected rest days left this week
 STREAK_CASES = [
@@ -38,6 +38,58 @@ def test_streak_rules(
 
     assert streak == expected_streak
     assert rest_days_left == expected_rest_days_left
+
+
+def test_today_without_work_is_its_own_state_even_for_a_user_with_no_sessions():
+    today = date(2026, 10, 29)
+
+    _, _, states = calculate_streak_states(set(), today)
+    _, _, states_after_work = calculate_streak_states({date(2026, 10, 27)}, today)
+
+    assert states == {today: "today"}
+    assert states_after_work[today] == "today"
+    assert states_after_work[date(2026, 10, 28)] == "rest"
+
+
+def streak_calendar(who: Account, anchor_date: str) -> dict[str, Any]:
+    return body(call(who, "GET", f"/api/streak?anchor_date={anchor_date}&timezone=UTC"))
+
+
+def test_the_calendar_shows_today_in_gray_until_there_is_work_and_the_days_after_it_stay_neutral(app: Flask):
+    ana = make_account(app, "ana")
+    today = datetime.now(UTC).date()
+    days = {day["date"]: day for day in streak_calendar(ana, today.isoformat())["calendar"]["days"]}
+
+    assert days[today.isoformat()]["state"] == "today"
+
+    save_session(ana, date=datetime.now(UTC).isoformat(), actualTimeSeconds=600)
+    days = {day["date"]: day for day in streak_calendar(ana, today.isoformat())["calendar"]["days"]}
+
+    assert days[today.isoformat()]["state"] == "work"
+    assert days[today.isoformat()]["total_sessions"] == 1
+
+
+def test_each_calendar_day_has_its_session_count_and_time_and_the_total_counts_days_worked_ever(app: Flask):
+    ana = make_account(app, "ana")
+    save_session(ana, date="2026-10-27T12:00:00Z", actualTimeSeconds=600)
+    save_session(ana, date="2026-10-27T15:00:00Z", actualTimeSeconds=300)
+    save_session(ana, date="2026-10-28T12:00:00Z", actualTimeSeconds=0)
+    save_session(ana, date="2026-09-01T12:00:00Z", actualTimeSeconds=900)
+
+    october = streak_calendar(ana, "2026-10-01")
+    days = {day["date"]: day for day in october["calendar"]["days"]}
+
+    assert (days["2026-10-27"]["total_sessions"], days["2026-10-27"]["total_time_seconds"]) == (2, 900)
+    assert (days["2026-10-28"]["total_sessions"], days["2026-10-28"]["total_time_seconds"]) == (1, 0)
+    assert (days["2026-10-29"]["total_sessions"], days["2026-10-29"]["total_time_seconds"]) == (0, 0)
+    assert october["total_worked_days"] == 2
+    assert streak_calendar(ana, "2026-09-01")["total_worked_days"] == 2
+
+
+def test_the_total_of_days_worked_is_zero_for_a_new_user(app: Flask):
+    ana = make_account(app, "ana")
+
+    assert streak_calendar(ana, "2026-10-01")["total_worked_days"] == 0
 
 
 @pytest.mark.parametrize("period, anchor_date, start_date, end_date", BOUNDS_CASES)

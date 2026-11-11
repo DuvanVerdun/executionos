@@ -669,11 +669,73 @@ button {
     border: calc(3 * var(--calendar-size-unit)) solid var(--color-reward);
 }
 
+.streak-calendar-day-today {
+    background-color: var(--color-border);
+}
+
+.streak-calendar .streak-calendar-day-neutral:hover,
+.streak-calendar .streak-calendar-day-rest:hover {
+    background-color: var(--color-surface-selected);
+}
+
+.streak-calendar .streak-calendar-day-work:hover,
+.streak-calendar .streak-calendar-day-today:hover {
+    filter: brightness(1.15);
+}
+
+.streak-day-summary {
+    --calendar-size-unit: clamp(0.625px, 0.052083333vw, 1.25px);
+    position: fixed;
+    z-index: 20;
+    transform: translate(-50%, calc(-100% - 8 * var(--calendar-size-unit)));
+    box-sizing: border-box;
+    padding: calc(12 * var(--calendar-size-unit)) calc(16 * var(--calendar-size-unit));
+    border: var(--calendar-size-unit) solid var(--color-border);
+    border-radius: calc(16 * var(--calendar-size-unit));
+    background-color: var(--color-surface-selected);
+    color: var(--color-white);
+    font-family: 'Outfit', sans-serif;
+    font-size: calc(24 * var(--calendar-size-unit));
+    line-height: 1.25;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.streak-calendar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(24 * var(--calendar-size-unit));
+    margin-top: calc(24 * var(--calendar-size-unit));
+}
+
+.streak-calendar-total {
+    box-sizing: border-box;
+    padding: calc(16 * var(--calendar-size-unit)) calc(24 * var(--calendar-size-unit));
+    border: var(--calendar-size-unit) solid var(--color-border);
+    border-radius: calc(16 * var(--calendar-size-unit));
+    background-color: var(--color-surface-selected);
+    text-align: center;
+}
+
+.streak-calendar-total-value {
+    color: var(--color-white);
+    font-size: calc(32 * var(--calendar-size-unit));
+    font-weight: bold;
+    line-height: 1.25;
+}
+
+.streak-calendar-total-label {
+    color: var(--color-text);
+    font-size: calc(24 * var(--calendar-size-unit));
+    line-height: 1.25;
+}
+
 .streak-calendar-legend {
     display: flex;
     flex-direction: column;
     gap: calc(8 * var(--calendar-size-unit));
-    margin-top: calc(24 * var(--calendar-size-unit));
     color: var(--color-white);
     font-size: calc(24 * var(--calendar-size-unit));
     line-height: 1.25;
@@ -2920,5 +2982,11 @@ body[data-screen="room"] .floating-message {
     .modal-overlay {
         -webkit-backdrop-filter: blur(4px);
         backdrop-filter: blur(4px);
+    }
+
+    .streak-day-summary {
+        background-color: rgb(28 28 28 / 85%);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
     }
 }

@@ -15,6 +15,8 @@ interface StreakState {
     restDaysRemaining: number;
     /** The current streak in days. Null until the first calendar loads. */
     currentStreak: number | null;
+    /** The days with work, ever. Null until the first calendar loads. */
+    totalWorkedDays: number | null;
     /** The header screen whose calendar popup is open. */
     openScreen: HeaderScreenName | null;
 }
@@ -25,6 +27,7 @@ export const streakStore = createStore<StreakState>({
     calendar: { month: '', days: [] },
     restDaysRemaining: 0,
     currentStreak: null,
+    totalWorkedDays: null,
     openScreen: null
 });
 
@@ -46,7 +49,9 @@ function createPlaceholderCalendar(anchorDate: string): StreakData['calendar'] {
         month: anchorDate.slice(0, 7),
         days: Array.from({ length: daysInMonth }, /** Create a neutral placeholder for each calendar day. */ (_, index) => ({
             date: `${anchorDate.slice(0, 7)}-${String(index + 1).padStart(2, '0')}`,
-            state: 'neutral'
+            state: 'neutral',
+            total_sessions: 0,
+            total_time_seconds: 0
         }))
     };
 }
@@ -72,7 +77,8 @@ export async function loadStreak(currentScreen: ScreenName): Promise<void> {
             view: 'ready',
             calendar: result.calendar,
             restDaysRemaining: result.rest_days_remaining_this_week,
-            currentStreak: result.current_streak
+            currentStreak: result.current_streak,
+            totalWorkedDays: result.total_worked_days
         });
 
     } catch (error) {
