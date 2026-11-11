@@ -117,11 +117,10 @@ export function RoomScreen() {
 
                 <div id="room-loading" className="room-loading" role="status" aria-label={t('rooms.loadingRoom')} style={{ display: view === 'loading' ? 'flex' : 'none' }}>
                     <div className="dashboard-skeleton room-skeleton-summary" aria-hidden="true"></div>
-                    <div className="dashboard-skeleton room-skeleton-mission" aria-hidden="true"></div>
-                    <section className="room-section" aria-hidden="true">
-                        <h2 className="dashboard-content-title">{t('rooms.ranking')}</h2>
-                        <div className="dashboard-skeleton room-skeleton-ranking"></div>
-                    </section>
+                    <div className="room-main-row">
+                        <div className="dashboard-skeleton room-skeleton-mission" aria-hidden="true"></div>
+                        <div className="dashboard-skeleton room-skeleton-ranking" aria-hidden="true"></div>
+                    </div>
                     <section className="room-section" aria-hidden="true">
                         <h2 className="dashboard-content-title">{t('rooms.history')}</h2>
                         <div className="dashboard-skeleton room-skeleton-history"></div>
@@ -160,34 +159,31 @@ export function RoomScreen() {
                         </div>
                     </div>
 
-                    <MissionCard
-                        idPrefix="room"
-                        className="plan-input-section room-mission-card"
-                        mission={mission}
-                        targetTime={targetTime}
-                        error={error}
-                        missionInputRef={missionInputRef}
-                        targetTimeInputRef={targetTimeInputRef}
-                        onMissionChange={(value) => {
-                            setMission(value);
-                            if (error?.field === 'mission') setError(null);
-                        }}
-                        onTargetTimeChange={(value) => {
-                            setTargetTime(value);
-                            if (error?.field === 'targetTime') setError(null);
-                        }}
-                        onStart={handleStartWork}
-                        startDisabled={isSessionBusy}
-                    >
-                        <p id="room-start-error" className="form-error-message plan-field-error" role="alert"></p>
-                    </MissionCard>
+                    <div className="room-main-row">
+                        <MissionCard
+                            idPrefix="room"
+                            className="plan-input-section room-mission-card"
+                            mission={mission}
+                            targetTime={targetTime}
+                            error={error}
+                            missionInputRef={missionInputRef}
+                            targetTimeInputRef={targetTimeInputRef}
+                            onMissionChange={(value) => {
+                                setMission(value);
+                                if (error?.field === 'mission') setError(null);
+                            }}
+                            onTargetTimeChange={(value) => {
+                                setTargetTime(value);
+                                if (error?.field === 'targetTime') setError(null);
+                            }}
+                            onStart={handleStartWork}
+                            startDisabled={isSessionBusy}
+                        >
+                            <p id="room-start-error" className="form-error-message plan-field-error" role="alert"></p>
+                        </MissionCard>
 
-                    <section className="room-section">
-                        <h2 id="room-ranking-title" className="dashboard-content-title">
-                            {snapshot ? t('rooms.rankingTitle', { count: snapshot.summary.members_count }) : ''}
-                        </h2>
                         <RoomRanking ranking={snapshot?.ranking ?? []} />
-                    </section>
+                    </div>
 
                     <section className="room-section">
                         <h2 className="dashboard-content-title">{t('rooms.history')}</h2>

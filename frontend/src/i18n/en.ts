@@ -183,7 +183,6 @@ export const en = {
     'rooms.openRoomMenu': 'Open room menu',
     'rooms.loadingRoom': 'Loading room',
     'rooms.ranking': 'Ranking',
-    'rooms.rankingTitle': 'Ranking — Members of this room ({count})',
     'rooms.history': 'Room history',
     'rooms.beatIt': 'Can you beat it?',
     'rooms.unavailableTitle': "This room isn't available",

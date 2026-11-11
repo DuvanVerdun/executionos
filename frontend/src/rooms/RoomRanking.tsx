@@ -40,11 +40,15 @@ function RankingRow({ member }: { member: RankingEntry }) {
     );
 }
 
-/** Draw the ranking of the room members. */
+/** Draw the ranking of the room members, in a card that has its own title. */
 export function RoomRanking({ ranking }: { ranking: readonly RankingEntry[] }) {
+    const t = useT();
     return (
         <div id="room-ranking" className="room-ranking">
-            {ranking.map(/** Draw a member's row. */ (member) => <RankingRow key={member.position} member={member} />)}
+            <h2 className="room-ranking-title">{t('rooms.ranking')}</h2>
+            <div className="room-ranking-rows">
+                {ranking.map(/** Draw a member's row. */ (member) => <RankingRow key={member.position} member={member} />)}
+            </div>
         </div>
     );
 }

@@ -2698,9 +2698,15 @@ button {
     outline-offset: 4px;
 }
 
+.room-main-row {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(40 * var(--rooms-size-unit));
+}
+
 .room-mission-card {
     --plan-size-unit: var(--rooms-size-unit);
-    align-self: center;
+    flex-shrink: 0;
 }
 
 .room-section {
@@ -2740,14 +2746,15 @@ button {
 }
 
 .room-skeleton-mission {
-    align-self: center;
+    flex-shrink: 0;
     width: calc(595 * var(--rooms-size-unit));
-    max-width: 100%;
     height: calc(533 * var(--rooms-size-unit));
 }
 
 .room-skeleton-ranking {
-    height: calc(260 * var(--rooms-size-unit));
+    flex: 1;
+    min-width: 0;
+    height: calc(326 * var(--rooms-size-unit));
 }
 
 .room-skeleton-history {
@@ -2756,11 +2763,27 @@ button {
 
 .room-ranking {
     display: flex;
+    flex: 1;
     flex-direction: column;
-    gap: calc(8 * var(--rooms-size-unit));
-    padding: calc(16 * var(--rooms-size-unit));
+    min-width: 0;
+    gap: calc(36 * var(--rooms-size-unit));
+    padding: calc(36 * var(--rooms-size-unit)) calc(16 * var(--rooms-size-unit)) calc(16 * var(--rooms-size-unit));
     border-radius: calc(27 * var(--rooms-size-unit));
     background-color: var(--color-surface);
+}
+
+.room-ranking-title {
+    padding: 0 calc(24 * var(--rooms-size-unit));
+    font-size: calc(36 * var(--rooms-size-unit));
+    line-height: 1.25;
+    color: var(--color-text);
+    text-align: left;
+}
+
+.room-ranking-rows {
+    display: flex;
+    flex-direction: column;
+    gap: calc(8 * var(--rooms-size-unit));
 }
 
 .room-ranking-row {
