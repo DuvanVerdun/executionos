@@ -27,7 +27,7 @@ export function RoomsScreen() {
 
     useDocumentEvent('click', /** Close the open room menu when clicking outside it. */ (event) => {
         if (openMenuRoomId === null || busyAction !== null) return;
-        if (closestElement(event.target, '.room-menu, .room-menu-toggle', Element)) return;
+        if (closestElement(event.target, '.room-menu, .room-menu-toggle, .modal-overlay', Element)) return;
         setRoomMenuOpen(null);
     });
 

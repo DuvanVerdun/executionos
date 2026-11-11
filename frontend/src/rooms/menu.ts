@@ -1,17 +1,30 @@
 import { t } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
+import { confirmAction } from '../shared/confirm';
 import { setFloatingMessage } from '../shared/floating-message';
 import type { RoomMenuAction, RoomMenuHooks, RoomMenuRoom } from '../types/rooms';
 import { deleteRoom, fetchRoomLink, patchRoomMembership, postLeaveRoom, postRefreshRoomLink } from './api';
 import { ROOM_ACTION_ERRORS } from './copy';
 import { buildRoomLink } from './links';
 
+/** Ask the user to confirm an action that is hard to undo. Return true at once for the actions that need no question. */
+function isConfirmed(action: RoomMenuAction): Promise<boolean> {
+    if (action === 'refresh-link') {
+        return confirmAction({ message: t('rooms.refreshConfirm'), confirmLabel: t('rooms.refreshLink') });
+    }
+    if (action === 'delete-room') {
+        return confirmAction({ message: t('rooms.deleteConfirm'), confirmLabel: t('rooms.deleteRoom') });
+    }
+    if (action === 'leave-room') {
+        return confirmAction({ message: t('rooms.leaveConfirm'), confirmLabel: t('rooms.leaveRoom') });
+    }
+    return Promise.resolve(true);
+}
+
 /** Run one room menu action for either menu. The hooks say how each screen reacts. */
 export async function runRoomMenuAction(action: RoomMenuAction, room: RoomMenuRoom, hooks: RoomMenuHooks): Promise<void> {
     if (hooks.isBusy()) return;
-    if (action === 'refresh-link' && !confirm(t('rooms.refreshConfirm'))) return;
-    if (action === 'delete-room' && !confirm(t('rooms.deleteConfirm'))) return;
-    if (action === 'leave-room' && !confirm(t('rooms.leaveConfirm'))) return;
+    if (!await isConfirmed(action)) return;
     const previousShowMissions = room.show_missions;
     if (action === 'toggle-missions') hooks.setShowMissions(room.id, !previousShowMissions);
     hooks.setBusy(action);

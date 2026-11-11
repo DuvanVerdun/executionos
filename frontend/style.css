@@ -2483,6 +2483,29 @@ button {
     filter: brightness(0.85);
 }
 
+.modal-secondary-btn {
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface-selected);
+    color: var(--color-text);
+}
+
+.modal-message {
+    text-align: center;
+    font-size: calc(32 * var(--modal-size-unit));
+    line-height: 1.25;
+    color: var(--color-text);
+}
+
+.modal-actions {
+    display: flex;
+    gap: calc(32 * var(--modal-size-unit));
+}
+
+.confirm-card {
+    width: min(calc(640 * var(--modal-size-unit)), 100%);
+    padding: calc(48 * var(--modal-size-unit));
+}
+
 .modal-close-btn:focus-visible,
 .modal-submit-btn:focus-visible {
     outline: 2px solid var(--color-text);

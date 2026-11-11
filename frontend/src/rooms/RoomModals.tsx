@@ -2,9 +2,9 @@ import { useRef, useState, type SubmitEvent } from 'react';
 import { useT } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { setFloatingMessage } from '../shared/floating-message';
+import { ModalOverlay } from '../shared/ModalOverlay';
 import { postJoinRoom, postRoom } from './api';
 import { buildRoomDisplayLink, buildRoomLink, extractRoomLinkToken } from './links';
-import { ModalOverlay } from './ModalOverlay';
 import { openRoom } from './room';
 import { loadRooms } from './rooms';
 

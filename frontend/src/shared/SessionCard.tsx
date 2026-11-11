@@ -4,6 +4,7 @@ import { formatDurationHoursMinutes } from '../lib/durations';
 import { deleteSession } from '../session/api';
 import type { ScreenName } from '../types/screens';
 import type { HistorySession } from '../types/session';
+import { confirmAction } from './confirm';
 
 /** Draw a session's target, focused time, and completion metrics. */
 export function SessionTimeSection({ session }: {
@@ -37,7 +38,7 @@ export function SessionMenu({ sessionId, screen, isOpen, onToggle, reload }: Ses
 
     /** Delete the session, then reload the Dashboard or Room data. */
     async function handleDelete(): Promise<void> {
-        if (!confirm(t('session.deleteConfirm'))) return;
+        if (!await confirmAction({ message: t('session.deleteConfirm'), confirmLabel: t('session.delete') })) return;
         setHasFailed(false);
         setIsDeleting(true);
         try {

@@ -31,7 +31,7 @@ export function RoomScreen() {
 
     useDocumentEvent('click', /** Close the top bar menu when clicking outside it. */ (event) => {
         if (!menuOpen || busyAction !== null) return;
-        if (closestElement(event.target, '#room-menu-wrapper', Element)) return;
+        if (closestElement(event.target, '#room-menu-wrapper, .modal-overlay', Element)) return;
         setRoomMenuState(false);
     });
 

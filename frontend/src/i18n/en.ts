@@ -4,6 +4,7 @@
  */
 export const en = {
     'common.retry': 'Retry',
+    'common.cancel': 'Cancel',
     'common.loadingMore': 'Loading more...',
     'common.moreSessionsFailed': "Couldn't load more sessions.",
     'common.serverUnreachable': "Couldn't reach the server. Try again.",

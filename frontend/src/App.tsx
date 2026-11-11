@@ -13,6 +13,7 @@ import { RoomsScreen } from './rooms/RoomsScreen';
 import { FocusScreen } from './session/FocusScreen';
 import { PlanScreen } from './session/PlanScreen';
 import { ReviewScreen } from './session/ReviewScreen';
+import { ConfirmModal } from './shared/ConfirmModal';
 import { FloatingMessage } from './shared/FloatingMessage';
 import { screenStore } from './shared/navigation';
 
@@ -40,6 +41,7 @@ export function App() {
             {screen === 'room' && <RoomScreen />}
             <FeedbackForm />
             <CheckinModal />
+            <ConfirmModal />
             <FloatingMessage />
         </>
     );

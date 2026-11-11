@@ -59,7 +59,7 @@ export function SessionHistory() {
     const sentinelRef = useRef<HTMLDivElement>(null);
 
     useDocumentEvent('click', /** Close history menus when clicking outside their controls. */ (event) => {
-        if (closestElement(event.target, '.dashboard-session-menu, .dashboard-session-open-menu-icon', Element)) return;
+        if (closestElement(event.target, '.dashboard-session-menu, .dashboard-session-open-menu-icon, .modal-overlay', Element)) return;
         setOpenMenuId(null);
     });
 
