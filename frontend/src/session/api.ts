@@ -19,6 +19,11 @@ export async function postSession(sessionData: SessionSubmission, userId: number
     return result;
 }
 
+/** Request a new mission for an owned session. The times of the session never change. */
+export function patchSessionMission(sessionId: number, mission: string, currentScreen: ScreenName): Promise<ApiResult<{ mission: string }>> {
+    return apiFetch<ApiResult<{ mission: string }>>({ path: `update-session/${sessionId}`, method: 'PATCH', body: { mission }, currentScreen });
+}
+
 /** Request deletion of an owned session. */
 export function deleteSession(sessionId: string, currentScreen: ScreenName = 'dashboard'): Promise<ApiResult<{ message: string; session_id: number }>> {
     return apiFetch<ApiResult<{ message: string; session_id: number }>>({ path: `delete-session/${sessionId}`, method: 'DELETE', currentScreen });

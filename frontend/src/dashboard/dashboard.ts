@@ -107,6 +107,15 @@ export async function loadMoreSessions(): Promise<void> {
     }
 }
 
+/** Show a new mission on a session of the list. The server has already saved it, and no total depends on it. */
+export function setSessionMission(sessionId: number, mission: string): void {
+    dashboardStore.update({
+        sessions: dashboardStore.get().sessions.map(/** Change the mission of the matching session. */ (session) => (
+            session.id === sessionId ? { ...session, mission } : session
+        ))
+    });
+}
+
 /** The sessions on screen, their daily summaries, and where the next page starts. */
 type SessionList = Pick<DashboardState, 'sessions' | 'dailySummaries' | 'nextCursor'>;
 

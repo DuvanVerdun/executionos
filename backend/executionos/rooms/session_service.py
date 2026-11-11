@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from executionos.extensions import db
 from executionos.models import ActiveRoomSession, Room, RoomMembership, Session, SessionEndNotice
+from executionos.params import parse_mission
 from executionos.rooms.errors import RoomNotAvailableError, RoomSessionConflictError
 from executionos.rooms.service import running_session_facts
 from executionos.timeutils import utc_iso
@@ -22,9 +23,6 @@ from executionos.rooms.rules import (
     overdue_reason,
     saved_end_point,
 )
-
-
-MISSION_MAX_LENGTH = 200
 
 LoadedRow = tuple[ActiveRoomSession, str]
 
@@ -277,12 +275,7 @@ def _validate_start_input(
     if isinstance(raw_room_id, bool) or not isinstance(raw_room_id, int):
         raise ValueError("Room ID must be an integer")
 
-    if (
-        not isinstance(raw_mission, str)
-        or not raw_mission.strip()
-        or len(raw_mission) > MISSION_MAX_LENGTH
-    ):
-        raise ValueError("A mission of at most 200 characters is required")
+    mission = parse_mission(raw_mission)
 
     if (
         isinstance(raw_target_time_seconds, bool)
@@ -291,7 +284,7 @@ def _validate_start_input(
     ):
         raise ValueError("Target time must be a positive integer")
 
-    return raw_room_id, raw_mission, raw_target_time_seconds
+    return raw_room_id, mission, raw_target_time_seconds
 
 
 def _load_member_room_name(room_id: int, user_id: int) -> str:

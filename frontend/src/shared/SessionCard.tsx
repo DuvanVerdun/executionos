@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useT } from '../i18n/i18n';
 import { formatDurationHoursMinutes } from '../lib/durations';
 import { deleteSession } from '../session/api';
 import type { ScreenName } from '../types/screens';
 import type { HistorySession } from '../types/session';
 import { confirmAction } from './confirm';
+import { EditMissionModal } from './EditMissionModal';
 
 /** Draw a session's target, focused time, and completion metrics. */
 export function SessionTimeSection({ session }: {
@@ -22,17 +24,22 @@ export function SessionTimeSection({ session }: {
 
 interface SessionMenuProps {
     sessionId: number;
-    /** The screen the card is on. Deleting needs it, in case the sign-in is lost. */
+    /** The mission that the session has now. */
+    mission: string;
+    /** The screen the card is on. Editing and deleting need it, in case the sign-in is lost. */
     screen: ScreenName;
     isOpen: boolean;
     onToggle: () => void;
+    /** Show the new mission on the card, after the server saved it. */
+    onMissionChanged: (mission: string) => void;
     /** Reload the data that shows the session, after it is deleted. */
     reload: () => Promise<void>;
 }
 
-/** Draw the menu icon of a session and its menu with the Delete button. */
-export function SessionMenu({ sessionId, screen, isOpen, onToggle, reload }: SessionMenuProps) {
+/** Draw the menu icon of a session and its menu with the Edit Mission and Delete buttons. */
+export function SessionMenu({ sessionId, mission, screen, isOpen, onToggle, onMissionChanged, reload }: SessionMenuProps) {
     const t = useT();
+    const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [hasFailed, setHasFailed] = useState(false);
 
@@ -62,7 +69,14 @@ export function SessionMenu({ sessionId, screen, isOpen, onToggle, reload }: Ses
             </span>
             <div className="dashboard-session-menu" style={isOpen ? { display: 'flex' } : undefined}>
                 <button
-                    className="dashboard-delete-session-btn"
+                    className="dashboard-session-menu-btn"
+                    disabled={isDeleting}
+                    onClick={() => { onToggle(); setIsEditing(true); }}
+                >
+                    {t('session.edit')}
+                </button>
+                <button
+                    className="dashboard-session-menu-btn"
                     data-session-id={sessionId}
                     disabled={isDeleting}
                     onClick={() => { void handleDelete(); }}
@@ -73,6 +87,16 @@ export function SessionMenu({ sessionId, screen, isOpen, onToggle, reload }: Ses
                     <p className="form-error-message" role="alert">{t('session.deleteFailed')}</p>
                 )}
             </div>
+            {isEditing && createPortal(
+                <EditMissionModal
+                    sessionId={sessionId}
+                    mission={mission}
+                    screen={screen}
+                    onSaved={onMissionChanged}
+                    onClose={() => { setIsEditing(false); }}
+                />,
+                document.body
+            )}
         </>
     );
 }

@@ -104,6 +104,15 @@ export async function handleRoomHistoryRetry(): Promise<void> {
     await loadMoreRoomSessions();
 }
 
+/** Show a new mission on a session of the room history. The server has already saved it, and no total depends on it. */
+export function setRoomSessionMission(sessionId: number, mission: string): void {
+    roomStore.update({
+        sessions: roomStore.get().sessions.map(/** Change the mission of the matching session. */ (session) => (
+            session.id === sessionId ? { ...session, mission } : session
+        ))
+    });
+}
+
 /** Load the room snapshot, and the history when it is needed. */
 export async function loadRoom(
     { silent = false, reloadHistory = false, surfaceErrors = !silent }: { silent?: boolean; reloadHistory?: boolean; surfaceErrors?: boolean } = {}

@@ -3,7 +3,7 @@ import { initializeStreakState } from '../streak/streak';
 import { fakeBackendByPath, requestedPaths, type FakeAnswer } from '../test/network';
 import type { DashboardData } from '../types/dashboard';
 import type { HistoryCursor, HistorySession } from '../types/session';
-import { dashboardStore, loadDashboard, refreshDashboard, type DashboardSurface } from './dashboard';
+import { dashboardStore, loadDashboard, refreshDashboard, setSessionMission, type DashboardSurface } from './dashboard';
 
 /** Make a saved session with the given ID. */
 function session(id: number): HistorySession {
@@ -139,6 +139,16 @@ describe('refreshing the Dashboard after a delete', () => {
         dashboardStore.update({ isLoadingMore: true });
         await refreshDashboard(2);
         expect(dashboardStore.get().isLoadingMore).toBe(false);
+    });
+});
+
+describe('changing a mission on the list', () => {
+    it('changes only the session that matches, and leaves the totals alone', () => {
+        showSessions([1, 2, 3], null);
+        const totalsBefore = dashboardStore.get().data;
+        setSessionMission(2, 'a new mission');
+        expect(dashboardStore.get().sessions.map(/** Read the mission of a session. */ (item) => item.mission)).toEqual(['Mission 1', 'a new mission', 'Mission 3']);
+        expect(dashboardStore.get().data).toBe(totalsBefore);
     });
 });
 

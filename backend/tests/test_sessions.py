@@ -6,7 +6,18 @@ from uuid import uuid4
 import pytest
 from flask import Flask
 
-from helpers import SESSION_DAY, all_pages, body, call, list_sessions, make_account, save_session, seed_session
+from helpers import (
+    SESSION_DAY,
+    all_pages,
+    body,
+    call,
+    create_room,
+    join_room,
+    list_sessions,
+    make_account,
+    save_session,
+    seed_session,
+)
 
 INVALID_SESSIONS = [
     pytest.param({"actualTimeSeconds": -1}, id="negative actual time"),
@@ -52,6 +63,81 @@ def test_a_user_cannot_delete_someone_elses_session(app: Flask):
     assert someone_elses.status_code == missing.status_code == 404
     assert body(someone_elses) == body(missing)
     assert len(list_sessions(ana)) == 1
+
+
+def test_a_user_can_change_the_mission_of_their_session_and_nothing_else(app: Flask):
+    ana = make_account(app, "ana")
+    session_id = body(save_session(ana))["session_id"]
+    before = list_sessions(ana)[0]
+
+    result = call(ana, "PATCH", f"/api/update-session/{session_id}", {
+        "mission": "  write better tests  ",
+        "targetTimeSeconds": 1,
+        "actualTimeSeconds": 1,
+        "date": "2020-01-01T00:00:00Z",
+    })
+
+    assert result.status_code == 200
+    assert body(result)["mission"] == "write better tests"
+    after = list_sessions(ana)[0]
+    assert after == {**before, "mission": "write better tests"}
+
+
+@pytest.mark.parametrize("payload", [
+    pytest.param({}, id="no mission"),
+    pytest.param({"mission": "   "}, id="blank mission"),
+    pytest.param({"mission": "x" * 201}, id="mission too long"),
+    pytest.param({"mission": 5}, id="mission is not text"),
+])
+def test_an_invalid_mission_is_rejected_and_the_session_does_not_change(app: Flask, payload: dict[str, Any]):
+    ana = make_account(app, "ana")
+    session_id = body(save_session(ana))["session_id"]
+
+    result = call(ana, "PATCH", f"/api/update-session/{session_id}", payload)
+
+    assert result.status_code == 400
+    assert body(result)["success"] is False
+    assert list_sessions(ana)[0]["mission"] == "write tests"
+
+
+def test_a_user_cannot_change_someone_elses_session(app: Flask):
+    ana = make_account(app, "ana")
+    bob = make_account(app, "bob")
+    session_id = body(save_session(ana))["session_id"]
+
+    someone_elses = call(bob, "PATCH", f"/api/update-session/{session_id}", {"mission": "hijacked"})
+    missing = call(bob, "PATCH", "/api/update-session/999999", {"mission": "hijacked"})
+
+    assert someone_elses.status_code == missing.status_code == 404
+    assert body(someone_elses) == body(missing)
+    assert list_sessions(ana)[0]["mission"] == "write tests"
+
+
+def test_a_member_can_change_the_mission_of_their_own_room_session_but_not_of_another_member(app: Flask):
+    ana = make_account(app, "ana")
+    bob = make_account(app, "bob")
+    room = create_room(ana)
+    join_room(bob, room)
+    seed_session(ana.user_id, SESSION_DAY, 900, mission="old plan", room_id=room["id"])
+    history_url = f"/api/rooms/{room['id']}/sessions?timezone=UTC"
+    session_id = body(call(ana, "GET", history_url))["sessions"][0]["id"]
+
+    by_bob = call(bob, "PATCH", f"/api/update-session/{session_id}", {"mission": "hijacked"})
+    by_ana = call(ana, "PATCH", f"/api/update-session/{session_id}", {"mission": "new plan"})
+
+    assert by_bob.status_code == 404
+    assert by_ana.status_code == 200
+    seen_by_bob = body(call(bob, "GET", history_url))["sessions"][0]
+    assert seen_by_bob["mission"] == "new plan"
+    assert seen_by_bob["actual_time_seconds"] == 900
+
+
+def test_a_saved_mission_is_stored_without_the_spaces_around_it(app: Flask):
+    ana = make_account(app, "ana")
+
+    save_session(ana, mission="  spaced out  ")
+
+    assert list_sessions(ana)[0]["mission"] == "spaced out"
 
 
 def test_paging_visits_every_session_once_newest_first(app: Flask):

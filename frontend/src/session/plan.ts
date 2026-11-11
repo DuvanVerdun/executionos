@@ -10,10 +10,17 @@ export interface MissionValidationError {
     message: string;
 }
 
-/** Return a mission or duration validation error, or an empty string. */
-function validatePlan(mission: string, targetTime: string): string {
+/** Return the problem of a mission, or an empty string when the mission is valid. */
+export function getMissionError(mission: string): string {
     if (!mission.trim()) return t('mission.required');
     if (mission.length > 50) return t('mission.tooLong');
+    return '';
+}
+
+/** Return a mission or duration validation error, or an empty string. */
+function validatePlan(mission: string, targetTime: string): string {
+    const missionError = getMissionError(mission);
+    if (missionError) return missionError;
     if (!targetTime || !/^\d{2}:\d{2}$/.test(targetTime)) {
         return t('mission.timeFormat');
     }
@@ -27,8 +34,7 @@ function validatePlan(mission: string, targetTime: string): string {
 export function validateMissionFields(mission: string, targetTime: string): MissionValidationError | null {
     const message = validatePlan(mission, targetTime);
     if (!message) return null;
-    const isMissionError = !mission.trim() || mission.length > 50;
-    return { field: isMissionError ? 'mission' : 'targetTime', message };
+    return { field: getMissionError(mission) ? 'mission' : 'targetTime', message };
 }
 
 /** Start a timestamp-based work session from a valid plan. */

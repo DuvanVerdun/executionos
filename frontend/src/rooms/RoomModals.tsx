@@ -1,21 +1,13 @@
 import { useRef, useState, type SubmitEvent } from 'react';
 import { useT } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
+import { CloseIcon } from '../shared/CloseIcon';
 import { setFloatingMessage } from '../shared/floating-message';
 import { ModalOverlay } from '../shared/ModalOverlay';
 import { postJoinRoom, postRoom } from './api';
 import { buildRoomDisplayLink, buildRoomLink, extractRoomLinkToken } from './links';
 import { openRoom } from './room';
 import { loadRooms } from './rooms';
-
-/** The X of a modal's close button. */
-function CloseIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-    );
-}
 
 interface RoomFormModalProps {
     /** The room link, shown after a room is created. */

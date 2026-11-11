@@ -1529,9 +1529,11 @@ button {
     right: 0;
     z-index: 2;
     max-width: 100%;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.dashboard-delete-session-btn {
+.dashboard-session-menu-btn {
     background-color: var(--color-page);
     border: none;
     color: var(--color-text);
@@ -1540,12 +1542,12 @@ button {
     border-radius: 16px;
 }
 
-.dashboard-delete-session-btn:hover {
+.dashboard-session-menu-btn:hover {
     cursor: pointer;
     filter: brightness(1.1);
 }
 
-.dashboard-delete-session-btn:disabled {
+.dashboard-session-menu-btn:disabled {
     cursor: wait;
     opacity: .7;
 }

@@ -10,7 +10,14 @@ from sqlalchemy.exc import IntegrityError
 from executionos.errors import error_response, server_error
 from executionos.extensions import db
 from executionos.models import Session
-from executionos.params import parse_anchor_date, parse_period, parse_timezone, read_cursor
+from executionos.params import (
+    parse_anchor_date,
+    parse_mission,
+    parse_period,
+    parse_timezone,
+    read_cursor,
+    read_json_object,
+)
 from executionos.rooms.session_service import finalize_overdue_for_users, finalize_quietly
 from executionos.sessions.service import get_paginated_sessions
 
@@ -75,8 +82,7 @@ def save_session() -> tuple[Any, int]:
             )).scalar_one_or_none()
             if existing is not None:
                 return jsonify({"success": True, "session_id": existing.id}), 200  # type: ignore
-        if not isinstance(data["mission"], str) or not data["mission"].strip() or len(data["mission"]) > 200:
-            raise ValueError("A mission of at most 200 characters is required")
+        mission = parse_mission(data["mission"])
         for field in ("targetTimeSeconds", "actualTimeSeconds"):
             value = data[field]
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -89,7 +95,7 @@ def save_session() -> tuple[Any, int]:
         new_session = Session(
             user_id=user_id,
             date=datetime.fromisoformat(data["date"].replace("Z", "+00:00")),
-            mission=data["mission"],
+            mission=mission,
             target_time_seconds=int(data["targetTimeSeconds"]),
             actual_time_seconds=int(data["actualTimeSeconds"])
         )
@@ -119,6 +125,35 @@ def save_session() -> tuple[Any, int]:
         return error_response("Could not save session", 500)
     except Exception:
         return server_error("Could not save session")
+
+@sessions_bp.route("/api/update-session/<int:session_id>", methods=["PATCH"])
+@jwt_required()
+def update_session(session_id: int) -> tuple[Any, int]:
+    """Change the mission of a session, but only if it belongs to the requesting user. The times never change."""
+    try:
+        user_id = int(get_jwt_identity())
+        mission = parse_mission(read_json_object().get("mission"))
+
+        session = db.session.execute(select(Session).filter_by(id=session_id, user_id=user_id)).scalar_one_or_none()
+
+        if session is None:
+            return error_response("Session not found", 404)
+
+        session.mission = mission
+        db.session.commit()
+
+        return jsonify({  # type: ignore
+            "success": True,
+            "message": "Session updated",
+            "session_id": session_id,
+            "mission": mission
+        }), 200
+    except ValueError:
+        db.session.rollback()
+        return error_response("Invalid session data", 400)
+    except Exception:
+        return server_error("Could not update session")
+
 
 @sessions_bp.route("/api/delete-session/<int:session_id>", methods=["DELETE"])
 @jwt_required()

@@ -7,6 +7,17 @@ from flask import request  # type: ignore[attr-defined]
 from executionos.timeutils import Period
 
 
+MISSION_MAX_LENGTH = 200
+
+
+def parse_mission(raw_mission: object) -> str:
+    """A valid mission, without the spaces around it."""
+    mission = raw_mission.strip() if isinstance(raw_mission, str) else ""
+    if not mission or len(mission) > MISSION_MAX_LENGTH:
+        raise ValueError(f"A mission of at most {MISSION_MAX_LENGTH} characters is required")
+    return mission
+
+
 def parse_period(raw_period: str | None) -> Period:
     if raw_period not in ("week", "month", "year", "all_time"):
         raise ValueError("Invalid period")

@@ -10,7 +10,7 @@ import { useStore } from '../lib/store';
 import { SessionMenu, SessionTimeSection } from '../shared/SessionCard';
 import type { RoomHistorySession } from '../types/rooms';
 import type { DailySummary } from '../types/session';
-import { handleRoomHistoryRetry, loadMoreRoomSessions, loadRoom } from './room';
+import { handleRoomHistoryRetry, loadMoreRoomSessions, loadRoom, setRoomSessionMission } from './room';
 import { roomStore } from './state';
 
 /** Draw the aggregated metrics of one day of room sessions. */
@@ -54,7 +54,9 @@ function RoomSessionRow({ session, isMenuOpen, onToggleMenu }: { session: RoomHi
                 {session.is_mine && (
                     <SessionMenu
                         sessionId={session.id}
+                        mission={session.mission ?? ''}
                         screen="room"
+                        onMissionChanged={(mission) => { setRoomSessionMission(session.id, mission); }}
                         isOpen={isMenuOpen}
                         onToggle={onToggleMenu}
                         reload={() => loadRoom({ silent: true, reloadHistory: true })}
