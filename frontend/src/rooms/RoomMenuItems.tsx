@@ -8,6 +8,8 @@ interface RoomMenuItemsProps {
     room: RoomMenuRoom;
     busyAction: RoomMenuAction | null;
     onAction: (action: RoomMenuAction) => void;
+    /** Open the modal that renames the room. Only the owner sees the row. */
+    onRename: () => void;
 }
 
 /** Draw one action row of a room menu. */
@@ -33,7 +35,7 @@ function MenuRow({ action, label, busyAction, onAction }: {
 }
 
 /** Fill a room menu with the rows this user's role allows. */
-export function RoomMenuItems({ room, busyAction, onAction }: RoomMenuItemsProps) {
+export function RoomMenuItems({ room, busyAction, onAction, onRename }: RoomMenuItemsProps) {
     const t = useT();
     const rowBusyAction = busyAction === 'toggle-missions' ? null : busyAction;
     return (
@@ -55,6 +57,9 @@ export function RoomMenuItems({ room, busyAction, onAction }: RoomMenuItemsProps
             </div>
             {room.is_owner && (
                 <>
+                    <button type="button" className="room-menu-item" role="menuitem" disabled={busyAction !== null} onClick={onRename}>
+                        {t('rooms.rename')}
+                    </button>
                     <MenuRow action="copy-link" label={t('rooms.copyLink')} busyAction={rowBusyAction} onAction={onAction} />
                     <MenuRow action="refresh-link" label={t('rooms.refreshLink')} busyAction={rowBusyAction} onAction={onAction} />
                     <MenuRow action="delete-room" label={t('rooms.deleteRoom')} busyAction={rowBusyAction} onAction={onAction} />

@@ -200,6 +200,7 @@ export const en = {
     'rooms.stateNotWorking': 'Not working',
 
     'rooms.showMissions': 'Show Missions',
+    'rooms.rename': 'Rename room',
     'rooms.copyLink': 'Copy link',
     'rooms.refreshLink': 'Refresh link',
     'rooms.deleteRoom': 'Delete room',
@@ -223,6 +224,9 @@ export const en = {
     'rooms.closeCreate': 'Close create room form',
     'rooms.closeJoin': 'Close join room form',
     'rooms.closeCreated': 'Close room created message',
+    'rooms.closeRename': 'Close rename room form',
+    'rooms.renameTitle': 'Rename Room',
+    'rooms.renameFailed': "Couldn't rename the room. Try again.",
     'rooms.createTitle': 'Create Room',
     'rooms.creating': 'Creating Room…',
     'rooms.joinTitle': 'Join Room',

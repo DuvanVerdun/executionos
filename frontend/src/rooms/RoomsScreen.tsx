@@ -6,7 +6,7 @@ import { useStore } from '../lib/store';
 import { Header } from '../shared/Header';
 import { Screen } from '../shared/Screen';
 import { RoomCard } from './RoomCard';
-import { CreateRoomModal, JoinRoomModal, RoomCreatedModal } from './RoomModals';
+import { CreateRoomModal, JoinRoomModal, RenameRoomModal, RoomCreatedModal } from './RoomModals';
 import { setRoomMenuState } from './room';
 import { isPollingRooms, pollRooms, retryRooms, setRoomMenuOpen } from './rooms';
 import { roomStore, roomsStore } from './state';
@@ -15,6 +15,7 @@ import { roomStore, roomsStore } from './state';
 type OpenModal =
     | { kind: 'create' }
     | { kind: 'join' }
+    | { kind: 'rename'; room: { id: number; name: string } }
     | { kind: 'created'; link: { full: string; display: string } };
 
 /** Draw the Rooms screen. */
@@ -81,7 +82,13 @@ export function RoomsScreen() {
                 </div>
 
                 <div id="rooms-grid" className="rooms-grid" style={{ display: surface === 'rooms' ? 'grid' : 'none' }}>
-                    {shownRooms.map(/** Draw a room card. */ (room) => <RoomCard key={room.id} room={room} />)}
+                    {shownRooms.map(/** Draw a room card. */ (room) => (
+                        <RoomCard
+                            key={room.id}
+                            room={room}
+                            onRename={() => { setRoomMenuOpen(null); setModal({ kind: 'rename', room: { id: room.id, name: room.name } }); }}
+                        />
+                    ))}
                 </div>
 
                 <div id="rooms-empty" className="empty-dashboard-cta-container" style={{ display: surface === 'empty' ? 'flex' : 'none' }}>
@@ -111,6 +118,9 @@ export function RoomsScreen() {
             )}
             {modal?.kind === 'join' && (
                 <JoinRoomModal isSubmitting={isSubmitting} setIsSubmitting={setIsSubmitting} onClose={() => { setModal(null); }} />
+            )}
+            {modal?.kind === 'rename' && (
+                <RenameRoomModal room={modal.room} screen="rooms" onClose={() => { setModal(null); }} />
             )}
             {modal?.kind === 'created' && (
                 <RoomCreatedModal link={modal.link} isSubmitting={isSubmitting} onClose={() => { setModal(null); }} />

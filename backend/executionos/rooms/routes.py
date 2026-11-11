@@ -18,6 +18,7 @@ from executionos.rooms.service import (
     leave_room_for_user,
     list_rooms_for_user,
     refresh_room_link_for_user,
+    rename_room_for_user,
     set_show_missions_for_user,
 )
 from executionos.rooms.session_service import (
@@ -97,6 +98,18 @@ def delete_room(room_id: int) -> tuple[Any, int]:
         finalize_overdue_for_rooms([room_id])
         delete_room_for_user(user_id, room_id)
         return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return room_error_response(error)
+
+@rooms_bp.route("/api/rooms/<int:room_id>", methods=["PATCH"])
+@jwt_required()
+def rename_room(room_id: int) -> tuple[Any, int]:
+    """Change the room name. Owner only."""
+    user_id = int(get_jwt_identity())
+    try:
+        data = read_json_object()
+        name = rename_room_for_user(user_id, room_id, data.get("name"))
+        return jsonify({"success": True, "name": name}), 200  # type: ignore
     except Exception as error:
         return room_error_response(error)
 

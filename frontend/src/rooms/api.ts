@@ -27,6 +27,11 @@ export function postRoom(name: string, currentScreen: ScreenName = 'rooms'): Pro
     return roomFetch<ApiResult<{ room: RoomCard & { link_token: string } }>>('rooms', 'POST', { name }, currentScreen);
 }
 
+/** Request a new name for a room. Owner only. */
+export function patchRoomName(roomId: number, name: string, currentScreen: ScreenName): Promise<ApiResult<{ name: string }>> {
+    return roomFetch<ApiResult<{ name: string }>>(`rooms/${roomId}`, 'PATCH', { name }, currentScreen);
+}
+
 /** Request to join a room with its link token. */
 export function postJoinRoom(linkToken: string, currentScreen: ScreenName = 'rooms'): Promise<ApiResult<{ room: RoomCard; already_member: boolean }>> {
     return roomFetch<ApiResult<{ room: RoomCard; already_member: boolean }>>('rooms/join', 'POST', { linkToken }, currentScreen);

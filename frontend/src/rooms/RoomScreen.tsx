@@ -8,6 +8,7 @@ import { useStore } from '../lib/store';
 import { MissionCard } from '../session/MissionCard';
 import { validateMissionFields, type MissionValidationError } from '../session/plan';
 import { Screen } from '../shared/Screen';
+import { RenameRoomModal } from './RoomModals';
 import { RoomHistory } from './RoomHistory';
 import { RoomMenuItems } from './RoomMenuItems';
 import { RoomRanking } from './RoomRanking';
@@ -26,6 +27,7 @@ export function RoomScreen() {
     const [targetTime, setTargetTime] = useState('00:00');
     const [error, setError] = useState<MissionValidationError | null>(null);
     const [isRetrying, setIsRetrying] = useState(false);
+    const [isRenaming, setIsRenaming] = useState(false);
     const missionInputRef = useRef<HTMLInputElement>(null);
     const targetTimeInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,6 +108,7 @@ export function RoomScreen() {
                                     room={snapshot.room}
                                     busyAction={busyAction}
                                     onAction={(action) => { void runRoomMenuAction(action, snapshot.room, roomMenuHooks); }}
+                                    onRename={() => { setRoomMenuState(false); setIsRenaming(true); }}
                                 />
                             )}
                         </div>
@@ -209,6 +212,10 @@ export function RoomScreen() {
                 </div>
 
             </div>
+
+            {isRenaming && snapshot && (
+                <RenameRoomModal room={snapshot.room} screen="room" onClose={() => { setIsRenaming(false); }} />
+            )}
 
         </Screen>
     );
