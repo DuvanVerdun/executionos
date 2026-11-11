@@ -4,6 +4,7 @@ import { createStore } from '../lib/store';
 import { waitForMinimumFeedback } from '../lib/timing';
 import { navigateTo } from '../shared/navigation';
 import { loadStreak } from '../streak/streak';
+import type { ApiSuccess } from '../types/api';
 import type { DashboardData, DashboardMetric, DashboardPeriod } from '../types/dashboard';
 import type { DailySummary, HistoryCursor, HistorySession } from '../types/session';
 import { fetchDashboardData, fetchSessionsPage } from './api';
@@ -106,6 +107,25 @@ export async function loadMoreSessions(): Promise<void> {
     }
 }
 
+/** The sessions on screen, their daily summaries, and where the next page starts. */
+type SessionList = Pick<DashboardState, 'sessions' | 'dailySummaries' | 'nextCursor'>;
+
+/** Show loaded Dashboard data: the summary and trend, the sessions, and the position of the next page. */
+function showDashboard(dashboardResult: ApiSuccess<DashboardData>, list: SessionList): void {
+    const { period, anchorDates } = dashboardStore.get();
+    const nextAnchorDates = period !== 'all_time' && dashboardResult.period.start_date
+        ? { ...anchorDates, [period]: dashboardResult.period.start_date }
+        : anchorDates;
+    dashboardStore.update({
+        data: dashboardResult,
+        ...list,
+        anchorDates: nextAnchorDates,
+        isLoading: false,
+        periodRange: { start_date: dashboardResult.period.start_date, end_date: dashboardResult.period.end_date },
+        surface: dashboardResult.summary.total_sessions === 0 ? 'empty' : 'data'
+    });
+}
+
 /** Load period data and sessions while ignoring superseded results. */
 export async function loadDashboard(feedbackStartedAt: number | null = null): Promise<void> {
     const generation = ++loadGeneration;
@@ -133,19 +153,10 @@ export async function loadDashboard(feedbackStartedAt: number | null = null): Pr
         if (!sessionsResult.success) {
             throw new Error(sessionsResult.error);
         }
-        const current = dashboardStore.get();
-        const nextAnchorDates = period !== 'all_time' && dashboardResult.period.start_date
-            ? { ...current.anchorDates, [period]: dashboardResult.period.start_date }
-            : current.anchorDates;
-        dashboardStore.update({
-            data: dashboardResult,
+        showDashboard(dashboardResult, {
             sessions: sessionsResult.sessions,
             dailySummaries: sessionsResult.daily_summaries,
-            nextCursor: sessionsResult.next_cursor,
-            anchorDates: nextAnchorDates,
-            isLoading: false,
-            periodRange: { start_date: dashboardResult.period.start_date, end_date: dashboardResult.period.end_date },
-            surface: dashboardResult.summary.total_sessions === 0 ? 'empty' : 'data'
+            nextCursor: sessionsResult.next_cursor
         });
 
         await loadStreak('dashboard');
@@ -159,6 +170,59 @@ export async function loadDashboard(feedbackStartedAt: number | null = null): Pr
         );
         dashboardStore.update({ surface: 'error' });
 
+    } finally {
+        if (generation === loadGeneration) {
+            dashboardStore.update({ isLoading: false });
+        }
+    }
+}
+
+/** Fetch session pages from the first one until there are at least this many sessions, or no page is left. */
+async function fetchSessionsAtLeast(period: DashboardPeriod, anchorDate: string, minimumCount: number): Promise<SessionList> {
+    let list: SessionList = { sessions: [], dailySummaries: {}, nextCursor: null };
+    do {
+        const page = await fetchSessionsPage(period, anchorDate, list.nextCursor);
+        if (!page.success) throw new Error(page.error);
+        list = {
+            sessions: [...list.sessions, ...page.sessions],
+            dailySummaries: { ...list.dailySummaries, ...page.daily_summaries },
+            nextCursor: page.next_cursor
+        };
+    } while (list.nextCursor !== null && list.sessions.length < minimumCount);
+    return list;
+}
+
+/**
+ * Update the Dashboard after a session was deleted, without a loading screen.
+ * The session leaves the list at once. The summary, the trend and the daily summaries then refresh in place,
+ * and the list keeps the length it had. If the refresh fails, the whole Dashboard loads again.
+ */
+export async function refreshDashboard(deletedSessionId: number): Promise<void> {
+    const generation = ++loadGeneration;
+    const { period, anchorDates, sessions } = dashboardStore.get();
+    const anchorDate = anchorDates[period];
+    const remaining = sessions.filter(/** Keep every session except the deleted one. */ (session) => session.id !== deletedSessionId);
+    dashboardStore.update({
+        sessions: remaining,
+        isLoading: true,
+        isLoadingMore: false,
+        paginationFailed: false,
+        paginationMessage: ''
+    });
+
+    try {
+        const [dashboardResult, list] = await Promise.all([
+            fetchDashboardData(period, anchorDate),
+            fetchSessionsAtLeast(period, anchorDate, remaining.length)
+        ]);
+        if (generation !== loadGeneration) return;
+        if (!dashboardResult.success) throw new Error(dashboardResult.error);
+        showDashboard(dashboardResult, list);
+        await loadStreak('dashboard');
+    } catch (error) {
+        if (generation !== loadGeneration) return;
+        console.error('Dashboard refresh error:', error);
+        await loadDashboard();
     } finally {
         if (generation === loadGeneration) {
             dashboardStore.update({ isLoading: false });

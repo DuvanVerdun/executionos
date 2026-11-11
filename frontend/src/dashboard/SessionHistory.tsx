@@ -9,7 +9,7 @@ import { formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { SessionMenu, SessionTimeSection } from '../shared/SessionCard';
 import type { DailySummary, HistorySession } from '../types/session';
-import { dashboardStore, loadDashboard, loadMoreSessions, retryPagination } from './dashboard';
+import { dashboardStore, loadMoreSessions, refreshDashboard, retryPagination } from './dashboard';
 
 /** Draw the aggregated metrics of a day of sessions. */
 function DailySummarySection({ summary }: { summary: DailySummary }) {
@@ -43,7 +43,7 @@ function SessionRow({ session, isMenuOpen, onToggleMenu }: SessionRowProps) {
                     screen="dashboard"
                     isOpen={isMenuOpen}
                     onToggle={onToggleMenu}
-                    reload={() => loadDashboard()}
+                    reload={() => refreshDashboard(session.id)}
                 />
             </div>
             <SessionTimeSection session={session} />
