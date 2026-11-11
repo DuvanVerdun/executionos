@@ -71,6 +71,12 @@ def read_cursor() -> tuple[datetime | None, int | None]:
     return parse_cursor_datetime(raw_cursor_date), int(raw_cursor_id)
 
 
+def read_optional_json_object() -> dict[str, Any]:
+    """The JSON object of this request, or an empty one when the request has no body."""
+    raw_data: object = request.get_json(silent=True)  # type: ignore[reportUnknownMemberType]
+    return cast(dict[str, Any], raw_data) if isinstance(raw_data, dict) else {}
+
+
 def read_json_object() -> dict[str, Any]:
     raw_data: object = request.get_json(silent=True)  # type: ignore[reportUnknownMemberType]
     if not isinstance(raw_data, dict):

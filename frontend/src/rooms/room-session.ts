@@ -6,14 +6,13 @@ import {
     ROOM_RETRY_WINDOW_MS
 } from '../config';
 import { t } from '../i18n/i18n';
-import { parseServerTime } from '../lib/dates';
 import { formatCountdown, formatDurationHoursMinutes, parseHHMMToSeconds } from '../lib/durations';
 import { errorStatus } from '../lib/errors';
 import { delay, millisecondsUntilNextSecond, waitForMinimumFeedback } from '../lib/timing';
 import { reviewStore, focusStore, type FinishLabel } from '../session/ui-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { getCurrentScreenName, navigateTo } from '../shared/navigation';
-import type { RoomSessionEnvelope, RoomSessionNotice, RoomSessionResult } from '../types/rooms';
+import type { RoomSessionEnvelope, RoomSessionNotice, RoomSessionPayload, RoomSessionResult } from '../types/rooms';
 import type { ScreenName } from '../types/screens';
 import {
     fetchRoomSession,
@@ -23,29 +22,21 @@ import {
     postStartRoomSession
 } from './api';
 import { armCheckinSound, cancelCheckinSound, unlockCheckinAudio } from './checkin-sound';
-import { getServerNowMs, updateClockOffset } from './clock';
 import { loadRoom, openRoom, showUnavailableRoom, startRoomPolling } from './room';
 import {
-    createInitialRoomSessionState, patchRoomDisplay, roomSessionStore
+    createInitialRoomSessionState, patchRoomDisplay, roomSessionStore, type RoomSessionState
 } from './room-session-state';
 import { roomSnapshotCache, roomStore } from './state';
 
 /** Fields that an outcome does not have. Declaring them as undefined lets the code test `outcome.stale` on any outcome. */
 type Without<K extends string> = { [P in K]?: undefined };
 
-/** A request that was sent and answered, with the times it was sent and answered. */
-interface TimedResult<R> {
-    result: R;
-    sentAtMs: number;
-    receivedAtMs: number;
-}
-
 /** How a queued room-session request ended. */
 type QueuedOutcome =
-    | (TimedResult<RoomSessionResult> & Without<'stale' | 'unauthorized' | 'failed'>)
-    | ({ unauthorized: true } & Without<'result' | 'sentAtMs' | 'receivedAtMs' | 'stale' | 'failed'>)
-    | ({ failed: true } & Without<'result' | 'sentAtMs' | 'receivedAtMs' | 'stale' | 'unauthorized'>)
-    | ({ stale: true } & Without<'result' | 'sentAtMs' | 'receivedAtMs' | 'unauthorized' | 'failed'>);
+    | ({ result: RoomSessionResult } & Without<'stale' | 'unauthorized' | 'failed'>)
+    | ({ unauthorized: true } & Without<'result' | 'stale' | 'failed'>)
+    | ({ failed: true } & Without<'result' | 'stale' | 'unauthorized'>)
+    | ({ stale: true } & Without<'result' | 'unauthorized' | 'failed'>);
 
 /** How a request run under the single in-flight lock ended. */
 type LockedOutcome<R> =
@@ -62,14 +53,14 @@ export function isRoomSessionEnvelope(result: RoomSessionResult | undefined): re
     return result !== undefined && 'server_time' in result && typeof result.server_time === 'string';
 }
 
-/** Return the seconds worked so far, with decimals, from the server's timestamps. */
+/** Return the seconds worked so far, with decimals, counted on this device's clock. */
 function computeRoomExactSeconds(nowMs: number): number {
     const state = roomSessionStore.get();
     const endMs = state.pausedAtMs ?? nowMs;
     return (endMs - state.startedAtMs) / 1000 - state.pausedSeconds;
 }
 
-/** Return the whole seconds worked so far, from the server's timestamps. */
+/** Return the whole seconds worked so far, counted on this device's clock. */
 function computeRoomActualSeconds(nowMs: number): number {
     return Math.max(0, Math.floor(computeRoomExactSeconds(nowMs)));
 }
@@ -77,7 +68,7 @@ function computeRoomActualSeconds(nowMs: number): number {
 /** Refresh the display values and return the exact completion percentage. */
 function refreshRoomDisplay(): number {
     const targetTimeSeconds = roomSessionStore.get().display.targetTimeSeconds;
-    const actualTimeSeconds = computeRoomActualSeconds(getServerNowMs());
+    const actualTimeSeconds = computeRoomActualSeconds(Date.now());
     patchRoomDisplay({
         actualTimeSeconds,
         percentageCompleted: Math.floor(actualTimeSeconds / targetTimeSeconds * 100),
@@ -100,31 +91,50 @@ function getSessionEndMessage(notice: RoomSessionNotice): { text: string; error?
         ?? { text: t('rooms.endGeneric'), error: !notice.saved };
 }
 
-/** Copy a room-session envelope into the client state. Return whether a session is active. */
-export function applyRoomSessionEnvelope(envelope: RoomSessionEnvelope, sentAtMs?: number, receivedAtMs?: number): boolean {
-    updateClockOffset(envelope, sentAtMs, receivedAtMs);
+/** Rebuild the timeline of a session this device does not know yet, for example after a reload, from the time the server counted. */
+function adoptServerTimeline(session: RoomSessionPayload): void {
+    const nowMs = Date.now();
+    const isPaused = session.state === 'paused';
+    roomSessionStore.update({
+        isPaused,
+        startedAtMs: nowMs - session.actual_time_seconds * 1000,
+        pausedAtMs: isPaused ? nowMs : null,
+        pausedSeconds: 0
+    });
+}
+
+/** Return where the check-in stands. It is counted on the time worked: it is due when the next whole hour of work is reached. */
+function computeCheckin(): RoomSessionState['checkin'] {
+    const state = roomSessionStore.get();
+    if (!state.active || state.isPaused) return { dueAtMs: null, deadlineAtMs: null, outstanding: false };
+    const nowMs = Date.now();
+    const untilDueMs = state.checkinMark * CHECKIN_INTERVAL_MS - computeRoomExactSeconds(nowMs) * 1000;
+    return { dueAtMs: nowMs + untilDueMs, deadlineAtMs: nowMs + untilDueMs + CHECKIN_RESPONSE_MS, outstanding: untilDueMs <= 0 };
+}
+
+/**
+ * Copy a room-session envelope into the client state. Return whether a session is active.
+ * This device counts the time. The envelope only changes it when this device has no session yet,
+ * and when the server says the session is paused or running and this device disagrees.
+ */
+export function applyRoomSessionEnvelope(envelope: RoomSessionEnvelope): boolean {
     if (envelope.notice) {
         const { text, error } = getSessionEndMessage(envelope.notice);
         setFloatingMessage(text, { error: Boolean(error) });
     }
     const session = envelope.session;
     if (!envelope.active || !session) return false;
-    const checkin = session.checkin;
+    const isKnown = roomSessionStore.get().active;
+    if (!isKnown) adoptServerTimeline(session);
+    else if (session.state === 'paused' && !roomSessionStore.get().isPaused) applyLocalPause();
+    else if (session.state === 'running' && roomSessionStore.get().isPaused) applyLocalResume();
     const state = roomSessionStore.get();
     roomSessionStore.update({
         active: true,
         submissionId: session.submission_id,
         roomId: session.room_id,
         roomName: session.room_name,
-        isPaused: session.state === 'paused',
-        startedAtMs: parseServerTime(session.started_at),
-        pausedAtMs: session.paused_at === null ? null : parseServerTime(session.paused_at),
-        pausedSeconds: session.paused_seconds,
-        checkin: {
-            dueAtMs: checkin.due_at === null ? null : parseServerTime(checkin.due_at),
-            deadlineAtMs: checkin.deadline_at === null ? null : parseServerTime(checkin.deadline_at),
-            outstanding: checkin.outstanding
-        },
+        checkinMark: session.checkin.mark,
         display: {
             ...state.display,
             currentMission: session.mission,
@@ -164,7 +174,7 @@ function scheduleRoomTick(): void {
         roomSessionStore.update({ tickTimer: null });
         return;
     }
-    const waitMs = millisecondsUntilNextSecond(computeRoomExactSeconds(getServerNowMs()));
+    const waitMs = millisecondsUntilNextSecond(computeRoomExactSeconds(Date.now()));
     roomSessionStore.update({ tickTimer: setTimeout(tickRoomSession, waitMs) });
 }
 
@@ -201,11 +211,11 @@ async function sendRoomHeartbeat(): Promise<void> {
     roomSessionStore.update({ heartbeatInFlight: true });
     const eventCounter = state.eventCounter;
     try {
-        const { result, sentAtMs, receivedAtMs } = await timeRoomRequest(() => postRoomSessionEvent('heartbeat', getCurrentScreenName()));
+        const result = await postRoomSessionEvent('heartbeat', getCurrentScreenName());
         const current = roomSessionStore.get();
         if (!current.active || eventCounter !== current.eventCounter) return;
         if (!isRoomSessionEnvelope(result)) return;
-        if (applyRoomSessionEnvelope(result, sentAtMs, receivedAtMs)) reconcileRoomSessionScreen();
+        if (applyRoomSessionEnvelope(result)) reconcileRoomSessionScreen();
         else await endRoomSession();
     } catch (error) {
         if (errorStatus(error) !== 401) console.error('Heartbeat failed:', error);
@@ -217,20 +227,13 @@ async function sendRoomHeartbeat(): Promise<void> {
 /** Ask the server for the current room session, for example when a check-in expires. */
 async function refreshRoomSession(): Promise<void> {
     try {
-        const { result, sentAtMs, receivedAtMs } = await timeRoomRequest(() => fetchRoomSession(getCurrentScreenName()));
+        const result = await fetchRoomSession(getCurrentScreenName());
         if (!isRoomSessionEnvelope(result)) return;
-        if (applyRoomSessionEnvelope(result, sentAtMs, receivedAtMs)) reconcileRoomSessionScreen();
+        if (applyRoomSessionEnvelope(result)) reconcileRoomSessionScreen();
         else await endRoomSession();
     } catch (error) {
         if (errorStatus(error) !== 401) console.error('Could not refresh the room session:', error);
     }
-}
-
-/** Run a request and return its result with the times it was sent and answered. */
-export async function timeRoomRequest<R>(request: () => Promise<R>): Promise<TimedResult<R>> {
-    const sentAtMs = Date.now();
-    const result = await request();
-    return { result, sentAtMs, receivedAtMs: Date.now() };
 }
 
 /** Show the screen the server's session state calls for, then redraw it. */
@@ -262,25 +265,26 @@ function closeCheckinModal(): void {
 /** Show the time left to respond. At zero, ask the server once what happened. */
 async function updateCheckinCountdown(): Promise<void> {
     const state = roomSessionStore.get();
-    const deadlineAtMs = state.checkin.deadlineAtMs ?? getServerNowMs();
-    const remainingSeconds = Math.ceil((deadlineAtMs - getServerNowMs()) / 1000);
+    const deadlineAtMs = state.checkin.deadlineAtMs ?? Date.now();
+    const remainingSeconds = Math.ceil((deadlineAtMs - Date.now()) / 1000);
     roomSessionStore.update({ checkinCountdown: `${formatCountdown(Math.max(0, remainingSeconds))} left to respond` });
     if (remainingSeconds > 0 || state.countdownRefreshed) return;
     roomSessionStore.update({ countdownRefreshed: true });
     await refreshRoomSession();
 }
 
-/** Open the check-in popup at its due time, or close it when nothing is due. */
+/** Work out where the check-in stands, then open the popup at its due time, or close it when nothing is due. */
 function scheduleCheckin(): void {
     clearTimeout(roomSessionStore.get().checkinTimer ?? undefined);
     cancelCheckinSound();
+    roomSessionStore.update({ checkin: computeCheckin() });
     const { active, isPaused, checkin } = roomSessionStore.get();
     const { dueAtMs, outstanding } = checkin;
     if (!active || isPaused || dueAtMs === null) {
         closeCheckinModal();
         return;
     }
-    const delayMs = dueAtMs - getServerNowMs();
+    const delayMs = dueAtMs - Date.now();
     if (outstanding || delayMs <= 0) {
         openCheckinModal();
         return;
@@ -329,8 +333,8 @@ async function sendRoomSessionWithRetry(request: () => Promise<RoomSessionResult
     const startedAt = performance.now();
     for (;;) {
         try {
-            const timed = await timeRoomRequest(request);
-            if (isRoomSessionEnvelope(timed.result) || timed.result.status < 500) return timed;
+            const result = await request();
+            if (isRoomSessionEnvelope(result) || result.status < 500) return { result };
         } catch (error) {
             if (errorStatus(error) === 401) return { unauthorized: true };
             console.error('Room session request failed:', error);
@@ -382,11 +386,10 @@ async function settleRoomSessionOutcome(outcome: QueuedOutcome, errorMessage: st
         return false;
     }
     if (roomSessionStore.get().pending > 0) {
-        updateClockOffset(envelope, outcome.sentAtMs, outcome.receivedAtMs);
         if (envelope.session) roomSessionStore.update({ submissionId: envelope.session.submission_id });
         return envelope.success;
     }
-    if (applyRoomSessionEnvelope(envelope, outcome.sentAtMs, outcome.receivedAtMs)) reconcileRoomSessionScreen();
+    if (applyRoomSessionEnvelope(envelope)) reconcileRoomSessionScreen();
     else await endRoomSession();
     return envelope.success;
 }
@@ -399,16 +402,15 @@ export function enterRoomSessionFocus(currentScreen: ScreenName): void {
     scheduleCheckin();
 }
 
-/** Clear everything the client holds about a room session, keeping the clock offset. */
+/** Clear everything the client holds about a room session. */
 export function resetRoomSessionClient(): void {
     const generation = roomSessionStore.get().generation + 1;
-    const clockOffsetMs = roomSessionStore.get().clockOffsetMs;
     stopRoomSessionTimers();
     clearTimeout(roomSessionStore.get().checkinTimer ?? undefined);
     closeCheckinModal();
     cancelCheckinSound();
     if (roomSessionStore.get().isBusy) setRoomSessionBusy(false);
-    roomSessionStore.set({ ...createInitialRoomSessionState(), generation, clockOffsetMs });
+    roomSessionStore.set({ ...createInitialRoomSessionState(), generation });
 }
 
 /** Add a just-saved session to the cached room summary, so the room looks right before it reloads. */
@@ -443,9 +445,8 @@ async function endRoomSession({ saved = false }: { saved?: boolean } = {}): Prom
     if (roomId !== null && (screen === 'focus' || screen === 'review')) await openRoom(roomId, screen);
 }
 
-/** Show Focus for a session the server has not confirmed yet. */
+/** Show Focus for a session the server has not confirmed yet. The time is counted from this moment, on this device. */
 function beginLocalRoomSession(roomId: number, mission: string, targetTimeSeconds: number): void {
-    const startedAtMs = Math.round(getServerNowMs());
     const state = roomSessionStore.get();
     roomSessionStore.update({
         active: true,
@@ -453,14 +454,10 @@ function beginLocalRoomSession(roomId: number, mission: string, targetTimeSecond
         roomId,
         roomName: roomStore.get().snapshot?.room.name ?? '',
         isPaused: false,
-        startedAtMs,
+        startedAtMs: Date.now(),
         pausedAtMs: null,
         pausedSeconds: 0,
-        checkin: {
-            dueAtMs: startedAtMs + CHECKIN_INTERVAL_MS,
-            deadlineAtMs: startedAtMs + CHECKIN_INTERVAL_MS + CHECKIN_RESPONSE_MS,
-            outstanding: false
-        },
+        checkinMark: 1,
         display: { ...state.display, currentMission: mission, targetTimeSeconds }
     });
     enterRoomSessionFocus('room');
@@ -468,26 +465,18 @@ function beginLocalRoomSession(roomId: number, mission: string, targetTimeSecond
 
 /** Pause the session on this screen right away. */
 function applyLocalPause(): void {
-    roomSessionStore.update({ isPaused: true, pausedAtMs: getServerNowMs() });
+    roomSessionStore.update({ isPaused: true, pausedAtMs: Date.now() });
     scheduleCheckin();
 }
 
-/** Resume the session on this screen right away. The check-in moves later by the time paused. */
+/** Resume the session on this screen right away. The check-in is counted on the time worked, so it moves later by itself. */
 function applyLocalResume(): void {
     const state = roomSessionStore.get();
     if (state.pausedAtMs === null) return;
-    const pausedForMs = getServerNowMs() - state.pausedAtMs;
     roomSessionStore.update({
-        pausedSeconds: state.pausedSeconds + pausedForMs / 1000,
+        pausedSeconds: state.pausedSeconds + (Date.now() - state.pausedAtMs) / 1000,
         pausedAtMs: null,
-        isPaused: false,
-        checkin: state.checkin.dueAtMs === null
-            ? state.checkin
-            : {
-                ...state.checkin,
-                dueAtMs: state.checkin.dueAtMs + pausedForMs,
-                deadlineAtMs: state.checkin.deadlineAtMs === null ? null : state.checkin.deadlineAtMs + pausedForMs
-            }
+        isPaused: false
     });
     scheduleCheckin();
 }
@@ -538,9 +527,10 @@ export async function handleRoomPauseResume(): Promise<void> {
     if (pausing) applyLocalPause();
     else applyLocalResume();
     renderRoomFocus();
+    const workedSeconds = roomSessionStore.get().display.actualTimeSeconds;
     const outcome = await enqueueRoomSessionRequest(
-        /** Send the pause or resume event. */
-        () => postRoomSessionEvent(pausing ? 'pause' : 'resume', getCurrentScreenName())
+        /** Send the pause event with the seconds counted at the click, or the resume event. */
+        () => postRoomSessionEvent(pausing ? 'pause' : 'resume', getCurrentScreenName(), pausing ? workedSeconds : undefined)
     );
     await settleRoomSessionOutcome(outcome, pausing ? t('rooms.errorPause') : t('rooms.errorResume'));
 }
@@ -588,9 +578,10 @@ export async function handleRoomStop(): Promise<void> {
     if (!renderReviewRoomSummaryFromCache()) reviewStore.update({ roomSummary: null });
     void loadReviewRoomSummary();
     if (!needsPause) return;
+    const workedSeconds = roomSessionStore.get().display.actualTimeSeconds;
     const outcome = await enqueueRoomSessionRequest(
-        /** Send the pause event that Stop uses. */
-        () => postRoomSessionEvent('pause', getCurrentScreenName())
+        /** Send the pause event that Stop uses, with the seconds counted at the click. */
+        () => postRoomSessionEvent('pause', getCurrentScreenName(), workedSeconds)
     );
     await settleRoomSessionOutcome(outcome, t('rooms.errorStop'));
 }
@@ -621,7 +612,7 @@ export async function handleRoomFinish(): Promise<void> {
             await roomSessionStore.get().queueTail;
             const current = roomSessionStore.get();
             if (!current.active || !current.submissionId) throw new Error('The session ended before it could be saved');
-            return postFinishRoomSession(current.submissionId);
+            return postFinishRoomSession(current.submissionId, current.display.actualTimeSeconds);
         },
         feedbackStartedAt
     );
@@ -648,20 +639,13 @@ export async function handleRoomFinish(): Promise<void> {
 export async function handleCheckinConfirm(): Promise<void> {
     const state = roomSessionStore.get();
     if (!state.active) return;
-    roomSessionStore.update({
-        checkin: {
-            ...state.checkin,
-            dueAtMs: state.checkin.dueAtMs === null ? null : state.checkin.dueAtMs + CHECKIN_INTERVAL_MS,
-            deadlineAtMs: state.checkin.dueAtMs === null || state.checkin.deadlineAtMs === null
-                ? state.checkin.deadlineAtMs
-                : state.checkin.deadlineAtMs + CHECKIN_INTERVAL_MS,
-            outstanding: false
-        }
-    });
+    refreshRoomDisplay();
+    const workedSeconds = roomSessionStore.get().display.actualTimeSeconds;
+    roomSessionStore.update({ checkinMark: state.checkinMark + 1 });
     scheduleCheckin();
     const outcome = await enqueueRoomSessionRequest(
-        /** Send the check-in event. */
-        () => postRoomSessionEvent('checkin', getCurrentScreenName())
+        /** Send the check-in event, with the seconds counted at the click. */
+        () => postRoomSessionEvent('checkin', getCurrentScreenName(), workedSeconds)
     );
     await settleRoomSessionOutcome(outcome, t('rooms.errorCheckin'));
 }

@@ -3,7 +3,7 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 
-from executionos.params import parse_timezone, read_cursor, read_json_object
+from executionos.params import parse_timezone, read_cursor, read_json_object, read_optional_json_object
 from executionos.rooms.errors import room_error_response
 from executionos.rooms.queries import (
     get_room_sessions_for_user,
@@ -228,7 +228,8 @@ def pause_room_session() -> tuple[Any, int]:
     """Pause the running room session. Stop uses the same transition."""
     user_id = int(get_jwt_identity())
     try:
-        return jsonify(pause_room_session_for_user(user_id)), 200  # type: ignore
+        data = read_optional_json_object()
+        return jsonify(pause_room_session_for_user(user_id, data.get("workedSeconds"))), 200  # type: ignore
     except Exception as error:
         return room_error_response(error)
 
@@ -248,7 +249,8 @@ def checkin_room_session() -> tuple[Any, int]:
     """Confirm presence for the outstanding check-in."""
     user_id = int(get_jwt_identity())
     try:
-        return jsonify(checkin_room_session_for_user(user_id)), 200  # type: ignore
+        data = read_optional_json_object()
+        return jsonify(checkin_room_session_for_user(user_id, data.get("workedSeconds"))), 200  # type: ignore
     except Exception as error:
         return room_error_response(error)
 
@@ -269,6 +271,7 @@ def finish_room_session() -> tuple[Any, int]:
     user_id = int(get_jwt_identity())
     try:
         data = read_json_object()
-        return jsonify(finish_room_session_for_user(user_id, data.get("submissionId"))), 200  # type: ignore
+        envelope = finish_room_session_for_user(user_id, data.get("submissionId"), data.get("actualSeconds"))
+        return jsonify(envelope), 200  # type: ignore
     except Exception as error:
         return room_error_response(error)

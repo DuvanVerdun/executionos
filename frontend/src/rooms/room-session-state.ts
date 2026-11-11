@@ -7,11 +7,13 @@ export interface RoomSessionState {
     roomId: number | null;
     roomName: string;
     isPaused: boolean;
+    /** The time is counted on this device's clock. The server only gets the count, never these moments. */
     startedAtMs: number;
     pausedAtMs: number | null;
     pausedSeconds: number;
     checkin: { dueAtMs: number | null; deadlineAtMs: number | null; outstanding: boolean };
-    clockOffsetMs: number;
+    /** The number of the next check-in: it is due when this many whole hours of work are reached. */
+    checkinMark: number;
     display: DisplaySession;
     /** True while a server-confirmed request (Finish) is in flight. */
     isBusy: boolean;
@@ -44,7 +46,7 @@ export function createInitialRoomSessionState(): RoomSessionState {
         pausedAtMs: null,
         pausedSeconds: 0,
         checkin: { dueAtMs: null, deadlineAtMs: null, outstanding: false },
-        clockOffsetMs: 0,
+        checkinMark: 1,
         display: {
             currentMission: '',
             targetTimeSeconds: 0,

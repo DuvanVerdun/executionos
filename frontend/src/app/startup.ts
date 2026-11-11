@@ -11,8 +11,7 @@ import { openRoom, showUnavailableRoom } from '../rooms/room';
 import {
     applyRoomSessionEnvelope,
     enterRoomSessionFocus,
-    isRoomSessionEnvelope,
-    timeRoomRequest
+    isRoomSessionEnvelope
 } from '../rooms/room-session';
 import { handleFinishWork } from '../session/review';
 import { sessionStore } from '../session/state';
@@ -105,14 +104,11 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
         }
     }
     try {
-        const { result: roomSessionResult, sentAtMs, receivedAtMs } = await timeRoomRequest(
-            /** Request the running room session. */
-            () => fetchRoomSession(currentScreen)
-        );
+        const roomSessionResult = await fetchRoomSession(currentScreen);
         if (roomSessionResult.status !== 200 || !isRoomSessionEnvelope(roomSessionResult)) {
             throw new Error(roomSessionResult.error || 'Could not load the room session');
         }
-        if (applyRoomSessionEnvelope(roomSessionResult, sentAtMs, receivedAtMs)) {
+        if (applyRoomSessionEnvelope(roomSessionResult)) {
             enterRoomSessionFocus(currentScreen);
             return;
         }

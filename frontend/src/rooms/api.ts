@@ -87,14 +87,18 @@ export function postStartRoomSession(roomId: number, mission: string, targetTime
     return roomFetch<RoomSessionResult>('room-session', 'POST', { roomId, mission, targetTimeSeconds }, 'room');
 }
 
-/** Send a room session event: pause, resume, checkin, or heartbeat. */
-export function postRoomSessionEvent(event: 'pause' | 'resume' | 'checkin' | 'heartbeat', currentScreen: ScreenName): Promise<RoomSessionResult> {
-    return roomFetch<RoomSessionResult>(`room-session/${event}`, 'POST', undefined, currentScreen);
+/** Send a room session event: pause, resume, checkin, or heartbeat. Pause and check-in carry the seconds the client counted. */
+export function postRoomSessionEvent(
+    event: 'pause' | 'resume' | 'checkin' | 'heartbeat',
+    currentScreen: ScreenName,
+    workedSeconds?: number
+): Promise<RoomSessionResult> {
+    return roomFetch<RoomSessionResult>(`room-session/${event}`, 'POST', workedSeconds === undefined ? undefined : { workedSeconds }, currentScreen);
 }
 
-/** Request that the paused room session be saved and ended. */
-export function postFinishRoomSession(submissionId: string): Promise<RoomSessionResult> {
-    return roomFetch<RoomSessionResult>('room-session/finish', 'POST', { submissionId }, 'review');
+/** Request that the paused room session be saved and ended, with the seconds the client counted. */
+export function postFinishRoomSession(submissionId: string, actualSeconds: number): Promise<RoomSessionResult> {
+    return roomFetch<RoomSessionResult>('room-session/finish', 'POST', { submissionId, actualSeconds }, 'review');
 }
 
 /** Request a room's summary, optionally counting the user's running session. */
