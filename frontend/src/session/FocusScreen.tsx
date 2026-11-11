@@ -1,10 +1,11 @@
+import { useDocumentEvent } from '../hooks/useDocumentEvent';
 import { useT } from '../i18n/i18n';
 import { formatDuration } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { roomSessionStore } from '../rooms/room-session-state';
 import { ProgressRing } from '../shared/ProgressRing';
 import { Screen } from '../shared/Screen';
-import { handlePauseResume, handleStopWork } from './focus';
+import { handleFocusTabVisible, handlePauseResume, handleStopWork } from './focus';
 import { sessionStore } from './state';
 import { focusStore } from './ui-state';
 
@@ -16,6 +17,10 @@ export function FocusScreen() {
     const { pauseLabel } = useStore(focusStore);
     const session = room.active ? room.display : personal;
     const exactPercentage = session.actualTimeSeconds / session.targetTimeSeconds * 100;
+
+    useDocumentEvent('visibilitychange', /** Bring the timer up to date when the tab is visible again. */ () => {
+        if (!document.hidden) handleFocusTabVisible();
+    });
 
     return (
         <Screen name="focus" className="focus-screen">

@@ -6,6 +6,7 @@ import { authStore } from '../auth/state';
 import { dashboardStore } from '../dashboard/dashboard';
 import { feedbackStore } from '../feedback/feedback';
 import { languageStore } from '../i18n/i18n';
+import { forgetClockSamples } from '../rooms/clock';
 import { roomSessionStore } from '../rooms/room-session-state';
 import { roomSnapshotCache, roomStore, roomsStore } from '../rooms/state';
 import { planDraftStore, sessionStore } from '../session/state';
@@ -45,6 +46,7 @@ remember(streakStore);
 beforeEach(() => {
     restorers.forEach((restore) => { restore(); });
     roomSnapshotCache.clear();
+    forgetClockSamples();
     localStorage.clear();
 });
 

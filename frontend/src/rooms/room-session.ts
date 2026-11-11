@@ -9,7 +9,7 @@ import { t } from '../i18n/i18n';
 import { parseServerTime } from '../lib/dates';
 import { formatCountdown, formatDurationHoursMinutes, parseHHMMToSeconds } from '../lib/durations';
 import { errorStatus } from '../lib/errors';
-import { delay, waitForMinimumFeedback } from '../lib/timing';
+import { delay, millisecondsUntilNextSecond, waitForMinimumFeedback } from '../lib/timing';
 import { reviewStore, focusStore, type FinishLabel } from '../session/ui-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { getCurrentScreenName, navigateTo } from '../shared/navigation';
@@ -62,12 +62,16 @@ export function isRoomSessionEnvelope(result: RoomSessionResult | undefined): re
     return result !== undefined && 'server_time' in result && typeof result.server_time === 'string';
 }
 
-/** Return the seconds worked so far, from the server's timestamps. */
-function computeRoomActualSeconds(nowMs: number): number {
+/** Return the seconds worked so far, with decimals, from the server's timestamps. */
+function computeRoomExactSeconds(nowMs: number): number {
     const state = roomSessionStore.get();
     const endMs = state.pausedAtMs ?? nowMs;
-    const elapsedSeconds = (endMs - state.startedAtMs) / 1000 - state.pausedSeconds;
-    return Math.max(0, Math.floor(elapsedSeconds));
+    return (endMs - state.startedAtMs) / 1000 - state.pausedSeconds;
+}
+
+/** Return the whole seconds worked so far, from the server's timestamps. */
+function computeRoomActualSeconds(nowMs: number): number {
+    return Math.max(0, Math.floor(computeRoomExactSeconds(nowMs)));
 }
 
 /** Refresh the display values and return the exact completion percentage. */
@@ -131,37 +135,61 @@ export function applyRoomSessionEnvelope(envelope: RoomSessionEnvelope, sentAtMs
     return true;
 }
 
-/** Update the Focus screen from the room session state. */
+/** Update the Focus screen from the room session state, and aim the next tick at the next second. */
 function renderRoomFocus(): void {
     refreshRoomDisplay();
     focusStore.set({ pauseLabel: roomSessionStore.get().isPaused ? 'Resume' : 'Pause' });
+    scheduleRoomTick();
 }
 
-/** Redraw Focus after the server changed the session, when Focus is showing. */
+/** Redraw Focus or Review after the server changed the session. Review then shows the time that the server will save. */
 function refreshRoomSessionView(): void {
-    if (getCurrentScreenName() === 'focus') renderRoomFocus();
+    const screen = getCurrentScreenName();
+    if (screen === 'focus') renderRoomFocus();
+    else if (screen === 'review') refreshRoomDisplay();
 }
 
-/** Update the running timer display once per second. */
+/** Show the time at this moment, and wait for the next second. */
 function tickRoomSession(): void {
-    const state = roomSessionStore.get();
-    if (!state.active || state.isPaused) return;
+    if (!roomSessionStore.get().active) return;
     refreshRoomDisplay();
+    scheduleRoomTick();
+}
+
+/** Wake up exactly when the shown second changes, so the number is never behind the clock. Nothing waits while the session is paused. */
+function scheduleRoomTick(): void {
+    const state = roomSessionStore.get();
+    clearTimeout(state.tickTimer ?? undefined);
+    if (!state.active || state.isPaused) {
+        roomSessionStore.update({ tickTimer: null });
+        return;
+    }
+    const waitMs = millisecondsUntilNextSecond(computeRoomExactSeconds(getServerNowMs()));
+    roomSessionStore.update({ tickTimer: setTimeout(tickRoomSession, waitMs) });
 }
 
 /** Start the display timer and the heartbeat. */
 function startRoomSessionTimers(): void {
     stopRoomSessionTimers();
-    roomSessionStore.update({
-        tickTimer: setInterval(tickRoomSession, 1000),
-        heartbeatTimer: setInterval(sendRoomHeartbeat, HEARTBEAT_INTERVAL_MS)
-    });
+    scheduleRoomTick();
+    roomSessionStore.update({ heartbeatTimer: setInterval(sendRoomHeartbeat, HEARTBEAT_INTERVAL_MS) });
+}
+
+/**
+ * Bring the room timer up to date when the tab becomes visible again.
+ * A hidden tab runs its timers late, so the number may be old and the check-in popup may be late.
+ */
+export function handleRoomTabVisible(): void {
+    const state = roomSessionStore.get();
+    if (!state.active) return;
+    refreshRoomSessionView();
+    if (!state.checkinOpen) scheduleCheckin();
 }
 
 /** Stop the display timer and the heartbeat. */
 function stopRoomSessionTimers(): void {
     const state = roomSessionStore.get();
-    clearInterval(state.tickTimer ?? undefined);
+    clearTimeout(state.tickTimer ?? undefined);
     clearInterval(state.heartbeatTimer ?? undefined);
     roomSessionStore.update({ tickTimer: null, heartbeatTimer: null });
 }

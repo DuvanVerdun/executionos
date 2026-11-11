@@ -26,7 +26,7 @@ export interface RoomSessionState {
     /** The check-in popup: whether it shows, and its countdown text. */
     checkinOpen: boolean;
     checkinCountdown: string;
-    tickTimer: ReturnType<typeof setInterval> | null;
+    tickTimer: ReturnType<typeof setTimeout> | null;
     heartbeatTimer: ReturnType<typeof setInterval> | null;
     checkinTimer: ReturnType<typeof setTimeout> | null;
     countdownTimer: ReturnType<typeof setInterval> | null;

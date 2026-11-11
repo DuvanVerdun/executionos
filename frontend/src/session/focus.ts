@@ -1,10 +1,16 @@
-import { handleRoomPauseResume, handleRoomStop } from '../rooms/room-session';
+import { handleRoomPauseResume, handleRoomStop, handleRoomTabVisible } from '../rooms/room-session';
 import { roomSessionStore } from '../rooms/room-session-state';
 import { navigateTo } from '../shared/navigation';
 import { sessionStore } from './state';
 import { saveActiveSession } from './storage';
 import { focusStore } from './ui-state';
-import { pauseSession, resumeSession, stopSession } from './timer';
+import { catchUpTimer, pauseSession, resumeSession, stopSession } from './timer';
+
+/** Bring the Focus timer up to date when the tab becomes visible again, after the browser ran its timers late. */
+export function handleFocusTabVisible(): void {
+    if (roomSessionStore.get().active) handleRoomTabVisible();
+    else catchUpTimer();
+}
 
 /** Toggle the active session between paused and running states. */
 export function handlePauseResume(): void {
