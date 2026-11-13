@@ -95,7 +95,7 @@ export function ReviewScreen() {
                         </button>
                         <button
                             id="review-finish-btn"
-                            className="reward-button"
+                            className={session.percentageCompleted >= 100 ? 'reward-button is-glowing' : 'reward-button'}
                             disabled={isFinishing || room.isBusy}
                             onClick={() => { void handleFinishWork(); }}
                         >

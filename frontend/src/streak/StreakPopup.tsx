@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { useT, type TranslationKey } from '../i18n/i18n';
 import { at } from '../lib/arrays';
 import { formatMonthAndYear, parseLocalDate } from '../lib/dates';
-import { formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import type { CalendarDay } from '../types/dashboard';
 import type { HeaderScreenName } from '../types/screens';
+import { DaySummaryContent } from './DaySummaryContent';
 import { loadStreak, shiftStreakMonth, streakStore } from './streak';
 
 const WEEKDAYS = [
@@ -31,18 +31,10 @@ interface HoveredDay {
  * It is drawn in the page body, because the calendar popup clips and blurs everything inside it.
  */
 function DaySummaryCard({ hovered }: { hovered: HoveredDay }) {
-    const t = useT();
     const { day } = hovered;
     return createPortal(
         <div className="streak-day-summary" role="tooltip" style={{ left: hovered.x, top: hovered.y }}>
-            {day.total_sessions === 0 ? (
-                <p>{t('streak.noSessions')}</p>
-            ) : (
-                <>
-                    <p>{day.total_sessions === 1 ? t('streak.sessionsOne') : t('streak.sessionsOther', { count: day.total_sessions })}</p>
-                    <p>{t('session.focused', { time: formatDurationHoursMinutes(day.total_time_seconds) })}</p>
-                </>
-            )}
+            <DaySummaryContent day={day} detailClassName="streak-day-summary-detail" />
         </div>,
         document.body
     );
@@ -109,7 +101,7 @@ export function StreakPopup({ screen }: { screen: HeaderScreenName }) {
                     );
                 })}
             </div>
-            {hovered !== null && openScreen === screen && <DaySummaryCard hovered={hovered} />}
+            {hovered !== null && openScreen === screen && <DaySummaryCard key={hovered.day.date} hovered={hovered} />}
             {isLoading ? (
                 <div className="dashboard-skeleton streak-calendar-loading-footer" aria-hidden="true" />
             ) : (

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useToday } from '../hooks/useToday';
 import { getJoinTokenFromHash } from '../rooms/links';
 import { LanguageToggle } from '../shared/LanguageToggle';
+import { navigateTo } from '../shared/navigation';
 import { Screen } from '../shared/Screen';
 import { AuthVisual } from './AuthVisual';
 import { InviteCard } from './InviteCard';
@@ -20,7 +21,11 @@ export function AuthShell({ screen, children }: AuthShellProps) {
     return (
         <Screen name={screen} className={`${screen}-screen`}>
             <div className="auth-header">
-                <h1 className="wordmark">ExecutionOS</h1>
+                <h1 className="wordmark">
+                    {hasInvite ? 'ExecutionOS' : (
+                        <button type="button" className="wordmark-link" onClick={() => { navigateTo('landing', screen); }}>ExecutionOS</button>
+                    )}
+                </h1>
                 <LanguageToggle />
             </div>
             <div className="auth-body">

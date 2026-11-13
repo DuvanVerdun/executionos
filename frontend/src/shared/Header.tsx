@@ -80,6 +80,7 @@ export function Header({ screen, className }: HeaderProps) {
                     id={`${screen}-streak-btn`}
                     className="streak-btn"
                     aria-label={t('header.openStreak')}
+                    aria-expanded={isStreakOpen}
                     onClick={() => { toggleStreakPopup(screen); }}
                 >
                     {`🔥 ${currentStreak ?? '—'}`}
@@ -97,7 +98,7 @@ export function Header({ screen, className }: HeaderProps) {
             <svg
                 ref={iconRef}
                 id={`${screen}-user-icon`}
-                className="user-icon"
+                className={isMenuOpen ? 'user-icon is-open' : 'user-icon'}
                 viewBox="0 0 48 48"
                 aria-label={t('header.openUserMenu')}
                 onClick={() => { toggleUserMenu(screen); }}

@@ -9,6 +9,9 @@
     --color-text: #b8b5b3;
     --color-white: #ffffff;
 
+    /* shadow of the app header and of every menu that hangs from it */
+    --shadow-raised: 0 6px 16px rgb(0 0 0 / 35%);
+
     /* font sizes */
     --body: 1rem;
     --button: clamp(1.3rem, 1.4vw, 1.65rem);
@@ -240,7 +243,8 @@ button {
     border-radius: 50%;
 }
 
-.user-icon:hover {
+.user-icon:hover,
+.user-icon.is-open {
     cursor: pointer;
     filter: brightness(1.1);
 }
@@ -320,6 +324,15 @@ button {
     align-items: center;
     justify-content: space-between;
     padding-block: clamp(20px, 2.5vw, 36px);
+}
+
+.wordmark-link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
 }
 
 .auth-header > .wordmark {
@@ -534,6 +547,17 @@ button {
     line-height: 1.25;
     font-weight: bold;
     cursor: pointer;
+    transition: filter .15s ease, box-shadow .15s ease;
+}
+
+#register-submit-btn:not(:disabled),
+#login-submit-btn:not(:disabled) {
+    box-shadow: 0 0 8px rgb(237 53 53 / 25%);
+}
+
+#register-submit-btn:hover:not(:disabled),
+#login-submit-btn:hover:not(:disabled) {
+    box-shadow: 0 0 16px rgb(237 53 53 / 40%);
 }
 
 :is(.register-card, .login-card) .switch-btn-container {
@@ -625,6 +649,8 @@ button {
     height: var(--header-height);
     padding: 0 var(--header-padding);
     gap: var(--header-gap);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-raised);
 }
 
 .plan-header {
@@ -667,8 +693,11 @@ button {
 #plan-streak-btn,
 #dashboard-streak-btn,
 #rooms-streak-btn {
-    padding: 0;
+    /* The padding is paid back by the negative margin, so the button keeps the place it had. */
+    padding: 0.35em 0.6em;
+    margin: -0.35em -0.6em;
     border: none;
+    border-radius: 0.6em;
     background: none;
     color: var(--color-white);
     font-family: inherit;
@@ -676,12 +705,16 @@ button {
     font-weight: bold;
     white-space: nowrap;
     cursor: pointer;
+    transition: background-color .2s ease;
 }
 
 #plan-streak-btn:hover,
 #dashboard-streak-btn:hover,
-#rooms-streak-btn:hover {
-    filter: brightness(1.1);
+#rooms-streak-btn:hover,
+#plan-streak-btn[aria-expanded='true'],
+#dashboard-streak-btn[aria-expanded='true'],
+#rooms-streak-btn[aria-expanded='true'] {
+    background-color: var(--color-surface-selected);
 }
 
 #plan-streak-popup,
@@ -690,8 +723,8 @@ button {
     --calendar-size-unit: clamp(0.625px, 0.052083333vw, 1.25px);
     position: absolute;
     top: calc(100% + 16 * var(--calendar-size-unit));
-
-    right: calc(var(--header-padding) + var(--header-avatar-size) + var(--header-gap));
+    right: 0;
+    z-index: 20;
     box-sizing: border-box;
     width: min(calc(460 * var(--calendar-size-unit)), calc(100vw - 32px));
     max-height: calc(100dvh - var(--header-offset) - var(--header-height) - 48 * var(--calendar-size-unit));
@@ -700,6 +733,57 @@ button {
     border: var(--calendar-size-unit) solid var(--color-border);
     border-radius: calc(24 * var(--calendar-size-unit));
     background-color: var(--color-surface);
+}
+
+/* The streak calendar and every menu grow out of their top right corner when they open. */
+#plan-streak-popup,
+#dashboard-streak-popup,
+#rooms-streak-popup,
+#plan-user-menu,
+#dashboard-user-menu,
+#rooms-user-menu,
+.language-menu,
+.dashboard-session-menu,
+.room-menu {
+    transform-origin: 100% 0;
+    animation: header-panel-in .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+@keyframes header-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #plan-streak-popup,
+    #dashboard-streak-popup,
+    #rooms-streak-popup,
+    #plan-user-menu,
+    #dashboard-user-menu,
+    #rooms-user-menu,
+    .language-menu,
+    .dashboard-session-menu,
+    .room-menu {
+        animation: none;
+    }
+}
+
+#plan-streak-popup,
+#dashboard-streak-popup,
+#rooms-streak-popup,
+#plan-user-menu,
+#dashboard-user-menu,
+#rooms-user-menu,
+.language-menu,
+.dashboard-session-menu,
+.room-menu {
+    box-shadow: var(--shadow-raised);
 }
 
 .streak-calendar-header {
@@ -746,6 +830,7 @@ button {
     width: 100%;
     aspect-ratio: 1;
     border-radius: 50%;
+    transition: background-color .3s ease, filter .3s ease;
 }
 
 .streak-calendar-day-work {
@@ -852,6 +937,7 @@ button {
 #plan-user-icon,
 #dashboard-user-icon,
 #rooms-user-icon {
+    margin-left: calc(var(--header-gap) / -2);
     width: var(--header-avatar-size);
     height: var(--header-avatar-size);
     flex-shrink: 0;
@@ -1080,6 +1166,17 @@ button {
     line-height: 1.25;
     font-weight: bold;
     cursor: pointer;
+    transition: filter .15s ease, box-shadow .15s ease;
+}
+
+#plan-start-work-btn:not(:disabled),
+#room-start-work-btn:not(:disabled) {
+    box-shadow: 0 0 calc(12 * var(--plan-size-unit)) rgb(237 53 53 / 35%);
+}
+
+#plan-start-work-btn:hover:not(:disabled),
+#room-start-work-btn:hover:not(:disabled) {
+    box-shadow: 0 0 calc(24 * var(--plan-size-unit)) rgb(237 53 53 / 55%);
 }
 
 
@@ -1407,8 +1504,30 @@ button {
     border-width: 1px;
 }
 
-#review-finish-btn:hover {
+#review-continue-btn,
+#review-finish-btn {
+    transition: filter .15s ease, box-shadow .15s ease;
+}
+
+#review-finish-btn:hover:not(:disabled) {
     filter: brightness(1.1);
+}
+
+/* The button that moves the session forward glows: Continue until the goal is reached, then Finish. */
+#review-continue-btn.cta-button:not(:disabled) {
+    box-shadow: 0 0 12px rgb(237 53 53 / 35%);
+}
+
+#review-continue-btn.cta-button:hover:not(:disabled) {
+    box-shadow: 0 0 24px rgb(237 53 53 / 55%);
+}
+
+#review-finish-btn.is-glowing:not(:disabled) {
+    box-shadow: 0 0 12px rgb(16 201 188 / 35%);
+}
+
+#review-finish-btn.is-glowing:hover:not(:disabled) {
+    box-shadow: 0 0 24px rgb(16 201 188 / 55%);
 }
 
 .review-button-container button:focus-visible {
@@ -2450,7 +2569,7 @@ button {
     border-radius: 999px;
     background-color: var(--color-border);
     cursor: pointer;
-    transition: background-color .5s ease;
+    transition: background-color .3s ease;
 }
 
 .room-switch:disabled {
@@ -2466,7 +2585,7 @@ button {
     height: calc(29 * var(--rooms-size-unit));
     border-radius: 50%;
     background-color: var(--color-white);
-    transition: transform .5s ease;
+    transition: transform .3s ease;
 }
 
 .room-switch[aria-checked="true"] {
@@ -3405,6 +3524,39 @@ body[data-screen="room"] .floating-message {
     left: 50%;
 }
 
+@keyframes landing-day-summary-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, calc(-100% - 8 * var(--calendar-size-unit) + 10 * var(--calendar-size-unit))) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, calc(-100% - 8 * var(--calendar-size-unit))) scale(1);
+    }
+}
+
+.streak-day-summary {
+    transform-origin: 50% 100%;
+    animation: landing-day-summary-in .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.landing-calendar-grid .streak-calendar-day {
+    transition: background-color .3s ease, filter .3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .streak-day-summary,
+    .landing-calendar-grid .streak-calendar-day {
+        animation: none;
+        transition: none;
+    }
+}
+
+.streak-day-summary-detail {
+    color: var(--color-text);
+    font-size: calc(16 * var(--calendar-size-unit));
+}
+
 .landing-day-summary-detail {
     color: var(--color-text);
     font-size: calc(16 * var(--lu));
@@ -4271,6 +4423,63 @@ body[data-screen="room"] .floating-message {
 }
 
 
+/* Login and Register: the copy next to the card comes in when the screen opens, one piece after another, like the Landing sections. */
+@media (prefers-reduced-motion: no-preference) {
+    .auth-visual > * {
+        animation: landing-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    }
+
+    .auth-visual > :nth-child(2) {
+        animation-delay: 0.1s;
+    }
+
+    .auth-visual > :nth-child(3) {
+        animation-delay: 0.2s;
+    }
+
+    .auth-visual > :nth-child(4) {
+        animation-delay: 0.3s;
+    }
+}
+
+
+/* Dashboard, Rooms and Room: once the content is ready, its blocks come in one after another from the top, a quieter version of the Landing effect. */
+@keyframes content-rise {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    #dashboard-data-container > *,
+    #room-data > *,
+    #rooms-grid > * {
+        animation: content-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    }
+
+    #dashboard-data-container > :nth-child(2),
+    #room-data > :nth-child(2),
+    #rooms-grid > :nth-child(2) {
+        animation-delay: 0.08s;
+    }
+
+    #dashboard-data-container > :nth-child(3),
+    #room-data > :nth-child(3),
+    #rooms-grid > :nth-child(3) {
+        animation-delay: 0.16s;
+    }
+
+    #rooms-grid > :nth-child(4) {
+        animation-delay: 0.24s;
+    }
+
+    #rooms-grid > :nth-child(n + 5) {
+        animation-delay: 0.32s;
+    }
+}
+
+
 .language-menu-wrapper {
     position: relative;
     width: 100%;
@@ -4278,8 +4487,9 @@ body[data-screen="room"] .floating-message {
 
 .language-menu {
     position: absolute;
-    top: 0;
-    right: calc(100% + 8 * var(--menu-size-unit));
+    /* Its first button lines up with the Language button, and a 16 unit gap separates it from the account menu, like the one under the header. */
+    top: calc(-9 * var(--menu-size-unit));
+    right: calc(100% + 25 * var(--menu-size-unit));
     z-index: 21;
     box-sizing: border-box;
     display: flex;

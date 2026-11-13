@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCurrentScreenName, screenStore } from '../shared/navigation';
@@ -144,20 +144,30 @@ describe('the calendar of the first section', () => {
         expect(within(section(HERO)).getByText('9 days worked. Exactly.')).toBeInTheDocument();
     });
 
-    it('shows yesterday summary when nothing is hovered', () => {
+    it('shows yesterday summary after the mouse has been away for 3 seconds', () => {
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+        vi.setSystemTime(new Date(2026, 10, 12, 12, 0));
         render(<LandingScreen />);
+        expect(within(section(HERO)).queryByRole('tooltip')).toBeNull();
+        act(() => { vi.advanceTimersByTime(3000); });
         const card = within(section(HERO)).getByRole('tooltip');
         expect(card).toHaveTextContent('Wed, Nov 11');
         expect(card).toHaveTextContent('2 sessions · 1h 50m focused');
     });
 
-    it('shows the summary of the day under the mouse, and goes back to yesterday when it leaves', async () => {
+    it('shows the summary of the day under the mouse at once, and brings yesterday back 3 seconds after it leaves', async () => {
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+        vi.setSystemTime(new Date(2026, 10, 12, 12, 0));
+        const user = userEvent.setup({ delay: null });
         render(<LandingScreen />);
         const hero = section(HERO);
-        await userEvent.hover(within(hero).getByText('10'));
+        act(() => { vi.advanceTimersByTime(3000); });
+        await user.hover(within(hero).getByText('10'));
         expect(within(hero).getAllByRole('tooltip')).toHaveLength(1);
         expect(within(hero).getByRole('tooltip')).toHaveTextContent('Tue, Nov 10');
-        await userEvent.unhover(within(hero).getByText('10'));
+        await user.unhover(within(hero).getByText('10'));
+        expect(within(hero).queryByRole('tooltip')).toBeNull();
+        act(() => { vi.advanceTimersByTime(3000); });
         expect(within(hero).getByRole('tooltip')).toHaveTextContent('Wed, Nov 11');
     });
 

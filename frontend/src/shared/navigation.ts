@@ -12,7 +12,7 @@ export const SCREEN_DISPLAY: Record<ScreenName, string> = {
 
 const ALLOWED_SCREEN_TRANSITIONS: Record<ScreenName, readonly ScreenName[]> = {
     loading: ['register', 'login'],
-    landing: ['loading', 'plan', 'dashboard', 'rooms'],
+    landing: ['loading', 'login', 'register', 'plan', 'dashboard', 'rooms'],
     register: ['loading', 'landing', 'login'],
     login: ['landing', 'register', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'],
     plan: ['loading', 'register', 'login', 'dashboard', 'rooms'],

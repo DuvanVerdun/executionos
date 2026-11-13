@@ -9,6 +9,9 @@ import { LoginPrompt } from './LoginPrompt';
 
 const HERO_DAYS = 14;
 
+/** How long the mouse must stay away from the calendar before yesterday's summary shows. */
+const YESTERDAY_DELAY_MS = 3000;
+
 interface HeroSectionProps {
     today: Date;
     /** The register button. The header offers its own once the page has scrolled past this one. */
@@ -53,7 +56,7 @@ export function HeroSection({ today, ctaRef }: HeroSectionProps) {
                 </div>
                 <div className="landing-card landing-card-record">
                     <p className="landing-card-label landing-card-label-white">{t('landing.hero.withLabel')}</p>
-                    <DemoCalendarGrid days={days} highlightedDate={yesterday} />
+                    <DemoCalendarGrid days={days} highlightedDate={yesterday} highlightDelayMs={YESTERDAY_DELAY_MS} />
                     <p className="landing-card-strong">{t('landing.hero.workedDays', { count: workedDays })}</p>
                 </div>
             </div>

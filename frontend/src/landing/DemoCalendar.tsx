@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT, type TranslationKey } from '../i18n/i18n';
-import { formatShortDate, parseLocalDate } from '../lib/dates';
-import { formatDurationHoursMinutes } from '../lib/durations';
+import { parseLocalDate } from '../lib/dates';
+import { DaySummaryContent } from '../streak/DaySummaryContent';
 import type { CalendarDay } from '../types/dashboard';
 
 const WEEKDAYS = [
@@ -15,24 +15,9 @@ function getVisualState(day: CalendarDay): 'work' | 'rest' | 'today' | 'neutral'
 
 /** Draw the summary card of a day: its date, and what it holds. It hangs above the day. */
 function DaySummary({ day }: { day: CalendarDay }) {
-    const t = useT();
-    let detail: string;
-    if (day.state === 'work') {
-        const sessions = day.total_sessions === 1 ? t('streak.sessionsOne') : t('streak.sessionsOther', { count: day.total_sessions });
-        detail = `${sessions} · ${t('session.focused', { time: formatDurationHoursMinutes(day.total_time_seconds) })}`;
-    } else if (day.state === 'rest') {
-        detail = t('landing.tip.rest');
-    } else if (day.state === 'today') {
-        detail = t('landing.tip.today');
-    } else if (day.state === 'missed') {
-        detail = t('streak.noSessions');
-    } else {
-        detail = t('landing.tip.future');
-    }
     return (
         <div className="streak-day-summary landing-day-summary" role="tooltip">
-            <p>{formatShortDate(parseLocalDate(day.date))}</p>
-            <p className="landing-day-summary-detail">{detail}</p>
+            <DaySummaryContent day={day} detailClassName="landing-day-summary-detail" />
         </div>
     );
 }
@@ -45,13 +30,23 @@ interface DemoCalendarGridProps {
     showWeekdays?: boolean;
     /** The date whose summary card shows when the mouse is not over a day. */
     highlightedDate?: string | null;
+    /** How long the mouse must stay away from the days before the highlighted date shows. Without it, the date shows at once. */
+    highlightDelayMs?: number;
 }
 
-/** Draw days like the consistency calendar of the app does. The summary card of a day shows when the mouse is over it. */
-export function DemoCalendarGrid({ days, leadingBlanks = 0, showWeekdays = false, highlightedDate = null }: DemoCalendarGridProps) {
+/** Draw days like the consistency calendar of the app does. The summary card of a day shows when the mouse is over it. The highlighted date shows only after the mouse has been away for a while, so the card never jumps between two days. */
+export function DemoCalendarGrid({ days, leadingBlanks = 0, showWeekdays = false, highlightedDate = null, highlightDelayMs = 0 }: DemoCalendarGridProps) {
     const t = useT();
     const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-    const shownDate = hoveredDate ?? highlightedDate;
+    const [readyDate, setReadyDate] = useState<string | null>(null);
+    const defaultDate = highlightDelayMs === 0 || readyDate === highlightedDate ? highlightedDate : null;
+    const shownDate = hoveredDate ?? defaultDate;
+
+    useEffect(() => {
+        if (highlightedDate === null || hoveredDate !== null || highlightDelayMs === 0) return;
+        const timer = setTimeout(() => { setReadyDate(highlightedDate); }, highlightDelayMs);
+        return () => { clearTimeout(timer); };
+    }, [highlightedDate, hoveredDate, highlightDelayMs]);
 
     return (
         <div className="streak-calendar landing-calendar-grid">
@@ -61,7 +56,7 @@ export function DemoCalendarGrid({ days, leadingBlanks = 0, showWeekdays = false
                 <span
                     key={day.date}
                     className={`streak-calendar-day streak-calendar-day-${getVisualState(day)}${shownDate === day.date ? ' is-highlighted' : ''}`}
-                    onMouseEnter={() => { setHoveredDate(day.date); }}
+                    onMouseEnter={() => { setReadyDate(null); setHoveredDate(day.date); }}
                     onMouseLeave={() => { setHoveredDate(null); }}
                 >
                     {parseLocalDate(day.date).getDate()}

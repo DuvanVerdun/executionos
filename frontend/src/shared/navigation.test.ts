@@ -27,13 +27,13 @@ describe('navigateTo', () => {
         expect(getCurrentScreenName()).toBe('dashboard');
     });
 
-    it.each(['loading', 'plan', 'dashboard', 'rooms'] as const)('opens the Landing from %s', (current) => {
+    it.each(['loading', 'login', 'register', 'plan', 'dashboard', 'rooms'] as const)('opens the Landing from %s', (current) => {
         screenStore.set({ screen: current });
         navigateTo('landing', current);
         expect(getCurrentScreenName()).toBe('landing');
     });
 
-    it.each(['focus', 'review', 'room', 'login', 'register'] as const)('refuses to open the Landing from %s', (current) => {
+    it.each(['focus', 'review', 'room'] as const)('refuses to open the Landing from %s', (current) => {
         screenStore.set({ screen: current });
         navigateTo('landing', current);
         expect(getCurrentScreenName()).toBe(current);
