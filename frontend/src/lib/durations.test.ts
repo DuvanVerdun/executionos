@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { setLanguage } from '../i18n/i18n';
 import {
     formatAverageSessionTime,
     formatCountdown,
@@ -96,5 +97,15 @@ describe('formatCountdown', () => {
         [300, '5:00']
     ])('shows %i seconds as %s', (seconds, text) => {
         expect(formatCountdown(seconds)).toBe(text);
+    });
+});
+
+describe('the units in Spanish', () => {
+    it('write minutes as min and seconds as seg', () => {
+        setLanguage('es');
+        expect(formatDurationHoursMinutes(5400)).toBe('1h 30min');
+        expect(formatDurationHoursMinutes(600)).toBe('10min');
+        expect(formatDurationHoursMinutesSeconds(11)).toBe('11 seg');
+        expect(formatDurationHoursMinutesSeconds(6540)).toBe('1h 49min');
     });
 });

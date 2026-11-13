@@ -11,8 +11,7 @@ import { openRoom, showUnavailableRoom } from '../rooms/room';
 import {
     applyRoomSessionEnvelope,
     enterRoomSessionFocus,
-    isRoomSessionEnvelope,
-    timeRoomRequest
+    isRoomSessionEnvelope
 } from '../rooms/room-session';
 import { handleFinishWork } from '../session/review';
 import { sessionStore } from '../session/state';
@@ -75,11 +74,11 @@ async function openLastScreen(userId: number, currentScreen: ScreenName): Promis
     }
 }
 
-/** Restore work or retry a pending Finish after authentication. */
+/** Restore work or retry a pending Finish after authentication. Nobody signed in sees the Landing, or Register when they come with a room link. */
 export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'): Promise<void> {
     const { accessToken, userId } = authStore.get();
     if (!accessToken || userId === null) {
-        navigateTo('register', 'loading');
+        navigateTo(getJoinTokenFromHash() === null ? 'landing' : 'register', 'loading');
         return;
     }
     let joinedRoomId: number | null = null;
@@ -105,14 +104,11 @@ export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'
         }
     }
     try {
-        const { result: roomSessionResult, sentAtMs, receivedAtMs } = await timeRoomRequest(
-            /** Request the running room session. */
-            () => fetchRoomSession(currentScreen)
-        );
+        const roomSessionResult = await fetchRoomSession(currentScreen);
         if (roomSessionResult.status !== 200 || !isRoomSessionEnvelope(roomSessionResult)) {
             throw new Error(roomSessionResult.error || 'Could not load the room session');
         }
-        if (applyRoomSessionEnvelope(roomSessionResult, sentAtMs, receivedAtMs)) {
+        if (applyRoomSessionEnvelope(roomSessionResult)) {
             enterRoomSessionFocus(currentScreen);
             return;
         }

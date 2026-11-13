@@ -3,13 +3,19 @@ import { handleLogout } from '../auth/logout';
 import { authStore } from '../auth/state';
 import { openFeedbackForm } from '../feedback/feedback';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
-import { useT, type TranslationKey } from '../i18n/i18n';
+import { languageStore, setLanguage, useT, type Language, type TranslationKey } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { StreakPopup } from '../streak/StreakPopup';
 import { closeStreakPopup, streakStore, toggleStreakPopup } from '../streak/streak';
 import { HEADER_SCREENS, type HeaderScreenName } from '../types/screens';
 import { goToHeaderScreen } from './header-navigation';
-import { closeUserMenu, toggleUserMenu, userMenuStore } from './user-menu';
+import { closeUserMenu, toggleLanguageMenu, toggleUserMenu, userMenuStore } from './user-menu';
+
+/** The languages of the language menu, each written in its own language. */
+const LANGUAGE_OPTIONS = [
+    { language: 'en', name: 'English' },
+    { language: 'es', name: 'Español' }
+] as const satisfies readonly { language: Language; name: string }[];
 
 const NAVIGATION_LABELS = {
     plan: 'nav.plan',
@@ -26,7 +32,8 @@ interface HeaderProps {
 /** Draw the header of a screen: the wordmark, the three navigation buttons, the streak and the account menu. */
 export function Header({ screen, className }: HeaderProps) {
     const t = useT();
-    const { openScreen: openMenuScreen } = useStore(userMenuStore);
+    const { openScreen: openMenuScreen, isLanguageMenuOpen } = useStore(userMenuStore);
+    const { language } = useStore(languageStore);
     const { openScreen: openStreakScreen, currentStreak } = useStore(streakStore);
     const { username } = useStore(authStore);
     const iconRef = useRef<SVGSVGElement>(null);
@@ -120,6 +127,32 @@ export function Header({ screen, className }: HeaderProps) {
                 >
                     {t('header.sendFeedback')}
                 </button>
+                <div className="language-menu-wrapper">
+                    <button
+                        type="button"
+                        id={`${screen}-user-menu-language-btn`}
+                        aria-haspopup="menu"
+                        aria-expanded={isLanguageMenuOpen}
+                        onClick={toggleLanguageMenu}
+                    >
+                        {t('header.language')}
+                    </button>
+                    {isLanguageMenuOpen && (
+                        <div className="language-menu" role="menu" aria-label={t('header.chooseLanguage')}>
+                            {LANGUAGE_OPTIONS.map(/** Draw the button of one language. The current one is checked. */ (option) => (
+                                <button
+                                    key={option.language}
+                                    type="button"
+                                    role="menuitemradio"
+                                    aria-checked={option.language === language}
+                                    onClick={() => { setLanguage(option.language); closeUserMenu(); }}
+                                >
+                                    {option.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 <button id={`${screen}-user-menu-logout-btn`} onClick={() => { void handleLogout(screen); }}>{t('header.logout')}</button>
             </div>
         </header>

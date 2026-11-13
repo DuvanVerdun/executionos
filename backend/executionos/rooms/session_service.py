@@ -17,9 +17,12 @@ from executionos.rooms.rules import (
     OverdueReason,
     RunningSessionFacts,
     actual_time_seconds,
+    checkin_can_be_confirmed,
     checkin_deadline_at,
     checkin_due_at,
     checkin_is_outstanding,
+    clamp_reported_seconds,
+    current_worked_seconds,
     overdue_reason,
     saved_end_point,
 )
@@ -191,7 +194,7 @@ def _session_payload(facts: RunningSessionFacts, room_name: str, now: datetime) 
         "started_at": utc_iso(facts.started_at),
         "paused_at": utc_iso(facts.paused_at) if facts.paused_at is not None else None,
         "paused_seconds": facts.paused_seconds,
-        "actual_time_seconds": actual_time_seconds(facts, now),
+        "actual_time_seconds": current_worked_seconds(facts, now),
         "state": "running" if running else "paused",
         "checkin": {
             "mark": facts.last_checkin_mark + 1,
@@ -341,7 +344,27 @@ def start_room_session_for_user(
     return _respond(user_id, (row, room_name), now)
 
 
-def pause_room_session_for_user(user_id: int) -> dict[str, Any]:
+def _parse_reported_seconds(raw_seconds: object) -> int | None:
+    """The time worked that the client reports, as whole seconds. None when the client did not send it."""
+    if raw_seconds is None:
+        return None
+
+    if isinstance(raw_seconds, bool) or not isinstance(raw_seconds, int) or raw_seconds < 0:
+        raise ValueError("Worked time must be a non-negative integer")
+
+    return raw_seconds
+
+
+def _worked_seconds(facts: RunningSessionFacts, now: datetime, reported_seconds: int | None) -> int:
+    """The time worked to keep: the client's own count, limited by what the server's clock allows."""
+    if reported_seconds is None:
+        return actual_time_seconds(facts, now)
+
+    return clamp_reported_seconds(facts, reported_seconds, now)
+
+
+def pause_room_session_for_user(user_id: int, raw_worked_seconds: object = None) -> dict[str, Any]:
+    reported_seconds = _parse_reported_seconds(raw_worked_seconds)
     now, loaded = _begin(user_id)
 
     if loaded is None:
@@ -357,7 +380,7 @@ def pause_room_session_for_user(user_id: int) -> dict[str, Any]:
         return _respond(user_id, loaded, now, conflict=True, consume_notice=False)
 
     row.last_interaction_at = now
-    row.last_interaction_actual_seconds = actual_time_seconds(facts, now)
+    row.last_interaction_actual_seconds = _worked_seconds(facts, now, reported_seconds)
     row.paused_at = now
     return _respond(user_id, loaded, now, consume_notice=False)
 
@@ -378,7 +401,8 @@ def resume_room_session_for_user(user_id: int) -> dict[str, Any]:
     return _respond(user_id, loaded, now, consume_notice=False)
 
 
-def checkin_room_session_for_user(user_id: int) -> dict[str, Any]:
+def checkin_room_session_for_user(user_id: int, raw_worked_seconds: object = None) -> dict[str, Any]:
+    reported_seconds = _parse_reported_seconds(raw_worked_seconds)
     now, loaded = _begin(user_id)
 
     if loaded is None:
@@ -387,10 +411,10 @@ def checkin_room_session_for_user(user_id: int) -> dict[str, Any]:
     row = loaded[0]
     facts = running_session_facts(row)
 
-    if checkin_is_outstanding(facts, now) and now <= checkin_deadline_at(facts):
+    if checkin_can_be_confirmed(facts, now):
         row.last_checkin_mark = facts.last_checkin_mark + 1
         row.last_interaction_at = now
-        row.last_interaction_actual_seconds = actual_time_seconds(facts, now)
+        row.last_interaction_actual_seconds = _worked_seconds(facts, now, reported_seconds)
 
     return _respond(user_id, loaded, now, consume_notice=False)
 
@@ -404,11 +428,16 @@ def _find_saved_session_id(user_id: int, submission_id: str) -> int | None:
     ).scalar_one_or_none()
 
 
-def finish_room_session_for_user(user_id: int, raw_submission_id: object) -> dict[str, Any]:
+def finish_room_session_for_user(
+    user_id: int,
+    raw_submission_id: object,
+    raw_actual_seconds: object = None,
+) -> dict[str, Any]:
     if not isinstance(raw_submission_id, str):
         raise ValueError("Submission ID must be a UUID string")
 
     submission_id = str(UUID(raw_submission_id))
+    reported_seconds = _parse_reported_seconds(raw_actual_seconds)
 
     now, loaded = _begin(user_id)
     saved_session_id: int | None = None
@@ -422,7 +451,7 @@ def finish_room_session_for_user(user_id: int, raw_submission_id: object) -> dic
         try:
             if _claim_row(facts):
                 session = _add_saved_session(
-                    facts, now, actual_time_seconds(facts, now)
+                    facts, now, _worked_seconds(facts, now, reported_seconds)
                 )
                 db.session.flush()
                 saved_session_id = session.id

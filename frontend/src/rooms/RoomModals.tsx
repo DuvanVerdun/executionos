@@ -1,11 +1,14 @@
 import { useRef, useState, type SubmitEvent } from 'react';
+import { useDocumentEvent } from '../hooks/useDocumentEvent';
 import { useT } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { CloseIcon } from '../shared/CloseIcon';
 import { setFloatingMessage } from '../shared/floating-message';
 import { ModalOverlay } from '../shared/ModalOverlay';
-import { postJoinRoom, postRoom } from './api';
+import type { ScreenName } from '../types/screens';
+import { patchRoomName, postJoinRoom, postRoom } from './api';
 import { buildRoomDisplayLink, buildRoomLink, extractRoomLinkToken } from './links';
+import { showRoomName } from './rename';
 import { openRoom } from './room';
 import { loadRooms } from './rooms';
 
@@ -151,6 +154,82 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
                 </div>
                 <button type="submit" id="join-room-submit-btn" className="modal-submit-btn" disabled={isSubmitting}>
                     {isSubmitting ? t('rooms.joining') : t('rooms.joinTitle')}
+                </button>
+            </form>
+        </ModalOverlay>
+    );
+}
+
+/** Ask for a new room name, save it, and show it everywhere the room appears. */
+export function RenameRoomModal({ room, screen, onClose }: { room: { id: number; name: string }; screen: ScreenName; onClose: () => void }) {
+    const t = useT();
+    const [name, setName] = useState(room.name);
+    const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useDocumentEvent('keydown', /** Close the modal with Escape, unless it is saving. */ (event) => {
+        if (event.key === 'Escape' && !isSubmitting) onClose();
+    });
+
+    /** Check the name, save it, and close the modal. */
+    async function handleSubmit(event: SubmitEvent<HTMLFormElement>): Promise<void> {
+        event.preventDefault();
+        if (isSubmitting) return;
+        const newName = name.trim();
+        if (!newName) {
+            setError(t('rooms.nameRequired'));
+            inputRef.current?.focus();
+            return;
+        }
+        if (newName === room.name) {
+            onClose();
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const result = await patchRoomName(room.id, newName, screen);
+            if (!result.success) {
+                setError(t('rooms.renameFailed'));
+                return;
+            }
+            showRoomName(room.id, result.name);
+            onClose();
+        } catch (caught) {
+            if (errorStatus(caught) === 401) return;
+            console.error('Could not rename the room:', caught);
+            setError(t('common.serverUnreachable'));
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    return (
+        <ModalOverlay id="rename-room-overlay" canClose={!isSubmitting} onClose={onClose} initialFocusRef={inputRef}>
+            <form
+                id="rename-room-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="rename-room-title" noValidate
+                onSubmit={(event) => { void handleSubmit(event); }}
+            >
+                <button type="button" id="rename-room-close-btn" className="modal-close-btn" aria-label={t('rooms.closeRename')} onClick={() => { if (!isSubmitting) onClose(); }}>
+                    <CloseIcon />
+                </button>
+                <h2 id="rename-room-title" className="modal-title">{t('rooms.renameTitle')}</h2>
+                <div className="modal-field">
+                    <div className="input-container">
+                        <input
+                            ref={inputRef}
+                            type="text" className="input" id="rename-room-input" placeholder=" " maxLength={50} autoComplete="off"
+                            aria-describedby="rename-room-error"
+                            aria-invalid={error ? true : undefined}
+                            value={name}
+                            onChange={(event) => { setName(event.target.value); setError(''); }}
+                        />
+                        <label className="input-placeholder" htmlFor="rename-room-input">{t('rooms.nameLabel')}</label>
+                    </div>
+                    <p id="rename-room-error" className="form-error-message modal-field-error" role="alert">{error}</p>
+                </div>
+                <button type="submit" id="rename-room-submit-btn" className="modal-submit-btn" disabled={isSubmitting}>
+                    {isSubmitting ? t('common.saving') : t('common.save')}
                 </button>
             </form>
         </ModalOverlay>

@@ -316,6 +316,15 @@ def delete_room_for_user(user_id: int, room_id: int) -> None:
     db.session.commit()
 
 
+def rename_room_for_user(user_id: int, room_id: int, raw_name: object) -> str:
+    _require_owner(room_id, user_id)
+    name = _validate_room_name(raw_name)
+
+    db.session.execute(update(Room).where(Room.id == room_id).values(name=name))
+    db.session.commit()
+    return name
+
+
 def get_room_link_for_user(user_id: int, room_id: int) -> str:
     _require_owner(room_id, user_id)
 

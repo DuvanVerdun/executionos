@@ -9,7 +9,7 @@ import { useStore } from '../lib/store';
 import { roomsStore } from './state';
 
 /** Draw a room card with its menu button and its menu. */
-export function RoomCard({ room }: { room: RoomCardData }) {
+export function RoomCard({ room, onRename }: { room: RoomCardData; onRename: () => void }) {
     const t = useT();
     const { openMenuRoomId, busyAction } = useStore(roomsStore);
     const isOpen = openMenuRoomId === room.id;
@@ -46,6 +46,7 @@ export function RoomCard({ room }: { room: RoomCardData }) {
                                 room={room}
                                 busyAction={busyAction}
                                 onAction={(action) => { void runRoomMenuAction(action, room, roomsMenuHooks); }}
+                                onRename={onRename}
                             />
                         )}
                     </div>

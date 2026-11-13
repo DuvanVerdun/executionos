@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authStore } from '../auth/state';
-import { roomStore } from '../rooms/state';
+import { roomSnapshotCache, roomStore } from '../rooms/state';
 import { saveLastScreen } from '../shared/last-screen';
 import { addBeforeSwitchHook, getCurrentScreenName, navigateTo, screenStore } from '../shared/navigation';
 import { initializeStreakState } from '../streak/streak';
@@ -61,11 +61,33 @@ describe('opening the app after sign-in', () => {
         expect(getCurrentScreenName()).toBe('plan');
     });
 
-    it('goes to Register when nobody is signed in', async () => {
+    it('shows the Landing when nobody is signed in', async () => {
         authStore.set({ accessToken: null, userId: null, username: '' });
         saveLastScreen(1, { screen: 'dashboard' });
         await routeToInitialScreen();
-        expect(getCurrentScreenName()).toBe('register');
+        expect(getCurrentScreenName()).toBe('landing');
+    });
+
+    it('goes to Register when nobody is signed in and the visitor came with a room link', async () => {
+        authStore.set({ accessToken: null, userId: null, username: '' });
+        history.replaceState(null, '', `${window.location.pathname}#join=abc123`);
+        try {
+            await routeToInitialScreen();
+            expect(getCurrentScreenName()).toBe('register');
+        } finally {
+            history.replaceState(null, '', window.location.pathname);
+        }
+    });
+
+    it('keeps the room link in the address while the visitor registers or logs in', async () => {
+        authStore.set({ accessToken: null, userId: null, username: '' });
+        history.replaceState(null, '', `${window.location.pathname}#join=abc123`);
+        try {
+            await routeToInitialScreen();
+            expect(window.location.hash).toBe('#join=abc123');
+        } finally {
+            history.replaceState(null, '', window.location.pathname);
+        }
     });
 });
 
@@ -90,6 +112,30 @@ describe('remembering the screen', () => {
         screenStore.set({ screen: 'plan' });
         navigateTo('focus', 'plan');
         expect(sessionStorage.getItem('executionOS_lastScreen')).toBe('{"userId":1,"screen":"dashboard"}');
+    });
+
+    it('forgets the data of rooms when the user reaches the Landing, so the next account sees none of it', () => {
+        registerNavigationHooks();
+        roomSnapshotCache.set(7, { room: { id: 7, name: 'Crew', is_owner: true, show_missions: true }, summary: { total_time_seconds: 0, total_sessions: 0, members_count: 1, average_session_time_seconds: null }, ranking: [] });
+        screenStore.set({ screen: 'plan' });
+        navigateTo('landing', 'plan');
+        expect(roomSnapshotCache.size).toBe(0);
+    });
+
+    it('starts the next screen at the top of the page when it leaves the Landing', () => {
+        registerNavigationHooks();
+        const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+        screenStore.set({ screen: 'landing' });
+        navigateTo('register', 'landing');
+        expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    });
+
+    it('does not move the page when it leaves any other screen', () => {
+        registerNavigationHooks();
+        const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+        screenStore.set({ screen: 'plan' });
+        navigateTo('dashboard', 'plan');
+        expect(scrollTo).not.toHaveBeenCalled();
     });
 
     it('saves nothing when nobody is signed in', () => {

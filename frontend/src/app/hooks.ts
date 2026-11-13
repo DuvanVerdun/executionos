@@ -48,12 +48,15 @@ export function registerNavigationHooks(): void {
             closeUserMenu();
         }
     });
-    addBeforeSwitchHook(/** Forget room data when the user reaches Login, Register or Loading. */ (nextScreen) => {
-        if (nextScreen === 'login' || nextScreen === 'register' || nextScreen === 'loading') {
+    addBeforeSwitchHook(/** Forget room data when the user reaches the Landing, Login, Register or Loading. */ (nextScreen) => {
+        if (nextScreen === 'landing' || nextScreen === 'login' || nextScreen === 'register' || nextScreen === 'loading') {
             resetRoomSessionClient();
             resetRoomsData();
             roomSnapshotCache.clear();
         }
+    });
+    addBeforeSwitchHook(/** Start the next screen at the top: the Landing is a long page, and the page keeps its scroll. */ (_nextScreen, currentScreen) => {
+        if (currentScreen === 'landing') window.scrollTo(0, 0);
     });
     addBeforeSwitchHook(/** Prepare the Focus and Review screens before they show. */ (nextScreen, currentScreen) => {
         if (nextScreen === 'focus' && currentScreen === 'loading') {

@@ -24,7 +24,7 @@ describe('logging out', () => {
         expect(getCurrentScreenName()).toBe('plan');
     });
 
-    it('signs out, forgets the last screen and shows Login when the user confirms', async () => {
+    it('signs out, forgets the last screen and shows the Landing when the user confirms', async () => {
         fakeBackend({ status: 200, body: { success: true } });
         saveLastScreen(1, { screen: 'dashboard' });
         const logout = handleLogout('plan');
@@ -32,7 +32,7 @@ describe('logging out', () => {
         await logout;
         expect(authStore.get().userId).toBeNull();
         expect(loadLastScreen(1)).toBeNull();
-        expect(getCurrentScreenName()).toBe('login');
+        expect(getCurrentScreenName()).toBe('landing');
     });
 
     it('shows an error message, and stays signed in, when the server cannot be reached', async () => {

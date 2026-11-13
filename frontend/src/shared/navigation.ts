@@ -6,14 +6,15 @@ type SwitchHook = (nextScreen: ScreenName, currentScreen: ScreenName) => void;
 
 /** How each screen is laid out when it shows. */
 export const SCREEN_DISPLAY: Record<ScreenName, string> = {
-    loading: 'flex', register: 'grid', login: 'grid',
+    loading: 'flex', landing: 'block', register: 'grid', login: 'grid',
     plan: 'flex', focus: 'flex', review: 'grid', dashboard: 'flex', rooms: 'flex', room: 'flex'
 };
 
 const ALLOWED_SCREEN_TRANSITIONS: Record<ScreenName, readonly ScreenName[]> = {
     loading: ['register', 'login'],
-    register: ['loading', 'login'],
-    login: ['register', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'],
+    landing: ['loading', 'plan', 'dashboard', 'rooms'],
+    register: ['loading', 'landing', 'login'],
+    login: ['landing', 'register', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'],
     plan: ['loading', 'register', 'login', 'dashboard', 'rooms'],
     focus: ['loading', 'login', 'register', 'plan', 'review', 'room'],
     review: ['loading', 'login', 'register', 'focus'],

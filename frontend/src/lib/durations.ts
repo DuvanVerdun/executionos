@@ -1,3 +1,5 @@
+import { t } from '../i18n/i18n';
+
 /** Convert an HH:MM duration to seconds. */
 export function parseHHMMToSeconds(timeString: string): number {
     const [hours, minutes] = timeString.split(':');
@@ -18,8 +20,8 @@ export function formatDuration(totalSeconds: number): string {
 export function formatDurationHoursMinutes(totalSeconds: number): string {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    if (hours >= 1) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    if (hours >= 1) return `${hours}h ${minutes}${t('common.minutesShort')}`;
+    return `${minutes}${t('common.minutesShort')}`;
 }
 
 /** Format a duration with unit labels and sub-minute seconds. */
@@ -29,14 +31,14 @@ export function formatDurationHoursMinutesSeconds(totalSeconds: number): string 
     const seconds = Math.floor(totalSeconds % 60);
     
     if (hours >= 1) {
-        if (seconds >= 1) return `${hours}h ${minutes}m ${seconds}s`;
-        return `${hours}h ${minutes}m`;
+        if (seconds >= 1) return `${hours}h ${minutes}${t('common.minutesShort')} ${seconds}s`;
+        return `${hours}h ${minutes}${t('common.minutesShort')}`;
     }
     if (minutes >= 1) {
-        if (seconds >= 1) return `${minutes}m ${seconds}s`;
-        return `${minutes}m`;
+        if (seconds >= 1) return `${minutes}${t('common.minutesShort')} ${seconds}s`;
+        return `${minutes}${t('common.minutesShort')}`;
     }
-    return `${seconds} sec`;
+    return `${seconds} ${t('common.secondsLong')}`;
 }
 
 /** Format an average session time. Averages under a minute show seconds. */

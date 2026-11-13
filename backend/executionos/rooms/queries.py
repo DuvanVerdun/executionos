@@ -6,7 +6,7 @@ from sqlalchemy import and_, func, select
 
 from executionos.extensions import db
 from executionos.models import Room, RoomMembership, Session, User
-from executionos.rooms.rules import actual_time_seconds, member_state, ring_percentage
+from executionos.rooms.rules import current_worked_seconds, member_state, ring_percentage
 from executionos.rooms.service import get_active_membership, load_live_facts
 from executionos.sessions.history import PAGE_SIZE, apply_cursor, daily_summaries, next_cursor, serialize_session
 
@@ -118,7 +118,7 @@ def get_room_summary_for_user(
         mine = load_live_facts([room_id], now, user_id)
 
         if mine:
-            running_seconds = actual_time_seconds(mine[0], now)
+            running_seconds = current_worked_seconds(mine[0], now)
 
     members_count = db.session.execute(
         select(func.count())

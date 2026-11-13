@@ -1,5 +1,4 @@
 import { CHECKIN_SOUND_URL } from '../config';
-import { getServerNowMs } from './clock';
 import { roomSessionStore } from './room-session-state';
 import { checkinAudio } from './state';
 
@@ -50,7 +49,7 @@ export function armCheckinSound(): void {
     const { dueAtMs } = checkin;
     if (!context || !buffer || context.state !== 'running') return;
     if (!active || isPaused || dueAtMs === null) return;
-    const delayMs = dueAtMs - getServerNowMs();
+    const delayMs = dueAtMs - Date.now();
     if (delayMs < 0) return;
     const source = context.createBufferSource();
     source.buffer = buffer;

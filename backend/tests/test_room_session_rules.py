@@ -1,9 +1,12 @@
 from executionos.rooms.rules import (
     RunningSessionFacts,
     actual_time_seconds,
+    checkin_can_be_confirmed,
     checkin_deadline_at,
     checkin_due_at,
     checkin_is_outstanding,
+    clamp_reported_seconds,
+    current_worked_seconds,
     overdue_reason,
 )
 from datetime import datetime, timedelta, UTC
@@ -94,3 +97,50 @@ def test_checkin_is_due_an_hour_of_work_after_the_start_and_expires_five_minutes
 
     paused = replace(session, paused_at=at(700))
     assert not checkin_is_outstanding(paused, at(10_000))
+
+
+@pytest.mark.parametrize(
+    "reported, elapsed, expected",
+    [
+        pytest.param(1800, 2000, 1800, id="a count below the server's elapsed time is kept"),
+        pytest.param(2005, 2000, 2005, id="a few seconds above it are allowed, for the delay of the request"),
+        pytest.param(99_999, 2000, 2010, id="a count far above it is limited to the elapsed time plus the margin"),
+        pytest.param(0, 2000, 0, id="zero is kept"),
+        pytest.param(5, 0, 5, id="a count right after the start is kept"),
+    ],
+)
+def test_a_reported_time_is_limited_by_the_servers_elapsed_time_plus_a_margin(
+    facts: RunningSessionFacts,
+    reported: int,
+    elapsed: int,
+    expected: int,
+):
+    assert clamp_reported_seconds(facts, reported, at(elapsed)) == expected
+
+
+def test_a_negative_reported_time_becomes_zero(facts: RunningSessionFacts):
+    assert clamp_reported_seconds(facts, -5, at(100)) == 0
+
+
+def test_the_time_shown_to_others_is_the_clients_count_while_paused_and_the_servers_count_while_running(
+    facts: RunningSessionFacts,
+):
+    running = replace(facts, last_interaction_actual_seconds=1800)
+    paused = replace(facts, paused_at=at(2000), last_interaction_actual_seconds=1800)
+    paused_without_count = replace(facts, paused_at=at(2000))
+
+    assert current_worked_seconds(running, at(2500)) == 2500
+    assert current_worked_seconds(paused, at(9000)) == 1800
+    assert current_worked_seconds(paused_without_count, at(9000)) == 2000
+
+
+def test_a_check_in_can_be_confirmed_a_little_before_it_is_due_until_its_deadline(facts: RunningSessionFacts):
+    assert not checkin_can_be_confirmed(facts, at(3539))
+    assert checkin_can_be_confirmed(facts, at(3540))
+    assert checkin_can_be_confirmed(facts, at(3600))
+    assert checkin_can_be_confirmed(facts, at(3900))
+    assert not checkin_can_be_confirmed(facts, at(3901))
+
+
+def test_a_paused_session_has_no_check_in_to_confirm(facts: RunningSessionFacts):
+    assert not checkin_can_be_confirmed(replace(facts, paused_at=at(3000)), at(3600))

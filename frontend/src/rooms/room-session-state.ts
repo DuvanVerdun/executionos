@@ -7,11 +7,13 @@ export interface RoomSessionState {
     roomId: number | null;
     roomName: string;
     isPaused: boolean;
+    /** The time is counted on this device's clock. The server only gets the count, never these moments. */
     startedAtMs: number;
     pausedAtMs: number | null;
     pausedSeconds: number;
     checkin: { dueAtMs: number | null; deadlineAtMs: number | null; outstanding: boolean };
-    clockOffsetMs: number;
+    /** The number of the next check-in: it is due when this many whole hours of work are reached. */
+    checkinMark: number;
     display: DisplaySession;
     /** True while a server-confirmed request (Finish) is in flight. */
     isBusy: boolean;
@@ -26,7 +28,7 @@ export interface RoomSessionState {
     /** The check-in popup: whether it shows, and its countdown text. */
     checkinOpen: boolean;
     checkinCountdown: string;
-    tickTimer: ReturnType<typeof setInterval> | null;
+    tickTimer: ReturnType<typeof setTimeout> | null;
     heartbeatTimer: ReturnType<typeof setInterval> | null;
     checkinTimer: ReturnType<typeof setTimeout> | null;
     countdownTimer: ReturnType<typeof setInterval> | null;
@@ -44,7 +46,7 @@ export function createInitialRoomSessionState(): RoomSessionState {
         pausedAtMs: null,
         pausedSeconds: 0,
         checkin: { dueAtMs: null, deadlineAtMs: null, outstanding: false },
-        clockOffsetMs: 0,
+        checkinMark: 1,
         display: {
             currentMission: '',
             targetTimeSeconds: 0,

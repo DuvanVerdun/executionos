@@ -25,15 +25,21 @@ export interface DashboardData {
     trend: TrendBucket[];
 }
 
-export type CalendarState = 'work' | 'rest' | 'missed' | 'neutral';
+/** `today` is today without work: it is still open, so it is not rest or missed. */
+export type CalendarState = 'work' | 'rest' | 'missed' | 'neutral' | 'today';
 
 export interface CalendarDay {
     date: string;
     state: CalendarState;
+    /** The sessions of that local day, and the time worked in them. */
+    total_sessions: number;
+    total_time_seconds: number;
 }
 
 export interface StreakData {
     current_streak: number;
+    /** The days with work, ever. */
+    total_worked_days: number;
     rest_days_remaining_this_week: number;
     calendar: {
         month: string;

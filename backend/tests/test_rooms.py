@@ -31,12 +31,14 @@ ROOM_ROUTES = [
     pytest.param("PATCH", "/api/rooms/{room_id}/membership", {"showMissions": True}, id="change membership"),
     pytest.param("POST", "/api/rooms/{room_id}/leave", None, id="leave"),
     pytest.param("DELETE", "/api/rooms/{room_id}", None, id="delete"),
+    pytest.param("PATCH", "/api/rooms/{room_id}", {"name": "New name"}, id="rename"),
 ]
 
 OWNER_ONLY_ROUTES = [
-    pytest.param("GET", "/api/rooms/{room_id}/link", id="read link"),
-    pytest.param("POST", "/api/rooms/{room_id}/link/refresh", id="refresh link"),
-    pytest.param("DELETE", "/api/rooms/{room_id}", id="delete"),
+    pytest.param("GET", "/api/rooms/{room_id}/link", None, id="read link"),
+    pytest.param("POST", "/api/rooms/{room_id}/link/refresh", None, id="refresh link"),
+    pytest.param("DELETE", "/api/rooms/{room_id}", None, id="delete"),
+    pytest.param("PATCH", "/api/rooms/{room_id}", {"name": "New name"}, id="rename"),
 ]
 
 
@@ -58,17 +60,64 @@ def test_a_non_member_gets_the_same_404_as_for_a_room_that_does_not_exist(
     assert body(private_room) == body(missing_room)
 
 
-@pytest.mark.parametrize("method, url", OWNER_ONLY_ROUTES)
-def test_a_member_who_is_not_the_owner_gets_403_on_owner_actions(app: Flask, method: str, url: str):
+@pytest.mark.parametrize("method, url, payload", OWNER_ONLY_ROUTES)
+def test_a_member_who_is_not_the_owner_gets_403_on_owner_actions(
+    app: Flask,
+    method: str,
+    url: str,
+    payload: dict[str, Any] | None,
+):
     ana = make_account(app, "ana")
     bob = make_account(app, "bob")
     room = create_room(ana)
     join_room(bob, room)
 
-    result = call(bob, method, url.format(room_id=room["id"]))
+    result = call(bob, method, url.format(room_id=room["id"]), payload)
 
     assert result.status_code == 403
     assert call(ana, "GET", f"/api/rooms/{room['id']}").status_code == 200
+
+
+def test_the_owner_can_rename_the_room_and_every_member_sees_the_new_name(app: Flask):
+    ana = make_account(app, "ana")
+    bob = make_account(app, "bob")
+    room = create_room(ana, "Old name")
+    join_room(bob, room)
+
+    result = call(ana, "PATCH", f"/api/rooms/{room['id']}", {"name": "  New name  "})
+
+    assert result.status_code == 200
+    assert body(result)["name"] == "New name"
+    for member in (ana, bob):
+        assert body(call(member, "GET", f"/api/rooms/{room['id']}"))["room"]["name"] == "New name"
+        assert [card["name"] for card in body(call(member, "GET", "/api/rooms"))["rooms"]] == ["New name"]
+
+
+def test_a_renamed_room_keeps_its_link_members_and_sessions(app: Flask):
+    ana = make_account(app, "ana")
+    room = create_room(ana, "Old name")
+    seed_session(ana.user_id, SESSION_DAY, 900, room_id=room["id"])
+
+    call(ana, "PATCH", f"/api/rooms/{room['id']}", {"name": "New name"})
+
+    assert body(call(ana, "GET", f"/api/rooms/{room['id']}/link"))["link_token"] == room["link_token"]
+    assert body(call(ana, "GET", f"/api/rooms/{room['id']}"))["summary"]["total_sessions"] == 1
+
+
+@pytest.mark.parametrize("payload", [
+    pytest.param({}, id="no name"),
+    pytest.param({"name": "   "}, id="blank name"),
+    pytest.param({"name": "x" * 51}, id="name too long"),
+    pytest.param({"name": 5}, id="name is not text"),
+])
+def test_an_invalid_room_name_is_rejected_and_the_room_does_not_change(app: Flask, payload: dict[str, Any]):
+    ana = make_account(app, "ana")
+    room = create_room(ana, "Old name")
+
+    result = call(ana, "PATCH", f"/api/rooms/{room['id']}", payload)
+
+    assert result.status_code == 400
+    assert body(call(ana, "GET", f"/api/rooms/{room['id']}"))["room"]["name"] == "Old name"
 
 
 def test_when_the_owner_leaves_the_member_who_joined_first_becomes_owner(app: Flask):

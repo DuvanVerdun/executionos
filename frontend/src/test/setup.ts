@@ -29,6 +29,7 @@ remember(authFormStore);
 remember(authStore);
 remember(dashboardStore);
 remember(feedbackStore);
+languageStore.set({ language: 'en' });
 remember(languageStore);
 remember(roomSessionStore);
 remember(roomStore);
@@ -71,3 +72,8 @@ class IntersectionObserverStub {
 }
 
 Object.defineProperty(window, 'IntersectionObserver', { configurable: true, value: IntersectionObserverStub });
+
+Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })
+});

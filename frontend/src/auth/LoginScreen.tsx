@@ -2,10 +2,10 @@ import { useRef, useState, type SubmitEvent } from 'react';
 import { routeToInitialScreen } from '../app/startup';
 import { useT } from '../i18n/i18n';
 import { useStore } from '../lib/store';
-import { Screen } from '../shared/Screen';
 import { navigateTo } from '../shared/navigation';
 import { login } from './api';
 import { AuthField } from './AuthField';
+import { AuthShell } from './AuthShell';
 import { authFormStore } from './forms-state';
 import { setAuthenticatedUser } from './identity';
 
@@ -51,8 +51,7 @@ export function LoginScreen() {
     }
 
     return (
-        <Screen name="login" className="wordmark-centered-layout login-screen">
-            <h1 className="wordmark">ExecutionOS</h1>
+        <AuthShell screen="login">
             <div className="login-card">
                 <h2 className="card-header">{t('auth.login.title')}</h2>
 
@@ -90,6 +89,6 @@ export function LoginScreen() {
                 </form>
 
             </div>
-        </Screen>
+        </AuthShell>
     );
 }
