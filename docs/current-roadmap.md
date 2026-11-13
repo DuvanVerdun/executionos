@@ -81,6 +81,11 @@ rewrite. They also give the rewrite a clear target: "looks exactly like this".
 
 26. **Forgot password with an email code.** An email service must be chosen first. This also completes item 8.
 27. **Landing and presentation page.** Explains ExecutionOS with a reworked copy, based on the pitch. Should exist before getting users.
+    - Calendars show the real today and the real last days. Month names and remaining days are always computed from the current month.
+    - On scroll, a header appears with the wordmark, Log in, and Start your first mission (Register), like the app header.
+    - Log in button: black fill, gray border and text. On hover: white fill, black text, white glow.
+    - Nothing in the "How it works" cards is clickable. The chart is not clickable.
+    - The "Hover a day" pill, when hovered, shows the tooltip of the day before yesterday, as if that day was hovered.
 28. **Translate the app to Spanish.** Everything, including errors and notices. Done last, after all new copy exists.
 
 ### Stage 7: Polish ideas

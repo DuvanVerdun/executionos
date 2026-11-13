@@ -7,14 +7,14 @@ import type { ScreenName } from '../types/screens';
 import { logout } from './api';
 import { clearAuthenticatedUser } from './identity';
 
-/** End the authenticated session and return to registration. */
+/** End the authenticated session and return to the Landing. */
 export async function handleLogout(currentScreen: ScreenName): Promise<void> {
     if (!await confirmAction({ message: t('auth.logoutConfirm'), confirmLabel: t('header.logout') })) return;
     try {
         await logout();
         clearAuthenticatedUser();
         clearLastScreen();
-        navigateTo('login', currentScreen);
+        navigateTo('landing', currentScreen);
     } catch {
         setFloatingMessage(t('auth.logoutFailed'), { error: true });
     }

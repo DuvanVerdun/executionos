@@ -6,6 +6,7 @@ import { DashboardScreen } from './dashboard/DashboardScreen';
 import { FeedbackForm } from './feedback/FeedbackForm';
 import { useDocumentEvent } from './hooks/useDocumentEvent';
 import { useStore } from './lib/store';
+import { LandingScreen } from './landing/LandingScreen';
 import { handleRoomSessionGesture } from './rooms/checkin-sound';
 import { CheckinModal } from './rooms/CheckinModal';
 import { RoomScreen } from './rooms/RoomScreen';
@@ -31,6 +32,7 @@ export function App() {
     return (
         <>
             {screen === 'loading' && <LoadingScreen />}
+            {screen === 'landing' && <LandingScreen />}
             {screen === 'register' && <RegisterScreen />}
             {screen === 'login' && <LoginScreen />}
             {screen === 'plan' && <PlanScreen />}

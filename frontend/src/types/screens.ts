@@ -1,5 +1,5 @@
 export const SCREEN_NAMES = [
-    'loading', 'register', 'login', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'
+    'loading', 'landing', 'register', 'login', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'
 ] as const;
 
 export type ScreenName = typeof SCREEN_NAMES[number];

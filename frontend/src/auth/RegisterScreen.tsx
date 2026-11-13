@@ -3,10 +3,10 @@ import { routeToInitialScreen } from '../app/startup';
 import { useT } from '../i18n/i18n';
 import { getPasswordError } from '../lib/validation';
 import { useStore } from '../lib/store';
-import { Screen } from '../shared/Screen';
 import { navigateTo } from '../shared/navigation';
 import { register } from './api';
 import { AuthField } from './AuthField';
+import { AuthShell } from './AuthShell';
 import { authFormStore } from './forms-state';
 import { setAuthenticatedUser } from './identity';
 
@@ -70,8 +70,7 @@ export function RegisterScreen() {
     }
 
     return (
-        <Screen name="register" className="wordmark-centered-layout register-screen">
-            <h1 className="wordmark">ExecutionOS</h1>
+        <AuthShell screen="register">
             <div className="register-card">
                 <h2 className="card-header">{t('auth.register.title')}</h2>
 
@@ -115,6 +114,6 @@ export function RegisterScreen() {
                 </form>
 
             </div>
-        </Screen>
+        </AuthShell>
     );
 }

@@ -7,6 +7,7 @@ import type { ScreenName } from './types/screens';
 describe('App', () => {
     it.each([
         ['loading', 'Retry'],
+        ['landing', 'Sound familiar?'],
         ['register', 'Register'],
         ['login', 'Create an account'],
         ['plan', 'Start Work'],
@@ -25,5 +26,6 @@ describe('App', () => {
         screenStore.set({ screen: 'plan' });
         render(<App />);
         expect(screen.queryByText('Create an account')).toBeNull();
+        expect(screen.queryByText('Sound familiar?')).toBeNull();
     });
 });

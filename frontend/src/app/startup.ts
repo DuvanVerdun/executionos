@@ -74,11 +74,11 @@ async function openLastScreen(userId: number, currentScreen: ScreenName): Promis
     }
 }
 
-/** Restore work or retry a pending Finish after authentication. */
+/** Restore work or retry a pending Finish after authentication. Nobody signed in sees the Landing, or Register when they come with a room link. */
 export async function routeToInitialScreen(currentScreen: ScreenName = 'loading'): Promise<void> {
     const { accessToken, userId } = authStore.get();
     if (!accessToken || userId === null) {
-        navigateTo('register', 'loading');
+        navigateTo(getJoinTokenFromHash() === null ? 'landing' : 'register', 'loading');
         return;
     }
     let joinedRoomId: number | null = null;

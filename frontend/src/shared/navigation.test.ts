@@ -27,6 +27,30 @@ describe('navigateTo', () => {
         expect(getCurrentScreenName()).toBe('dashboard');
     });
 
+    it.each(['loading', 'plan', 'dashboard', 'rooms'] as const)('opens the Landing from %s', (current) => {
+        screenStore.set({ screen: current });
+        navigateTo('landing', current);
+        expect(getCurrentScreenName()).toBe('landing');
+    });
+
+    it.each(['focus', 'review', 'room', 'login', 'register'] as const)('refuses to open the Landing from %s', (current) => {
+        screenStore.set({ screen: current });
+        navigateTo('landing', current);
+        expect(getCurrentScreenName()).toBe(current);
+    });
+
+    it.each(['register', 'login'] as const)('goes from the Landing to %s', (next) => {
+        screenStore.set({ screen: 'landing' });
+        navigateTo(next, 'landing');
+        expect(getCurrentScreenName()).toBe(next);
+    });
+
+    it.each(['plan', 'focus', 'dashboard'] as const)('refuses to go from the Landing to %s', (next) => {
+        screenStore.set({ screen: 'landing' });
+        navigateTo(next, 'landing');
+        expect(getCurrentScreenName()).toBe('landing');
+    });
+
     it('runs the steps added by features before the screen changes, in order', () => {
         const calls: string[] = [];
         addBeforeSwitchHook(/** Record the first step. */ (next, current) => {

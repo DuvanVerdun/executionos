@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+    addDays,
     formatLocalDate,
+    formatLongDate,
+    formatMonthAndYear,
+    formatMonthName,
     formatPeriodDate,
     formatSessionDateLabel,
     formatTrendBucketLabel,
+    formatShortDate,
+    getDaysInMonth,
     getSessionLocalDateKey,
     groupSessionsByLocalDate,
     normalizePeriodAnchor,
@@ -104,5 +110,43 @@ describe('period and chart labels', () => {
         ['all_time', 'Nov']
     ] as const)('labels a bucket in a %s view as %s', (period, label) => {
         expect(formatTrendBucketLabel('2026-11-09', period)).toBe(label);
+    });
+});
+
+describe('addDays', () => {
+    it('moves a date forward and back, across months and years', () => {
+        expect(formatLocalDate(addDays(new Date(2026, 10, 30), 1))).toBe('2026-12-01');
+        expect(formatLocalDate(addDays(new Date(2026, 0, 1), -1))).toBe('2025-12-31');
+        expect(formatLocalDate(addDays(new Date(2028, 1, 28), 1))).toBe('2028-02-29');
+    });
+
+    it('drops the time of day and keeps the original date unchanged', () => {
+        const original = new Date(2026, 10, 12, 18, 45);
+        const moved = addDays(original, 2);
+        expect([moved.getHours(), moved.getMinutes()]).toEqual([0, 0]);
+        expect(original.getDate()).toBe(12);
+    });
+});
+
+describe('getDaysInMonth', () => {
+    it.each([
+        [new Date(2026, 10, 12), 30],
+        [new Date(2026, 11, 31), 31],
+        [new Date(2027, 1, 1), 28],
+        [new Date(2028, 1, 1), 29]
+    ] as const)('counts the days of the month of %s', (date, expected) => {
+        expect(getDaysInMonth(date)).toBe(expected);
+    });
+});
+
+describe('the long and short names of a date', () => {
+    it('writes the weekday, the month and the day', () => {
+        expect(formatLongDate(new Date(2026, 10, 12))).toBe('Thursday, November 12');
+        expect(formatShortDate(new Date(2026, 10, 11))).toBe('Wed, Nov 11');
+    });
+
+    it('writes the month, and the month with its year', () => {
+        expect(formatMonthName(new Date(2026, 10, 12))).toBe('November');
+        expect(formatMonthAndYear(new Date(2026, 10, 12))).toBe('November 2026');
     });
 });

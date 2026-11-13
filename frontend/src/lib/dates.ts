@@ -19,6 +19,44 @@ export function parseLocalDate(dateString: string): Date {
     return new Date(year ?? NaN, (month ?? NaN) - 1, day ?? NaN);
 }
 
+/** Return the calendar date a number of days after a date. Negative numbers go back. The time of day is dropped. */
+export function addDays(date: Date, days: number): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+/** Return how many days the month of a date has. */
+export function getDaysInMonth(date: Date): number {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+/** Format a date as its weekday, month and day, like "Thursday, November 12". */
+export function formatLongDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+    }).format(date);
+}
+
+/** Format a date as a short weekday, month and day, like "Wed, Nov 11". */
+export function formatShortDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    }).format(date);
+}
+
+/** Format the month of a date as its name, like "November". */
+export function formatMonthName(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+}
+
+/** Format the month of a date with its year, like "November 2026". */
+export function formatMonthAndYear(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+}
+
 /** Normalize an anchor to the selected calendar period. */
 export function normalizePeriodAnchor(period: DashboardPeriod, anchorDate: string): string {
     const date = parseLocalDate(anchorDate);
