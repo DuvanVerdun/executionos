@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from 'react';
 import { useT } from '../i18n/i18n';
 import { withCssVariables } from '../lib/css';
+import { LanguageToggle } from '../shared/LanguageToggle';
 import { navigateTo } from '../shared/navigation';
 
 /** How many pixels of scrolling it takes for the header background to appear completely. */
@@ -73,6 +74,7 @@ export function LandingHeader({ heroCtaRef }: LandingHeaderProps) {
             <button type="button" className="landing-login-btn" onClick={() => { navigateTo('login', 'landing'); }}>
                 {t('landing.header.login')}
             </button>
+            <LanguageToggle />
         </header>
     );
 }
