@@ -160,6 +160,8 @@ These boundaries may change if real user evidence creates a reason to change the
 
 Desktop only. Design canvas: 1440×1024, for Figma prototypes. The built app is responsive, see `docs/architecture.md`.
 
+Languages: Spanish (the default) and English, chosen in the account menu.
+
 ## Glossary
 
 - **Session:** one timed run on a mission.
@@ -173,6 +175,9 @@ Desktop only. Design canvas: 1440×1024, for Figma prototypes. The built app is 
 - **Room session:** a session started inside a room. It is held by the server while it runs, and it is saved to the user's personal history and to the room.
 - **Check-in:** once per hour of actual time, a popup asks "Are you still there?" The user has 5 minutes to click **Still here**.
 - **Working, Paused, Not working:** the state each member shows in the ranking.
+- **Streak:** the days worked in a row. Rest days do not break it.
+- **Rest day:** a day without work that the week allows. A week has two.
+- **Missed day:** the third day without work in a week. It restarts the streak.
 
 ## Rooms
 
@@ -187,6 +192,29 @@ Rules a user can observe:
 - Work done after a Resume is lost if the next check-in is missed. This is intentional: paused time is never counted as work.
 - A user who returns after a session ended without them sees a message saying what happened.
 - Personal sessions can be started at any time, even while in rooms. They never appear in a room.
+- Only the owner can rename a room.
+
+## Streak and Calendar
+
+- A day with a session counts as worked. The streak is the days worked in a row.
+- A week (Monday to Sunday) has two rest days that do not accumulate. The third day without work is a missed day and restarts the streak.
+- Today without work is gray: it is still open.
+- The calendar also shows the total days worked, the rest days left this week, and the sessions and time of a day when hovering it.
+
+## Editing and Navigation
+
+- The mission of a saved session can be edited, from the Dashboard and the Room history. Times never change.
+- One header on Plan, Dashboard, and Rooms holds the navigation, the streak, and the account menu.
+- A reload returns to the last Plan, Dashboard, Rooms, or room screen, until the tab closes.
+- Confirmations use one modal, not the browser's popup.
+
+## Landing and Entry
+
+- Not signed in: the Landing. With a room link: Register. Signed in: never the Landing, Login, or Register. Logging out goes to the Landing. Login and Register have no way back to it, except a reload.
+- Login and Register show a picture beside the card. With a room link they also show an invite card, which does not name the room.
+- The Landing has one section per screen: the promise, the pain, the days left in the month, how it works, stats and chart, the streak calendar, rooms, and a final call. Every call to action goes to Register.
+- Its header fades in as the page scrolls, and offers its own register button once the first one is out of view.
+- Dates are real. Everything else is demo data, and the demos cannot be clicked.
 
 ## Product Decision Test
 

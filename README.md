@@ -25,7 +25,9 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 - Offline session queue and retry
 - Session deletion
 - Dashboard with trends, streaks, and a consistency calendar
-- Co-DeepWork Rooms: join with a link, work together, ranking, hourly check-ins, and sessions saved to both your history and the room
+- Edit session missions and rename rooms
+- Co-DeepWork Rooms: work together through a link, with a ranking and hourly check-ins
+- Landing page, and Spanish (default) and English
 
 ## Stack
 
@@ -68,6 +70,9 @@ Trend charts, streaks, a consistency calendar, and a full UI redesign.
 
 **v0.6 — Co-DeepWork Rooms**  
 Shared rooms where small groups do deep work together, with server-held sessions and check-ins.
+
+**v0.6.1 — Rebuild, Spanish & Landing**  
+A React and TypeScript rewrite with tests, a landing page, and Spanish.
 
 ## About the project
 

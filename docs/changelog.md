@@ -3,6 +3,19 @@
 Each version is a meaningful product step. Small fixes and polish get their
 own commits, not their own entry.
 
+## v0.6.1 — Rebuild, Spanish & Landing (Nov 13, 2026)
+
+- Landing page for visitors, and a picture beside Login and Register (with an invite card for room links).
+- Spanish (the default) and English, with a language menu in the user menu.
+- One shared header, and a reload returns to the last screen.
+- Edit the mission of a saved session, and rename a room (owner only).
+- Streak calendar: today in gray, total days worked, and a summary when hovering a day.
+- Room session time counted on the device and checked by the server.
+- One modal replaces the browser popups, and the Dashboard refreshes in place after a delete.
+- Rewritten in strict TypeScript and React, with tests on both sides.
+- Backend split by feature, generic 500 errors, and a safer register.
+- Fixes: check-in sound, header shifting with the scrollbar, ring direction, button hover, loading wordmark.
+
 ## v0.6 — Co-DeepWork Rooms (Oct 24, 2026)
 
 - Rooms: create, join with a link, leave, and owner-only delete, with link copy and refresh.

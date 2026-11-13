@@ -75,21 +75,25 @@ Do not move responsibilities between layers without a concrete reason.
 
 ```
 src/
-  main.tsx       connects the screen-change steps, starts React, then starts the app
+  main.tsx       connects the screen-change steps, sets the page language, starts React, then starts the app
   App.tsx        shows the screen that is active, and the parts above every screen
   config.ts      backend address and timing constants
   app/           startup.ts (restore sign-in, first screen), hooks.ts (steps around screen changes), LoadingScreen
   lib/           pure helpers (durations, dates, validation, timing, errors, arrays, css), store.ts, dom.ts
-  hooks/         shared React hooks: useDocumentEvent, useInView
+  hooks/         shared React hooks: useDocumentEvent, useInView, useToday
+  i18n/          en.ts, es.ts, i18n.ts (see Frontend Texts)
   types/         backend response shapes and shared types
-  shared/        navigation (which screen shows), floating message, account menu, Header, Screen, ProgressRing, SessionCard
-  auth/          state, http (token refresh), api, identity, logout, Register and Login screens
+  shared/        navigation (which screen shows), last-screen, floating message, confirm and edit-mission modals,
+                 account menu (with the language menu), Header, Screen, ProgressRing, SessionCard
+  auth/          state, http (token refresh), api, identity, logout, AuthShell (the layout of Login and Register,
+                 with AuthVisual and InviteCard), Register and Login screens
   session/       state, ui-state, api, timer, storage (active session + offline queue), sync, plan, focus, review,
                  MissionCard, Plan, Focus and Review screens
   dashboard/     api, dashboard (state and loading flows), chart-math, TrendChart, SessionHistory, DashboardScreen
   streak/        api, streak (state and loading flows), StreakPopup
   feedback/      api, feedback (state and send flow), FeedbackForm
-  rooms/         api, state, room-session-state, rooms, room, room-session, menu, copy, links, clock,
+  landing/       the Landing: screen, header, one file per section, demo data, scroll effects (see Landing)
+  rooms/         api, state, room-session-state, rooms, room, room-session, rename, menu, copy, links,
                  checkin-sound, and the Rooms and Room screens with their cards, menus and modals
 ```
 
@@ -111,6 +115,19 @@ src/
 - **Strict TypeScript.** No `any`. `as` only where backend JSON and browser storage enter
   (`auth/http.ts`, `session/storage.ts`). Lint: `npm run lint` (typescript-eslint strict and the React hooks rules).
 
+## Screens and Navigation
+
+- Screens: `loading`, `landing`, `register`, `login`, `plan`, `focus`, `review`, `dashboard`, `rooms`, `room`.
+  There is no URL router. `screenStore` holds the screen, and `navigateTo` only follows the transitions
+  that `shared/navigation.ts` allows.
+- **Startup** (`app/startup.ts`): not signed in goes to `landing`, or to `register` with a `#join=` link. Signed in
+  joins, restores running sessions, and returns to the last screen.
+- Logout goes to `landing`. A request that needs a new sign-in goes to `login`. Login and Register never go
+  back to `landing`.
+- The last screen is saved in `sessionStorage` (`shared/last-screen.ts`) and forgotten at logout.
+- Leaving `landing` scrolls to the top. Reaching `landing`, `login`, `register`, or `loading` clears the room
+  data (`app/hooks.ts`).
+
 ## Frontend Tests
 
 - `npm test` from `frontend/` runs Vitest once (`npm run test:watch` re-runs on save). The
@@ -118,8 +135,8 @@ src/
 - A test sits next to the file it tests (`timer.ts` and `timer.test.ts`). Test files are also
   covered by `npm run typecheck` and `npm run lint`.
 - Shared test setup is in `src/test/`. Before every test it puts every store back to its first
-  state and clears `localStorage`. It also stubs what jsdom lacks (`navigator.locks`,
-  `IntersectionObserver`). `network.ts` fakes `fetch`, so no server runs.
+  state and clears `localStorage`. It sets the language to English, so texts in tests stay in English, and it stubs what jsdom lacks
+  (`navigator.locks`, `IntersectionObserver`, `matchMedia`). `network.ts` fakes `fetch`, so no server runs.
 - Dates run in the fixed timezone `America/Argentina/Buenos_Aires` (set in `vite.config.ts`).
   Timer tests use fake timers and a fake clock.
 - Tests aim at behavior where a failure would hurt: formatting and validation, the timer, the
@@ -132,16 +149,38 @@ src/
 - Every text the user sees goes through `t('feature.name')`. No screen holds its own text.
   Our own small module, no library (`src/i18n/`).
 - `en.ts` holds the English texts and decides which keys exist. Keys are grouped by feature.
-  `es.ts` holds the Spanish texts. A text missing there falls back to English.
+  `es.ts` holds the Spanish texts, written with "tú". It has a text for every key (`es.test.ts` checks it, and
+  that both have the same `{slots}`). A text missing there would fall back to English.
 - Keys are typed. A wrong key fails `npm run typecheck`. A text with a `{slot}` needs its
   value: `t('review.target', { time })`.
 - Components call `useT()`, so they redraw when the language changes. Plain code (logic
-  files) imports `t`. `setLanguage` changes the language.
+  files) imports `t`.
+- **The language.** Spanish is the default. `setLanguage` saves it in `localStorage` (`executionOS_language`)
+  and sets `<html lang>`. The account menu has the language menu (`shared/Header.tsx`, `shared/user-menu.ts`).
 - Plurals use two keys (`membersOne`, `membersOther`) and the code picks one.
-- Not through `t()` yet: dates (`Intl` with `en-US`), duration units, and messages that
-  the backend sends. Developer messages (`console.error`, thrown errors) stay English.
+- **Dates and units.** `lib/dates.ts` formats dates with `Intl` and `getLocale()` (`es` or `en-US`).
+  `lib/durations.ts` takes the units `min` and `seg` from keys (`common.minutesShort`, `common.secondsLong`).
+- Not through `t()`: messages that the backend sends. Developer messages (`console.error`, thrown
+  errors) stay English.
 - Store values that a screen turns into text (`pauseLabel`, `finishLabel`) stay as typed
   values. The screen calls `t()`.
+
+## Landing
+
+`src/landing/`. No backend endpoint.
+
+- One file per section, put together by `LandingScreen`. `auth/AuthShell` reuses the demo parts.
+- The demos use the real `TrendChart`, `RoomRanking`, `MissionCard`, `ProgressRing`, and calendar classes. The
+  Focus and Review cards are copies. Demos are `inert`.
+- `demo.ts` is pure and takes the visitor's date. Sessions and time depend on how many days ago a day was.
+  Day states follow the week rule of the app (two rest days, the third is missed). The chart reaches 2h today.
+- `hooks/useToday` gives today's date and refreshes it after midnight.
+- Sizes are `calc(N * var(--lu))`. `--lu` follows the window's width and height, so each section fits one screen.
+- The header sets `--header-background` (0 to 1 over 120px) and the CSS draws the bar. Its register button shows
+  once the first one is above the header.
+- `useRevealOnScroll` adds `is-revealed` to sections in view, under `landing-animated`. Reduced motion skips it.
+- Keys: `landing.*`, `auth.visual.*`, `auth.invite.*`. The invite card is generic because no public endpoint
+  gives a room's name.
 
 ## Backend Structure
 
@@ -314,8 +353,10 @@ Elapsed time is derived from:
 - Accumulated paused time.
 - Current session state.
 
-`setInterval()` may update the display but must never determine elapsed-time
-correctness.
+A timer may update the display but must never determine elapsed-time
+correctness. The Focus and room timers wake up when the shown second changes
+(`millisecondsUntilNextSecond` in `lib/timing.ts`), not on a fixed interval, so the
+number is never late. A hidden tab catches up when it becomes visible.
 
 ## Active Session Persistence
 
@@ -333,6 +374,15 @@ The queue is a resilience mechanism, not a second database.
 
 The backend remains authoritative.
 
+## Streak
+
+`GET /api/streak` is computed on each request. `calculate_streak_states` (`dashboard/streak.py`) walks the days
+from the first day worked to today. A day with work is `work`. After work, a day without work is `rest` while
+the week (Monday to Sunday) has used fewer than two rest days, then `missed`, which resets the streak. Today
+without work is `today`. The answer has `current_streak`, `total_worked_days`, `rest_days_remaining_this_week`,
+and a month `calendar` with each day's state, sessions, and time. `PATCH /api/update-session/<id>` changes a
+mission, never the times.
+
 ## Rooms
 
 Shared rooms are a layer on top of personal execution. The server learns about a
@@ -345,8 +395,9 @@ Three ideas run through everything:
 2. **Lazy finalization.** There is no background worker. Whichever request next
    reads the relevant scope closes the overdue sessions, and closing is
    idempotent.
-3. **The server row is the authority** for a running room session. The client
-   displays it and sends events.
+3. **The server row is the authority** for a running room session: its state, its
+   saving, and a limit on the time. The client counts the time worked on its own clock
+   and sends events with that count.
 
 ### Modules
 
@@ -367,6 +418,8 @@ Three ideas run through everything:
 | `PAUSED_TIMEOUT_SECONDS` | 3600 | backend |
 | `CHECKIN_INTERVAL_SECONDS` | 3600 | backend |
 | `CHECKIN_RESPONSE_SECONDS` | 300 | backend |
+| `REPORTED_TIME_TOLERANCE_SECONDS` | 10, margin on the client's count | backend |
+| `CHECKIN_EARLY_TOLERANCE_SECONDS` | 60, a check-in can be confirmed this early | backend |
 | `ROOM_NAME_MAX_LENGTH` | 50 | backend |
 | `LINK_TOKEN_BYTES` | 16 | backend |
 | `PAGE_SIZE` | 20, personal list and room history | backend |
@@ -387,7 +440,8 @@ through `_as_utc_aware`.
 - **`active_room_sessions`:** one running session per user (unique `user_id`).
   Holds `room_id`, a server-generated `submission_id`, mission, target,
   `started_at`, `paused_at`, `paused_seconds` (float), `last_checkin_mark`,
-  `last_interaction_at` and `last_interaction_actual_seconds` (set together), and
+  `last_interaction_at` and `last_interaction_actual_seconds` (set together: the time
+  worked that the client counted at that moment, limited by the server), and
   `last_heartbeat_at`.
 - **`session_end_notices`:** one per user. `reason` (`missed_checkin`,
   `paused_timeout`, `disconnected`), `saved`, `actual_time_seconds`. Read and
@@ -399,19 +453,26 @@ never run against production.
 
 ### Derivation rules
 
-- **Actual time:** `max(0, floor((T - started_at) - paused_seconds))`, where `T` is
-  now if running, else `paused_at`.
+- **Actual time (server's own count):** `max(0, floor((T - started_at) - paused_seconds))`, where `T` is
+  now if running, else `paused_at`. It is the fallback and the limit.
+- **Time worked that is kept:** pause, check-in, and finish may carry the client's count
+  (`workedSeconds`, `actualSeconds`). The server keeps it between 0 and its own elapsed time since
+  `started_at` plus `REPORTED_TIME_TOLERANCE_SECONDS`. Without it, the server uses its own count. While
+  paused, the time shown to others is `last_interaction_actual_seconds`.
 - **Check-in** (while running): `due_at = started_at + paused_seconds +
   next_mark * 3600`, with `next_mark = last_checkin_mark + 1`. It is outstanding
   when `now >= due_at`. `deadline_at = due_at + 300`. The five minutes count from
-  the moment it became due, not from when a popup is displayed.
+  the moment it became due, not from when a popup is displayed. A confirmation is
+  accepted from `CHECKIN_EARLY_TOLERANCE_SECONDS` before `due_at` until `deadline_at`,
+  because the client opens the popup when its own count reaches the hour.
 - **Overdue candidates:** `disconnected` at last heartbeat + 180s, `paused_timeout`
   at `paused_at` + 3600s (only if paused), `missed_checkin` at `deadline_at` (only
   if running). The earliest expired candidate gives the reason. Ties go in that
   order: disconnected, missed_checkin, paused_timeout.
 - **End point of an overdue row:** saved only if there was an interaction. The
   session is saved at `last_interaction_at` with `last_interaction_actual_seconds`.
-- **Interactions:** a pause (including Stop) and a successful Still here. Start,
+- **Interactions:** a pause (including Stop) and a successful Still here, each saving the
+  time worked at that moment. Start,
   Resume, Continue, and Finish are never interactions, so paused time can never be
   counted as work.
 - **Member state:** no row is `not_working`, a running row is `working`, a paused
@@ -455,6 +516,7 @@ one query, so a request costs about three statements.
   appends `Z`.
 - Success is `{success: true, ...}`. Failure is `{success: false, error}` with a
   generic text. Never return `str(e)`.
+- Renaming is `PATCH /api/rooms/<id>` with `{name}`, owner only (a non-owner gets 403).
 - Status codes: 400, 403 (an active member who is not the owner), **404 for every
   "not available" case** (unknown room, non-member, bad or refreshed link, deleted
   room), 409.
@@ -486,15 +548,18 @@ one query, so a request costs about three statements.
   The heartbeat is skipped while requests are queued.
 - **Finish is server-confirmed.** It waits for the queue, shows "Saving…" for at
   least two seconds, and retries with the same `submission_id`.
-- **Clock.** The client estimates the server clock offset from the midpoint of each
-  round trip, so timers and check-ins follow server time.
+- **Time.** The client counts the time worked from its own clock, and sends the count with Pause,
+  Still here, and Finish. After a reload the client has no timeline, so it rebuilds one from the
+  time the server counted (`adoptServerTimeline`). The server's state only changes a known
+  timeline when the server says paused or running and the client disagrees.
 - **Sync.** Rooms and Room screens poll every 15 seconds, skip hidden tabs, never
   overlap, and ignore stale responses (generation counters).
 - **Stale-while-revalidate.** Rooms and Room screens show their last data at once and
   refresh silently. The skeleton appears only on a first visit. A failed load when
   opening a screen shows its error state, and a failed background poll stays silent.
-- **Check-in.** The popup opens at `due_at` and plays a sound scheduled on the audio
-  clock, so tab throttling does not delay it. Audio needs a user gesture to unlock.
+- **Check-in.** The popup opens when the client's worked time reaches the next whole hour, and
+  plays a sound scheduled on the audio clock, so tab throttling does not delay it. Audio needs a
+  user gesture to unlock. A tab that becomes visible again brings the timer and the check-in up to date.
 - **Ordering at load.** Authenticate, join from `#join=` if present, restore the
   server's running session, then restore a personal session, then go to Plan.
 
