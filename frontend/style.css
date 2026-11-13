@@ -307,7 +307,7 @@ button {
     box-sizing: border-box;
     height: auto;
     min-height: 100dvh;
-    padding: 0 clamp(24px, 5.56vw, 80px);
+    padding: 0;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     align-items: stretch;
@@ -320,11 +320,17 @@ button {
     line-height: 1.2;
 }
 
+/* The wordmark and the language toggle sit where they sit in the header of the Landing. */
 .auth-header {
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-block: clamp(20px, 2.5vw, 36px);
+    width: 80%;
+    height: clamp(48px, 4.166667vw, 96px);
+    margin: clamp(16px, 1.666667vw, 40px) auto 0;
+    padding: 0 clamp(16px, 2.083333vw, 48px);
+    border: 1px solid transparent;
 }
 
 .wordmark-link {
@@ -409,7 +415,7 @@ button {
     align-items: stretch;
     justify-content: center;
     gap: clamp(48px, 6.94vw, 100px);
-    padding-bottom: clamp(24px, 4vh, 48px);
+    padding: 0 clamp(24px, 5.56vw, 80px) clamp(24px, 4vh, 48px);
 }
 
 .auth-column {
@@ -2963,8 +2969,9 @@ button {
     flex-shrink: 0;
     width: calc(64 * var(--rooms-size-unit));
     height: calc(64 * var(--rooms-size-unit));
+    box-sizing: border-box;
     padding: 0;
-    border: none;
+    border: 1px solid var(--color-border);
     border-radius: 50%;
     background-color: var(--color-surface);
     color: var(--color-text);
