@@ -1,3 +1,4 @@
+import { getLocale } from '../i18n/i18n';
 import type { DashboardPeriod } from '../types/dashboard';
 
 /** Return the browser's resolved time zone. */
@@ -31,7 +32,7 @@ export function getDaysInMonth(date: Date): number {
 
 /** Format a date as its weekday, month and day, like "Thursday, November 12". */
 export function formatLongDate(date: Date): string {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(getLocale(), {
         weekday: 'long',
         month: 'long',
         day: 'numeric'
@@ -40,7 +41,7 @@ export function formatLongDate(date: Date): string {
 
 /** Format a date as a short weekday, month and day, like "Wed, Nov 11". */
 export function formatShortDate(date: Date): string {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(getLocale(), {
         weekday: 'short',
         month: 'short',
         day: 'numeric'
@@ -49,12 +50,12 @@ export function formatShortDate(date: Date): string {
 
 /** Format the month of a date as its name, like "November". */
 export function formatMonthName(date: Date): string {
-    return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+    return new Intl.DateTimeFormat(getLocale(), { month: 'long' }).format(date);
 }
 
 /** Format the month of a date with its year, like "November 2026". */
 export function formatMonthAndYear(date: Date): string {
-    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+    return new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric' }).format(date);
 }
 
 /** Normalize an anchor to the selected calendar period. */
@@ -108,7 +109,7 @@ export function getSessionLocalDateKey(session: { date: string }): string {
 
 /** Format a session date for a history card heading. */
 export function formatSessionDateLabel(session: { date: string }): string {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(getLocale(), {
         weekday: 'long',
         month: 'long',
         day: 'numeric'
@@ -119,7 +120,7 @@ export function formatSessionDateLabel(session: { date: string }): string {
 export function formatPeriodDate(dateString: string | null): string {
     if (!dateString) return '';
 
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(getLocale(), {
         month: 'short',
         day: 'numeric'
     }).format(parseLocalDate(dateString));
@@ -130,7 +131,7 @@ export function formatTrendBucketLabel(bucketStart: string, period: DashboardPer
     const date = parseLocalDate(bucketStart);
 
     if (period === 'week') {
-        return new Intl.DateTimeFormat('en-US', {
+        return new Intl.DateTimeFormat(getLocale(), {
             weekday: 'short'
         }).format(date);
     }
@@ -139,7 +140,7 @@ export function formatTrendBucketLabel(bucketStart: string, period: DashboardPer
         return String(date.getDate());
     }
 
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(getLocale(), {
         month: 'short'
     }).format(date);
 }

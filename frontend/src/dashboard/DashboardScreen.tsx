@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { useT, type TranslationKey } from '../i18n/i18n';
 import { getElement } from '../lib/dom';
-import { formatLocalDate, formatPeriodDate, parseLocalDate } from '../lib/dates';
+import { formatLocalDate, formatMonthName, formatPeriodDate, parseLocalDate } from '../lib/dates';
 import { formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { waitForMinimumFeedback } from '../lib/timing';
@@ -38,7 +38,7 @@ const METRICS = [
 function getPeriodLabel(period: DashboardPeriod, range: PeriodRange): string {
     if (period === 'all_time' || range.start_date === null) return '';
     if (period === 'month') {
-        return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(parseLocalDate(range.start_date));
+        return formatMonthName(parseLocalDate(range.start_date));
     }
     if (period === 'year') return String(parseLocalDate(range.start_date).getFullYear());
     return `${formatPeriodDate(range.start_date)} – ${formatPeriodDate(range.end_date)}`;

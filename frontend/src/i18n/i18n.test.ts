@@ -1,13 +1,17 @@
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { en } from './en';
 import { es } from './es';
-import { languageStore, setLanguage, t, translate, useT, type TranslationKey } from './i18n';
+import { DEFAULT_LANGUAGE, getLocale, languageStore, loadLanguage, setLanguage, t, translate, useT, type TranslationKey } from './i18n';
 
-afterEach(() => {
+/** Take away the two Spanish texts that the tests below put in, or the real ones. */
+function clearSpanishTexts(): void {
     delete es['common.retry'];
     delete es['review.target'];
-});
+}
+
+beforeEach(clearSpanishTexts);
+afterEach(clearSpanishTexts);
 
 describe('t', () => {
     it('returns the English text of a key', () => {
@@ -28,7 +32,33 @@ describe('t', () => {
 });
 
 describe('the language', () => {
-    it('starts in English', () => {
+    it('is Spanish when nobody chose a language', () => {
+        expect(DEFAULT_LANGUAGE).toBe('es');
+        expect(loadLanguage()).toBe('es');
+    });
+
+    it('remembers the language that was chosen, in this browser', () => {
+        setLanguage('en');
+        expect(loadLanguage()).toBe('en');
+        setLanguage('es');
+        expect(loadLanguage()).toBe('es');
+    });
+
+    it('ignores a saved language it does not know', () => {
+        localStorage.setItem('executionOS_language', 'fr');
+        expect(loadLanguage()).toBe('es');
+    });
+
+    it('sets the language of the page, and the locale of dates', () => {
+        setLanguage('en');
+        expect(document.documentElement.lang).toBe('en');
+        expect(getLocale()).toBe('en-US');
+        setLanguage('es');
+        expect(document.documentElement.lang).toBe('es');
+        expect(getLocale()).toBe('es');
+    });
+
+    it('starts in English in the tests', () => {
         expect(languageStore.get().language).toBe('en');
     });
 

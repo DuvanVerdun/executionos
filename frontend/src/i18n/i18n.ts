@@ -16,8 +16,23 @@ type TranslationArguments<Key extends TranslationKey> = [Slots<(typeof en)[Key]>
     ? []
     : [values: Record<Slots<(typeof en)[Key]>, string | number>];
 
+/** The language the app shows when nobody chose one. */
+export const DEFAULT_LANGUAGE: Language = 'es';
+
+const LANGUAGE_STORAGE_KEY = 'executionOS_language';
+
+/** Return the language that was chosen in this browser, or the default one. */
+export function loadLanguage(): Language {
+    try {
+        const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+        return stored === 'en' || stored === 'es' ? stored : DEFAULT_LANGUAGE;
+    } catch {
+        return DEFAULT_LANGUAGE;
+    }
+}
+
 /** The language the app shows now. */
-export const languageStore = createStore<{ language: Language }>({ language: 'en' });
+export const languageStore = createStore<{ language: Language }>({ language: loadLanguage() });
 
 const dictionaries: Record<Language, Partial<Record<TranslationKey, string>>> = { en, es };
 
@@ -44,7 +59,18 @@ export function useT(): typeof t {
     return t;
 }
 
-/** Change the language the app shows. */
+/** Change the language the app shows, and remember it in this browser. */
 export function setLanguage(language: Language): void {
     languageStore.set({ language });
+    document.documentElement.lang = language;
+    try {
+        localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+    } catch {
+        return;
+    }
+}
+
+/** Return the locale that dates and numbers follow in the language the app shows now. */
+export function getLocale(): string {
+    return languageStore.get().language === 'es' ? 'es' : 'en-US';
 }

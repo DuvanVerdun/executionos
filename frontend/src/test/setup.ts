@@ -29,6 +29,7 @@ remember(authFormStore);
 remember(authStore);
 remember(dashboardStore);
 remember(feedbackStore);
+languageStore.set({ language: 'en' });
 remember(languageStore);
 remember(roomSessionStore);
 remember(roomStore);

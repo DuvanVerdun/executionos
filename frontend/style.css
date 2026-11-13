@@ -832,8 +832,11 @@ button {
     user-select: none;
 }
 
+#plan-user-menu-language-btn,
 #plan-user-menu-logout-btn,
+#dashboard-user-menu-language-btn,
 #dashboard-user-menu-logout-btn,
+#rooms-user-menu-language-btn,
 #rooms-user-menu-logout-btn,
 #plan-user-menu-feedback-btn,
 #dashboard-user-menu-feedback-btn,
@@ -854,8 +857,11 @@ button {
     cursor: pointer;
 }
 
+#plan-user-menu-language-btn:hover,
 #plan-user-menu-logout-btn:hover,
+#dashboard-user-menu-language-btn:hover,
 #dashboard-user-menu-logout-btn:hover,
+#rooms-user-menu-language-btn:hover,
 #rooms-user-menu-logout-btn:hover,
 #plan-user-menu-feedback-btn:hover,
 #dashboard-user-menu-feedback-btn:hover,
@@ -2136,6 +2142,7 @@ button {
     #plan-user-menu,
     #dashboard-user-menu,
     #rooms-user-menu,
+    .language-menu,
     #dashboard-feedback-form,
     .floating-message {
         background-color: rgb(20 20 20 / 85%);
@@ -4195,4 +4202,48 @@ body[data-screen="room"] .floating-message {
 .landing-animated .landing-hero.is-revealed .landing-word {
     animation: landing-focus 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
     animation-delay: calc(0.15s + var(--word) * 0.1s);
+}
+
+
+.language-menu-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.language-menu {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 8 * var(--menu-size-unit));
+    z-index: 21;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: calc(8 * var(--menu-size-unit));
+    min-width: 100%;
+    padding: calc(8 * var(--menu-size-unit));
+    border: var(--menu-size-unit) solid var(--color-border);
+    border-radius: calc(24 * var(--menu-size-unit));
+    background-color: var(--color-surface);
+}
+
+.language-menu button {
+    width: 100%;
+    padding: calc(16 * var(--menu-size-unit)) calc(24 * var(--menu-size-unit));
+    border: none;
+    border-radius: calc(12 * var(--menu-size-unit));
+    background-color: var(--color-page);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: calc(24 * var(--menu-size-unit));
+    line-height: 1.25;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.language-menu button[aria-checked='true'] {
+    color: var(--color-white);
+}
+
+.language-menu button:hover {
+    filter: brightness(1.1);
 }

@@ -10,6 +10,8 @@ export const en = {
     'common.loadingMore': 'Loading more...',
     'common.moreSessionsFailed': "Couldn't load more sessions.",
     'common.serverUnreachable': "Couldn't reach the server. Try again.",
+    'common.minutesShort': 'm',
+    'common.secondsLong': 'sec',
 
     'nav.plan': 'Plan',
     'nav.dashboard': 'Dashboard',
@@ -19,6 +21,8 @@ export const en = {
     'header.openUserMenu': 'Open user menu',
     'header.sendFeedback': 'Send Feedback',
     'header.logout': 'Logout',
+    'header.language': 'Language',
+    'header.chooseLanguage': 'Choose a language',
 
     'loading.unreachable': "Couldn't reach the server. Try again in a moment.",
     'loading.retry': 'Retry',

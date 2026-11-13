@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useT, type TranslationKey } from '../i18n/i18n';
 import { at } from '../lib/arrays';
-import { parseLocalDate } from '../lib/dates';
+import { formatMonthAndYear, parseLocalDate } from '../lib/dates';
 import { formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import type { CalendarDay } from '../types/dashboard';
@@ -56,10 +56,7 @@ export function StreakPopup({ screen }: { screen: HeaderScreenName }) {
     if (view === 'idle') return null;
 
     const isLoading = view === 'loading';
-    const title = new Intl.DateTimeFormat('en-US', {
-        month: 'long',
-        year: 'numeric'
-    }).format(parseLocalDate(`${calendar.month}-01`));
+    const title = formatMonthAndYear(parseLocalDate(`${calendar.month}-01`));
 
     const header = (
         <div className="streak-calendar-header">

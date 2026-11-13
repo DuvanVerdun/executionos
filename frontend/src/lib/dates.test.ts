@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { setLanguage } from '../i18n/i18n';
 import {
     addDays,
     formatLocalDate,
@@ -148,5 +149,15 @@ describe('the long and short names of a date', () => {
     it('writes the month, and the month with its year', () => {
         expect(formatMonthName(new Date(2026, 10, 12))).toBe('November');
         expect(formatMonthAndYear(new Date(2026, 10, 12))).toBe('November 2026');
+    });
+});
+
+describe('the names of dates in Spanish', () => {
+    it('follow the language of the app', () => {
+        setLanguage('es');
+        expect(formatLongDate(new Date(2026, 10, 12))).toBe('jueves, 12 de noviembre');
+        expect(formatMonthName(new Date(2026, 10, 12))).toBe('noviembre');
+        expect(formatMonthAndYear(new Date(2026, 10, 12))).toBe('noviembre de 2026');
+        expect(formatTrendBucketLabel('2026-11-09', 'week')).toBe('lun');
     });
 });
