@@ -14,6 +14,7 @@ import {
     handleDashboardToPlan,
     loadDashboard
 } from './dashboard';
+import { FilterMenu } from './FilterMenu';
 import { PeriodControls } from './PeriodControls';
 import { SessionHistory } from './SessionHistory';
 import { TrendChart } from './TrendChart';
@@ -39,7 +40,7 @@ function scrollBackToStats(summary: HTMLElement | null): void {
 /** Draw the Dashboard screen. */
 export function DashboardScreen() {
     const t = useT();
-    const { period, metric, surface, data } = useStore(dashboardStore);
+    const { period, metric, surface, data, loadedKey } = useStore(dashboardStore);
     const [isRetrying, setIsRetrying] = useState(false);
     const [isBackDisabled, setIsBackDisabled] = useState(true);
     const listRef = useRef<HTMLDivElement>(null);
@@ -138,21 +139,17 @@ export function DashboardScreen() {
 
                                 <section className="dashboard-trend-section">
 
-                                    <div className="dashboard-metric-toggle">
-                                        {METRICS.map(/** Draw a trend metric button. */ (option) => (
-                                            <button
-                                                key={option.value}
-                                                type="button"
-                                                data-dashboard-metric={option.value}
-                                                className={metric === option.value ? 'active' : undefined}
-                                                onClick={() => { changeDashboardMetric(option.value); }}
-                                            >
-                                                {t(option.label)}
-                                            </button>
-                                        ))}
+                                    <div className="dashboard-trend-header">
+                                        <h2 className="dashboard-content-title">{t('dashboard.chartTitle')}</h2>
+                                        <FilterMenu
+                                            label="dashboard.chooseMetric"
+                                            options={METRICS}
+                                            selected={metric}
+                                            onSelect={changeDashboardMetric}
+                                        />
                                     </div>
 
-                                    <TrendChart buckets={data.trend} period={period} metric={metric} />
+                                    <TrendChart key={`${loadedKey}:${metric}`} buckets={data.trend} period={period} metric={metric} />
 
                                 </section>
 

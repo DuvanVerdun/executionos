@@ -1,10 +1,9 @@
-import { useRef, useState } from 'react';
-import { useDocumentEvent } from '../hooks/useDocumentEvent';
 import { useT, type TranslationKey } from '../i18n/i18n';
 import { formatLocalDate, formatMonthName, formatPeriodDate, parseLocalDate } from '../lib/dates';
 import { useStore } from '../lib/store';
 import type { DashboardPeriod } from '../types/dashboard';
 import { changeDashboardPeriod, dashboardStore, moveDashboardPeriod, type PeriodRange } from './dashboard';
+import { FilterMenu } from './FilterMenu';
 
 const PERIODS = [
     { value: 'week', label: 'dashboard.week' },
@@ -27,15 +26,8 @@ function getPeriodLabel(period: DashboardPeriod, range: PeriodRange): string {
 export function PeriodControls() {
     const t = useT();
     const { period, periodRange } = useStore(dashboardStore);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const filterRef = useRef<HTMLDivElement>(null);
     const isAllTime = period === 'all_time';
     const today = formatLocalDate(new Date());
-
-    useDocumentEvent('click', /** Close the period menu when a click occurs outside it. */ (event) => {
-        if (event.target instanceof Node && filterRef.current?.contains(event.target)) return;
-        setIsMenuOpen(false);
-    }, isMenuOpen);
 
     return (
         <div className="dashboard-period-controls">
@@ -63,34 +55,12 @@ export function PeriodControls() {
                 </button>
             </div>
 
-            <div ref={filterRef} className="dashboard-period-filter">
-                <button
-                    type="button"
-                    className="dashboard-period-filter-btn"
-                    aria-label={t('dashboard.choosePeriod')}
-                    aria-haspopup="menu"
-                    aria-expanded={isMenuOpen}
-                    onClick={() => { setIsMenuOpen(!isMenuOpen); }}
-                >
-                    <span className="material-symbols-outlined" aria-hidden="true">filter_list</span>
-                </button>
-                {isMenuOpen && (
-                    <div className="dashboard-period-menu" role="menu" aria-label={t('dashboard.choosePeriod')}>
-                        {PERIODS.map(/** Draw the button of one period. The selected one is checked. */ (option) => (
-                            <button
-                                key={option.value}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={option.value === period}
-                                data-dashboard-period={option.value}
-                                onClick={() => { setIsMenuOpen(false); void changeDashboardPeriod(option.value); }}
-                            >
-                                {t(option.label)}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
+            <FilterMenu
+                label="dashboard.choosePeriod"
+                options={PERIODS}
+                selected={period}
+                onSelect={(value) => { void changeDashboardPeriod(value); }}
+            />
         </div>
     );
 }

@@ -81,12 +81,8 @@ def calculate_streak_states(
     )
 
 
-def get_streak_data(
-    user_id: int,
-    anchor_date: date,
-    timezone: ZoneInfo,
-) -> dict[str, Any]:
-    sessions = list(
+def _get_user_sessions(user_id: int) -> list[Session]:
+    return list(
         db.session.execute(
             select(Session)
             .where(Session.user_id == user_id)
@@ -95,6 +91,32 @@ def get_streak_data(
         .scalars()
         .all()
     )
+
+
+def get_rest_dates(user_id: int, timezone: ZoneInfo) -> set[date]:
+    """Return the days that count as rest days in the user's streak."""
+    today = datetime.now(UTC).astimezone(timezone).date()
+
+    work_dates = {
+        session_local_date(session, timezone)
+        for session in _get_user_sessions(user_id)
+        if session.actual_time_seconds > 0
+    }
+
+    _, _, states = calculate_streak_states(
+        {work_date for work_date in work_dates if work_date <= today},
+        today,
+    )
+
+    return {day for day, state in states.items() if state == "rest"}
+
+
+def get_streak_data(
+    user_id: int,
+    anchor_date: date,
+    timezone: ZoneInfo,
+) -> dict[str, Any]:
+    sessions = _get_user_sessions(user_id)
 
     today = datetime.now(UTC).astimezone(timezone).date()
 

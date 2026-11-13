@@ -132,6 +132,20 @@ def test_dashboard_numbers_and_days_follow_the_users_timezone(app: Flask):
     assert sessions_per_day(in_buenos_aires) == {"2026-10-27": 2}
 
 
+def test_daily_trend_days_say_whether_they_were_rest_days(app: Flask):
+    ana = make_account(app, "ana")
+    save_session(ana, date="2026-10-26T12:00:00Z", actualTimeSeconds=600)
+
+    week = dashboard(ana, "week", "2026-10-26", "UTC")
+    month = dashboard(ana, "month", "2026-10-01", "UTC")
+    year = dashboard(ana, "year", "2026-10-01", "UTC")
+
+    # The streak gives two rest days after the work, and the days after them are missed.
+    assert [day["is_rest_day"] for day in week["trend"]] == [False, True, True, False, False, False, False]
+    assert [day["bucket_start"] for day in month["trend"] if day["is_rest_day"]] == ["2026-10-27", "2026-10-28"]
+    assert not any(bucket["is_rest_day"] for bucket in year["trend"])
+
+
 def test_dashboard_and_session_list_show_only_the_users_own_sessions(app: Flask):
     ana = make_account(app, "ana")
     bob = make_account(app, "bob")

@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import { at } from '../lib/arrays';
 import type { TrendBucket } from '../types/dashboard';
-import { createTrendCurvePath, formatTrendMetricValue, getTrendAxisTicks, getTrendMetricValue, type ChartPoint } from './chart-math';
+import {
+    createTrendCurvePath,
+    formatTrendMetricValue,
+    getNearestPoint,
+    getTrendAxisTicks,
+    getTrendLabelIndexes,
+    getTrendMetricValue,
+    type ChartPoint
+} from './chart-math';
 
 const bucket: TrendBucket = {
     bucket_start: '2026-11-09',
     total_time_seconds: 3600,
     total_sessions: 3,
-    average_completion_percentage: 66.6
+    average_completion_percentage: 66.6,
+    is_rest_day: false
 };
 
 /** Make a chart point at a position. */
@@ -65,5 +75,35 @@ describe('createTrendCurvePath', () => {
     it('keeps the curve flat at a peak, so it does not overshoot', () => {
         const path = createTrendCurvePath([point(0, 0), point(30, 90), point(60, 0)]);
         expect(path).toMatch(/ 20,90 /);
+    });
+});
+
+describe('getTrendLabelIndexes', () => {
+    it('labels every bucket when there are few of them', () => {
+        expect(getTrendLabelIndexes(7, 8)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    });
+
+    it.each([28, 29, 30, 31])('labels the first and the last day of a month of %d days, with gaps that differ by at most 1', (days) => {
+        const indexes = getTrendLabelIndexes(days, 8);
+        const gaps = indexes.slice(1).map(/** Measure the distance to the previous label. */ (index, position) => index - at(indexes, position));
+        expect(indexes[0]).toBe(0);
+        expect(indexes.at(-1)).toBe(days - 1);
+        expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
+    });
+
+    it('labels the only bucket of a chart', () => {
+        expect(getTrendLabelIndexes(1, 8)).toEqual([0]);
+    });
+});
+
+describe('getNearestPoint', () => {
+    it('picks the point closest to a horizontal position', () => {
+        const points = [point(10, 0), point(50, 0), point(90, 0)];
+        expect(getNearestPoint(points, 62)).toBe(points[1]);
+        expect(getNearestPoint(points, 80)).toBe(points[2]);
+    });
+
+    it('finds nothing without points', () => {
+        expect(getNearestPoint([], 10)).toBeNull();
     });
 });

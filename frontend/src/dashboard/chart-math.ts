@@ -71,3 +71,21 @@ export function createTrendCurvePath(points: ChartPoint[]): string {
     });
     return path;
 }
+
+/**
+ * Choose which buckets get a label and a vertical gridline: the first, the last, and the ones between them as evenly spaced as whole buckets allow.
+ * A month of 30 days has gaps of 4 and 5 days, and never two labels side by side.
+ */
+export function getTrendLabelIndexes(bucketCount: number, maxLabels: number): number[] {
+    const labelCount = Math.min(bucketCount, maxLabels);
+    if (labelCount < 2) return [0];
+    return Array.from({ length: labelCount }, /** Spread the labels from the first bucket to the last one. */ (_, label) =>
+        Math.round(label * (bucketCount - 1) / (labelCount - 1))
+    );
+}
+
+/** Return the point whose position is the closest to an horizontal position, or null when there are no points. */
+export function getNearestPoint(points: ChartPoint[], x: number): ChartPoint | null {
+    return points.reduce<ChartPoint | null>(/** Keep the closest point so far. */ (nearest, point) =>
+        nearest === null || Math.abs(point.x - x) < Math.abs(nearest.x - x) ? point : nearest, null);
+}

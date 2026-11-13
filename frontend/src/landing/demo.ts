@@ -137,7 +137,8 @@ export function demoTrend(today: Date): TrendBucket[] {
             bucket_start: formatLocalDate(addDays(today, -daysAgo)),
             total_time_seconds: demoFocusMinutes(daysAgo) * 60,
             total_sessions: demoSessions(daysAgo),
-            average_completion_percentage: AVERAGE_COMPLETION_PERCENTAGE
+            average_completion_percentage: AVERAGE_COMPLETION_PERCENTAGE,
+            is_rest_day: false
         };
     });
 }

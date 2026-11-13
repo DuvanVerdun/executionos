@@ -11,6 +11,9 @@ export type TranslationKey = keyof typeof en;
 /** The names of the `{slots}` inside a text. */
 type Slots<Text extends string> = Text extends `${string}{${infer Name}}${infer Rest}` ? Name | Slots<Rest> : never;
 
+/** The keys whose texts have no `{slots}`, so they need nothing besides themselves. */
+export type PlainTranslationKey = { [Key in TranslationKey]: [Slots<(typeof en)[Key]>] extends [never] ? Key : never }[TranslationKey];
+
 /** What a key needs besides itself: nothing, or the values for its slots. */
 type TranslationArguments<Key extends TranslationKey> = [Slots<(typeof en)[Key]>] extends [never]
     ? []

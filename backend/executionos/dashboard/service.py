@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
+from executionos.dashboard.streak import get_rest_dates
 from executionos.extensions import db
 from executionos.models import Session
 from executionos.sessions.history import SessionSummaryAccumulator, session_completion_percentage, session_local_date
@@ -117,6 +118,7 @@ def _build_trend(
     anchor_date: date,
     bounds: PeriodBounds,
     timezone: ZoneInfo,
+    rest_dates: set[date],
 ) -> list[dict[str, Any]]:
     bucket_starts = _get_trend_bucket_starts(
         period,
@@ -168,6 +170,7 @@ def _build_trend(
             "total_time_seconds": accumulator.total_time_seconds,
             "total_sessions": accumulator.total_sessions,
             "average_completion_percentage": average_completion,
+            "is_rest_day": bucket_start in rest_dates,
         })
 
     return trend
@@ -186,6 +189,13 @@ def get_dashboard_data(
     )
 
     sessions = _get_sessions_for_period(user_id, bounds)
+
+    # Only the daily buckets of a week or a month can be rest days.
+    rest_dates = (
+        get_rest_dates(user_id, timezone)
+        if period in ("week", "month")
+        else set()
+    )
 
     total_sessions = len(sessions)
     total_time_seconds = sum(
@@ -237,5 +247,6 @@ def get_dashboard_data(
             anchor_date,
             bounds,
             timezone,
+            rest_dates,
         ),
     }

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCurrentScreenName, screenStore } from '../shared/navigation';
@@ -155,17 +155,16 @@ describe('the calendar of the first section', () => {
         expect(card).toHaveTextContent('2 sessions · 1h 50m focused');
     });
 
-    it('shows the summary of the day under the mouse at once, and brings yesterday back 3 seconds after it leaves', async () => {
+    it('shows the summary of the day under the mouse at once, and brings yesterday back 3 seconds after it leaves', () => {
         vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
         vi.setSystemTime(new Date(2026, 10, 12, 12, 0));
-        const user = userEvent.setup({ delay: null });
         render(<LandingScreen />);
         const hero = section(HERO);
         act(() => { vi.advanceTimersByTime(3000); });
-        await user.hover(within(hero).getByText('10'));
+        fireEvent.mouseEnter(within(hero).getByText('10'));
         expect(within(hero).getAllByRole('tooltip')).toHaveLength(1);
         expect(within(hero).getByRole('tooltip')).toHaveTextContent('Tue, Nov 10');
-        await user.unhover(within(hero).getByText('10'));
+        fireEvent.mouseLeave(within(hero).getByText('10'));
         expect(within(hero).queryByRole('tooltip')).toBeNull();
         act(() => { vi.advanceTimersByTime(3000); });
         expect(within(hero).getByRole('tooltip')).toHaveTextContent('Wed, Nov 11');

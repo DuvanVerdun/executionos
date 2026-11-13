@@ -62,7 +62,7 @@ export function SessionMenu({ sessionId, mission, screen, isOpen, onToggle, onMi
     return (
         <>
             <span
-                className="material-symbols-outlined dashboard-session-open-menu-icon dashboard-session-toggle-menu-icon"
+                className={`material-symbols-outlined dashboard-session-open-menu-icon dashboard-session-toggle-menu-icon${isOpen ? ' is-open' : ''}`}
                 onClick={onToggle}
             >
                 more_vert

@@ -7,6 +7,8 @@ export interface TrendBucket {
     total_time_seconds: number;
     total_sessions: number;
     average_completion_percentage: number | null;
+    /** A day of a week or a month that the streak counted as rest. Months and years have none. */
+    is_rest_day: boolean;
 }
 
 export interface DashboardData {
