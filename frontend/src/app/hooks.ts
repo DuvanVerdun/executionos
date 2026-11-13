@@ -1,7 +1,7 @@
 import { authFormStore } from '../auth/forms-state';
 import { setLoginRequiredHandler } from '../auth/http';
 import { authStore } from '../auth/state';
-import { leaveDashboardScreen } from '../dashboard/dashboard';
+import { leaveDashboardScreen, resetDashboardData } from '../dashboard/dashboard';
 import { t } from '../i18n/i18n';
 import { closeFeedbackForm } from '../feedback/feedback';
 import { leaveRoomScreen } from '../rooms/room';
@@ -48,10 +48,11 @@ export function registerNavigationHooks(): void {
             closeUserMenu();
         }
     });
-    addBeforeSwitchHook(/** Forget room data when the user reaches the Landing, Login, Register or Loading. */ (nextScreen) => {
+    addBeforeSwitchHook(/** Forget room and Dashboard data when the user reaches the Landing, Login, Register or Loading. */ (nextScreen) => {
         if (nextScreen === 'landing' || nextScreen === 'login' || nextScreen === 'register' || nextScreen === 'loading') {
             resetRoomSessionClient();
             resetRoomsData();
+            resetDashboardData();
             roomSnapshotCache.clear();
         }
     });

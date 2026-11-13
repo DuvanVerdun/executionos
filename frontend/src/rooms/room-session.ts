@@ -267,7 +267,7 @@ async function updateCheckinCountdown(): Promise<void> {
     const state = roomSessionStore.get();
     const deadlineAtMs = state.checkin.deadlineAtMs ?? Date.now();
     const remainingSeconds = Math.ceil((deadlineAtMs - Date.now()) / 1000);
-    roomSessionStore.update({ checkinCountdown: `${formatCountdown(Math.max(0, remainingSeconds))} left to respond` });
+    roomSessionStore.update({ checkinCountdown: t('checkin.countdown', { time: formatCountdown(Math.max(0, remainingSeconds)) }) });
     if (remainingSeconds > 0 || state.countdownRefreshed) return;
     roomSessionStore.update({ countdownRefreshed: true });
     await refreshRoomSession();

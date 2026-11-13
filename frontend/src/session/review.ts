@@ -1,5 +1,5 @@
 import { authStore } from '../auth/state';
-import { loadDashboard } from '../dashboard/dashboard';
+import { loadDashboard, resetDashboardData } from '../dashboard/dashboard';
 import { t } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
 import { waitForMinimumFeedback } from '../lib/timing';
@@ -117,6 +117,7 @@ export async function handleFinishWork(): Promise<void> {
         await waitForMinimumFeedback(feedbackStartedAt);
         if (authStore.get().userId !== userId) return;
         resetApp();
+        resetDashboardData();
         navigateTo('dashboard', 'review');
         setFloatingMessage(saved
             ? t('session.saved')

@@ -3,7 +3,7 @@ import { initializeStreakState } from '../streak/streak';
 import { fakeBackendByPath, requestedPaths, type FakeAnswer } from '../test/network';
 import type { DashboardData } from '../types/dashboard';
 import type { HistoryCursor, HistorySession } from '../types/session';
-import { dashboardStore, loadDashboard, refreshDashboard, setSessionMission, type DashboardSurface } from './dashboard';
+import { dashboardStore, loadDashboard, refreshDashboard, resetDashboardData, setSessionMission, type DashboardSurface } from './dashboard';
 
 /** Make a saved session with the given ID. */
 function session(id: number): HistorySession {
@@ -50,6 +50,7 @@ function showSessions(ids: number[], nextCursor: HistoryCursor | null): void {
 beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     initializeStreakState();
+    resetDashboardData();
 });
 
 describe('refreshing the Dashboard after a delete', () => {
@@ -162,5 +163,59 @@ describe('loading the Dashboard', () => {
         stopListening();
         expect(seen).toContain('loading');
         expect(dashboardStore.get().surface).toBe('data');
+    });
+});
+
+describe('coming back to the Dashboard', () => {
+    /** Answer the Dashboard requests with one session. */
+    function answerWithOneSession(): void {
+        fakeBackendByPath(/** Answer each request. */ (path) => (path.startsWith('dashboard') ? { status: 200, body: summary(1) } : path.startsWith('get-sessions') ? page([1], null) : { status: 500 }));
+    }
+
+    it('keeps the loaded data on screen while the new data loads', async () => {
+        answerWithOneSession();
+        dashboardStore.update({ anchorDates: { week: '2026-11-09', month: '', year: '', all_time: '' } });
+        await loadDashboard();
+        const seen: DashboardSurface[] = [];
+        const stopListening = dashboardStore.subscribe(/** Record the surface after each change. */ () => { seen.push(dashboardStore.get().surface); });
+        await loadDashboard();
+        stopListening();
+        expect(seen).not.toContain('loading');
+        expect(dashboardStore.get().surface).toBe('data');
+    });
+
+    it('shows the loading screen again when the period changes', async () => {
+        answerWithOneSession();
+        dashboardStore.update({ anchorDates: { week: '2026-11-09', month: '', year: '', all_time: '' } });
+        await loadDashboard();
+        dashboardStore.update({ anchorDates: { week: '2026-11-02', month: '', year: '', all_time: '' } });
+        const seen: DashboardSurface[] = [];
+        const stopListening = dashboardStore.subscribe(/** Record the surface after each change. */ () => { seen.push(dashboardStore.get().surface); });
+        await loadDashboard();
+        stopListening();
+        expect(seen).toContain('loading');
+    });
+
+    it('shows the loading screen again after the data was forgotten', async () => {
+        answerWithOneSession();
+        dashboardStore.update({ anchorDates: { week: '2026-11-09', month: '', year: '', all_time: '' } });
+        await loadDashboard();
+        resetDashboardData();
+        expect(dashboardStore.get().data).toBeNull();
+        const seen: DashboardSurface[] = [];
+        const stopListening = dashboardStore.subscribe(/** Record the surface after each change. */ () => { seen.push(dashboardStore.get().surface); });
+        await loadDashboard();
+        stopListening();
+        expect(seen).toContain('loading');
+    });
+
+    it('keeps the loaded data when the new load fails', async () => {
+        answerWithOneSession();
+        dashboardStore.update({ anchorDates: { week: '2026-11-09', month: '', year: '', all_time: '' } });
+        await loadDashboard();
+        fakeBackendByPath(/** Fail every request. */ () => ({ status: 500 }));
+        await loadDashboard();
+        expect(dashboardStore.get().surface).toBe('data');
+        expect(dashboardStore.get().data?.summary.total_sessions).toBe(1);
     });
 });

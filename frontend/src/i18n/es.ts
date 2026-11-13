@@ -190,12 +190,13 @@ export const es: Partial<Record<TranslationKey, string>> = {
     'dashboard.week': 'Semana',
     'dashboard.month': 'Mes',
     'dashboard.year': 'Año',
-    'dashboard.allTime': 'Todo el tiempo',
+    'dashboard.allTime': 'Siempre',
     'dashboard.metricTime': 'Tiempo',
     'dashboard.metricCompletion': 'Completado',
     'dashboard.metricSessions': 'Sesiones',
     'dashboard.previousPeriod': 'Período anterior',
     'dashboard.nextPeriod': 'Período siguiente',
+    'dashboard.choosePeriod': 'Elegir un período',
     'dashboard.loading': 'Cargando el panel',
     'dashboard.stats': 'Estadísticas',
     'dashboard.sessionHistory': 'Historial de sesiones',
@@ -332,5 +333,6 @@ export const es: Partial<Record<TranslationKey, string>> = {
     'rooms.endDisconnectedNotSaved': 'Tu sesión terminó al cerrarse la aplicación, sin actividad. No guardada.',
 
     'checkin.title': '¿Sigues ahí?',
+    'checkin.countdown': '{time} para responder',
     'checkin.confirm': 'Sigo aquí'
 };

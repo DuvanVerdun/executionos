@@ -8,6 +8,7 @@
     --color-cta: #ed3535;
     --color-text: #b8b5b3;
     --color-white: #ffffff;
+    --color-menu-selected: color-mix(in srgb, var(--color-page) 70%, var(--color-surface));
 
     /* shadow of the app header and of every menu that hangs from it */
     --shadow-raised: 0 6px 16px rgb(0 0 0 / 35%);
@@ -744,6 +745,7 @@ button {
 #rooms-user-menu,
 .language-menu,
 .dashboard-session-menu,
+.dashboard-period-menu,
 .room-menu {
     transform-origin: 100% 0;
     animation: header-panel-in .3s cubic-bezier(.2, .8, .2, 1) both;
@@ -769,6 +771,7 @@ button {
     #rooms-user-menu,
     .language-menu,
     .dashboard-session-menu,
+    .dashboard-period-menu,
     .room-menu {
         animation: none;
     }
@@ -782,6 +785,7 @@ button {
 #rooms-user-menu,
 .language-menu,
 .dashboard-session-menu,
+.dashboard-period-menu,
 .room-menu {
     box-shadow: var(--shadow-raised);
 }
@@ -1581,7 +1585,8 @@ button {
     padding: 0;
     display: grid;
     place-items: center;
-    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
     opacity: 1;
     transition: opacity .3s ease, filter .1s ease-in;
 }
@@ -1647,11 +1652,6 @@ button {
     width: clamp(450px, 27.8vw, 534px);
     height: fit-content;
     font-size: var(--header);
-    color: var(--color-text);
-}
-
-.dashboard-weekly-stats-container .dashboard-content-title {
-    width: 100%;
     color: var(--color-text);
 }
 
@@ -1996,57 +1996,52 @@ button {
 }
 
 
-.dashboard-period-toggle button,
 .dashboard-metric-toggle button {
     background-color: var(--color-surface);
     color: var(--color-text);
     border-color: var(--color-border);
 }
 
-.dashboard-period-toggle button.active,
 .dashboard-metric-toggle button.active {
     background-color: var(--color-surface-selected);
 }
 
-.dashboard-period-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    width: 100%;
-    gap: 24px;
-}
-
-.dashboard-period-toggle {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    width: 100%;
-    border-radius: 12px;
-    background-color: var(--color-surface);
-}
-
-.dashboard-period-toggle button {
-    padding: 12px 16px;
-    border: none;
-    border-radius: 12px;
-    font-family: inherit;
-    font-size: clamp(20px, 1.67vw, 24px);
-    line-height: 1.25;
-    cursor: pointer;
-}
-
-.dashboard-period-toggle button.active {
-    color: var(--color-white);
-}
-
-.dashboard-period-navigation {
+.dashboard-stats-header {
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 8px 12px;
-    border-radius: 12px;
+    width: 100%;
+    margin-bottom: -16px;
+}
+
+.dashboard-stats-header .dashboard-content-title {
+    width: auto;
+}
+
+.dashboard-period-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.dashboard-period-navigation {
+    box-sizing: border-box;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    height: clamp(36px, 2.5vw, 48px);
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
     background-color: var(--color-surface);
-    font-size: clamp(20px, 1.67vw, 24px);
+    font-size: clamp(16px, 1.25vw, 20px);
     line-height: 1.25;
+}
+
+.dashboard-period-navigation p {
+    align-self: center;
+    padding: 0 4px;
 }
 
 .dashboard-period-navigation[hidden] {
@@ -2054,24 +2049,87 @@ button {
 }
 
 .dashboard-period-navigation button {
-    padding: 0 4px;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    padding: 0;
     border: none;
-    background: none;
+    border-radius: 50%;
+    background-color: var(--color-surface-selected);
     color: var(--color-text);
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
     cursor: pointer;
 }
 
-.dashboard-period-toggle button:hover,
+.dashboard-period-navigation .material-symbols-outlined {
+    font-size: clamp(24px, 1.9vw, 32px);
+}
+
 .dashboard-period-navigation button:hover:not(:disabled) {
-    filter: brightness(1.1);
+    filter: brightness(1.4);
 }
 
 .dashboard-period-navigation button:disabled {
     opacity: 0.4;
     cursor: default;
+}
+
+.dashboard-period-filter {
+    position: relative;
+}
+
+.dashboard-period-filter-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(36px, 2.5vw, 48px);
+    height: clamp(36px, 2.5vw, 48px);
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.dashboard-period-filter-btn:hover {
+    filter: brightness(1.1);
+}
+
+.dashboard-period-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    background-color: var(--color-surface);
+}
+
+.dashboard-period-menu button {
+    padding: 16px 24px;
+    border: none;
+    border-radius: 12px;
+    background-color: var(--color-page);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: clamp(18px, 1.25vw, 24px);
+    line-height: 1.25;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.dashboard-period-menu button[aria-checked='true'] {
+    background-color: var(--color-menu-selected);
+    color: var(--color-white);
+}
+
+.dashboard-period-menu button:hover {
+    filter: brightness(1.1);
 }
 
 
@@ -2154,7 +2212,6 @@ button {
     --skeleton-summary-row-height: calc(2 * clamp(20px, 1.67vw, 32px) + clamp(36px, 3.33vw, 48px) * 1.15 + 12px + clamp(18px, 1.67vw, 24px) * 1.25);
 }
 
-.dashboard-loading-summary,
 .dashboard-loading-history {
     display: flex;
     flex-direction: column;
@@ -2167,6 +2224,8 @@ button {
 }
 
 .dashboard-skeleton {
+    position: relative;
+    overflow: hidden;
     border-radius: 24px;
     background-color: var(--color-border);
     animation: dashboard-skeleton-brightness 1.8s ease-in-out infinite;
@@ -2194,6 +2253,24 @@ button {
 @keyframes dashboard-skeleton-brightness {
     0%, 100% { filter: brightness(0.8); }
     50% { filter: brightness(1); }
+}
+
+@keyframes dashboard-skeleton-sweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(200%); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .dashboard-skeleton::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 50%;
+        background: linear-gradient(90deg, transparent, rgb(255 255 255 / 7%), transparent);
+        animation: dashboard-skeleton-sweep 1.8s ease-in-out infinite;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4517,6 +4594,7 @@ body[data-screen="room"] .floating-message {
 }
 
 .language-menu button[aria-checked='true'] {
+    background-color: var(--color-menu-selected);
     color: var(--color-white);
 }
 

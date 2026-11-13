@@ -197,6 +197,7 @@ export const en = {
     'dashboard.metricSessions': 'Sessions',
     'dashboard.previousPeriod': 'Previous period',
     'dashboard.nextPeriod': 'Next period',
+    'dashboard.choosePeriod': 'Choose a period',
     'dashboard.loading': 'Loading dashboard',
     'dashboard.stats': 'Stats',
     'dashboard.sessionHistory': 'Session History',
@@ -333,5 +334,6 @@ export const en = {
     'rooms.endDisconnectedNotSaved': 'Your session ended when the app closed, with no activity. Not saved.',
 
     'checkin.title': 'Are you still there?',
+    'checkin.countdown': '{time} left to respond',
     'checkin.confirm': 'Still here'
 } as const;

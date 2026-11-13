@@ -34,6 +34,8 @@ interface DashboardState {
     isLoadingMore: boolean;
     paginationFailed: boolean;
     paginationMessage: string;
+    /** Which period and date the data on screen belongs to. Nothing on screen yet, or data that must not be reused, is null. */
+    loadedKey: string | null;
 }
 
 export const dashboardStore = createStore<DashboardState>({
@@ -49,7 +51,8 @@ export const dashboardStore = createStore<DashboardState>({
     isLoading: false,
     isLoadingMore: false,
     paginationFailed: false,
-    paginationMessage: ''
+    paginationMessage: '',
+    loadedKey: null
 });
 
 /** Grows with every load and every screen exit, so older results can be ignored. */
@@ -63,6 +66,24 @@ export function initializeDashboardState(): void {
             anchorDates: { ...anchorDates, [period]: normalizePeriodAnchor(period, formatLocalDate(new Date())) }
         });
     }
+}
+
+/** Name the selected period and date. */
+function getSelectionKey(): string {
+    const { period, anchorDates } = dashboardStore.get();
+    return period === 'all_time' ? period : `${period}:${anchorDates[period]}`;
+}
+
+/** Forget the loaded data, so the next visit shows the loading state. The selected period stays. Used on sign-out and after a session is finished. */
+export function resetDashboardData(): void {
+    dashboardStore.update({
+        data: null,
+        sessions: [],
+        dailySummaries: {},
+        nextCursor: null,
+        surface: 'data',
+        loadedKey: null
+    });
 }
 
 /** Return the dates of the selected period, before the server answers. */
@@ -131,7 +152,8 @@ function showDashboard(dashboardResult: ApiSuccess<DashboardData>, list: Session
         anchorDates: nextAnchorDates,
         isLoading: false,
         periodRange: { start_date: dashboardResult.period.start_date, end_date: dashboardResult.period.end_date },
-        surface: dashboardResult.summary.total_sessions === 0 ? 'empty' : 'data'
+        surface: dashboardResult.summary.total_sessions === 0 ? 'empty' : 'data',
+        loadedKey: getSelectionKey()
     });
 }
 
@@ -140,33 +162,37 @@ export async function loadDashboard(feedbackStartedAt: number | null = null): Pr
     const generation = ++loadGeneration;
     const { period, anchorDates } = dashboardStore.get();
     const anchorDate = anchorDates[period];
+    const before = dashboardStore.get();
+    /** The data of this same period and date is already on screen: it stays until the new data arrives. */
+    const isShowingLoaded = feedbackStartedAt === null && before.data !== null && before.loadedKey === getSelectionKey();
     dashboardStore.update({
         isLoading: true,
         isLoadingMore: false,
         paginationFailed: false,
-        paginationMessage: '',
-        periodRange: getSelectedPeriodRange()
+        paginationMessage: ''
     });
-    if (feedbackStartedAt === null) dashboardStore.update({ surface: 'loading' });
+    if (!isShowingLoaded) dashboardStore.update({ periodRange: getSelectedPeriodRange() });
+    if (feedbackStartedAt === null && !isShowingLoaded) dashboardStore.update({ surface: 'loading' });
+
+    /** Fetch the first sessions. Sessions already on screen are fetched again up to the same length. */
+    async function fetchFirstSessions(): Promise<SessionList> {
+        if (isShowingLoaded) return fetchSessionsAtLeast(period, anchorDate, before.sessions.length);
+        const page = await fetchSessionsPage(period, anchorDate);
+        if (!page.success) throw new Error(page.error);
+        return { sessions: page.sessions, dailySummaries: page.daily_summaries, nextCursor: page.next_cursor };
+    }
 
     try {
-        const [dashboardResult, sessionsResult] = await Promise.all([
+        const [dashboardResult, list] = await Promise.all([
             fetchDashboardData(period, anchorDate),
-            fetchSessionsPage(period, anchorDate)
+            fetchFirstSessions()
         ]);
         if (feedbackStartedAt !== null) await waitForMinimumFeedback(feedbackStartedAt);
         if (generation !== loadGeneration) return;
         if (!dashboardResult.success) {
             throw new Error(dashboardResult.error);
         }
-        if (!sessionsResult.success) {
-            throw new Error(sessionsResult.error);
-        }
-        showDashboard(dashboardResult, {
-            sessions: sessionsResult.sessions,
-            dailySummaries: sessionsResult.daily_summaries,
-            nextCursor: sessionsResult.next_cursor
-        });
+        showDashboard(dashboardResult, list);
 
         await loadStreak('dashboard');
 
@@ -177,7 +203,7 @@ export async function loadDashboard(feedbackStartedAt: number | null = null): Pr
             'Dashboard loading error:',
             error
         );
-        dashboardStore.update({ surface: 'error' });
+        if (!isShowingLoaded) dashboardStore.update({ surface: 'error' });
 
     } finally {
         if (generation === loadGeneration) {

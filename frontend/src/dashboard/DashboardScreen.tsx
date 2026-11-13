@@ -1,48 +1,28 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { useT, type TranslationKey } from '../i18n/i18n';
 import { getElement } from '../lib/dom';
-import { formatLocalDate, formatMonthName, formatPeriodDate, parseLocalDate } from '../lib/dates';
 import { formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { waitForMinimumFeedback } from '../lib/timing';
 import { syncOfflineWork } from '../session/sync';
 import { Header } from '../shared/Header';
 import { Screen } from '../shared/Screen';
-import type { DashboardMetric, DashboardPeriod } from '../types/dashboard';
+import type { DashboardMetric } from '../types/dashboard';
 import {
     changeDashboardMetric,
-    changeDashboardPeriod,
     dashboardStore,
     handleDashboardToPlan,
-    loadDashboard,
-    moveDashboardPeriod,
-    type PeriodRange
+    loadDashboard
 } from './dashboard';
+import { PeriodControls } from './PeriodControls';
 import { SessionHistory } from './SessionHistory';
 import { TrendChart } from './TrendChart';
-
-const PERIODS = [
-    { value: 'week', label: 'dashboard.week' },
-    { value: 'month', label: 'dashboard.month' },
-    { value: 'year', label: 'dashboard.year' },
-    { value: 'all_time', label: 'dashboard.allTime' }
-] as const satisfies readonly { value: DashboardPeriod; label: TranslationKey }[];
 
 const METRICS = [
     { value: 'time', label: 'dashboard.metricTime' },
     { value: 'completion', label: 'dashboard.metricCompletion' },
     { value: 'sessions', label: 'dashboard.metricSessions' }
 ] as const satisfies readonly { value: DashboardMetric; label: TranslationKey }[];
-
-/** Return the text of the period label: a month, a year, a range of days, or nothing for all time. */
-function getPeriodLabel(period: DashboardPeriod, range: PeriodRange): string {
-    if (period === 'all_time' || range.start_date === null) return '';
-    if (period === 'month') {
-        return formatMonthName(parseLocalDate(range.start_date));
-    }
-    if (period === 'year') return String(parseLocalDate(range.start_date).getFullYear());
-    return `${formatPeriodDate(range.start_date)} – ${formatPeriodDate(range.end_date)}`;
-}
 
 /** Return to Stats below the sticky header, respecting reduced motion. */
 function scrollBackToStats(summary: HTMLElement | null): void {
@@ -59,7 +39,7 @@ function scrollBackToStats(summary: HTMLElement | null): void {
 /** Draw the Dashboard screen. */
 export function DashboardScreen() {
     const t = useT();
-    const { period, metric, periodRange, surface, data } = useStore(dashboardStore);
+    const { period, metric, surface, data } = useStore(dashboardStore);
     const [isRetrying, setIsRetrying] = useState(false);
     const [isBackDisabled, setIsBackDisabled] = useState(true);
     const listRef = useRef<HTMLDivElement>(null);
@@ -101,8 +81,6 @@ export function DashboardScreen() {
         }
     }
 
-    const isAllTime = period === 'all_time';
-    const today = formatLocalDate(new Date());
     return (
         <Screen name="dashboard" className="dashboard-screen">
 
@@ -112,53 +90,13 @@ export function DashboardScreen() {
 
                 <section id="dashboard-content" className="dashboard-content">
 
-                    <section className="dashboard-period-controls">
-
-                        <div className="dashboard-period-toggle">
-                            {PERIODS.map(/** Draw a period button. */ (option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    data-dashboard-period={option.value}
-                                    className={period === option.value ? 'active' : undefined}
-                                    onClick={() => { void changeDashboardPeriod(option.value); }}
-                                >
-                                    {t(option.label)}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="dashboard-period-navigation" hidden={isAllTime}>
-                            <button
-                                type="button"
-                                id="dashboard-previous-period-btn"
-                                aria-label={t('dashboard.previousPeriod')}
-                                disabled={isAllTime}
-                                onClick={() => { void moveDashboardPeriod(-1); }}
-                            >
-                                ‹
-                            </button>
-
-                            <p id="dashboard-period-label">{getPeriodLabel(period, periodRange)}</p>
-
-                            <button
-                                type="button"
-                                id="dashboard-next-period-btn"
-                                aria-label={t('dashboard.nextPeriod')}
-                                disabled={isAllTime || periodRange.end_date >= today}
-                                onClick={() => { void moveDashboardPeriod(1); }}
-                            >
-                                ›
-                            </button>
-                        </div>
-
+                    <section ref={summaryRef} className="dashboard-stats-header" tabIndex={-1}>
+                        {surface !== 'empty' && surface !== 'error' && <h2 className="dashboard-content-title">{t('dashboard.stats')}</h2>}
+                        <PeriodControls />
                     </section>
 
                     <div id="dashboard-loading" className="dashboard-loading" role="status" aria-label={t('dashboard.loading')} style={{ display: surface === 'loading' ? 'flex' : 'none' }}>
-                        <section className="dashboard-loading-summary" aria-hidden="true">
-                            <h2 className="dashboard-content-title">{t('dashboard.stats')}</h2>
-                            <div className="dashboard-skeleton dashboard-skeleton-summary"></div>
-                        </section>
+                        <div className="dashboard-skeleton dashboard-skeleton-summary" aria-hidden="true"></div>
                         <div className="dashboard-skeleton dashboard-skeleton-chart" aria-hidden="true"></div>
                         <section className="dashboard-loading-history" aria-hidden="true">
                             <h2 className="dashboard-content-title">{t('dashboard.sessionHistory')}</h2>
@@ -169,16 +107,7 @@ export function DashboardScreen() {
                     <div id="dashboard-data-container" style={{ display: surface === 'data' ? 'block' : 'none' }}>
                         {data && (
                             <>
-                                <section
-                                    ref={summaryRef}
-                                    id="dashboard-summary-container"
-                                    className="dashboard-weekly-stats-container"
-                                    tabIndex={-1}
-                                >
-                                    <h2 className="dashboard-content-title">
-                                        {t('dashboard.stats')}
-                                    </h2>
-
+                                <section id="dashboard-summary-container" className="dashboard-weekly-stats-container">
                                     <div className="dashboard-summary-grid">
                                         <div className="dashboard-summary-card">
                                             <p id="dashboard-total-time-display" className="dashboard-summary-value">
