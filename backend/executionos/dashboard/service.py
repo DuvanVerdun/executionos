@@ -191,7 +191,7 @@ def get_dashboard_data(
     sessions = _get_sessions_for_period(user_id, bounds)
 
     # Only the daily buckets of a week or a month can be rest days.
-    rest_dates = (
+    rest_dates: set[date] = (
         get_rest_dates(user_id, timezone)
         if period in ("week", "month")
         else set()

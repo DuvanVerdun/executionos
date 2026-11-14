@@ -116,6 +116,21 @@ After implementation:
 
 Do not claim untested behavior works.
 
+Before answering that a change is done, run the checks CI runs, in WSL Ubuntu:
+
+- Backend: `pyright` and `python -m pytest`.
+- Frontend: `npm run typecheck`, `npm run lint`, `npm test`.
+
+The backend venv is `backend/venv` (Python 3.13). Activate it first: `source venv/bin/activate`.
+
+If any fails, fix the cause and rerun. Don't answer until all pass.
+
+Use judgment when the problem is a test or the environment, not the code:
+
+- Don't sink time into a flaky, hanging, or broken test. Stop and tell me.
+- Never edit, skip, or loosen a test just to make it pass without telling me what and why.
+- If a check can't run, say which one and why. Don't claim it passed.
+
 ## Git Safety
 
 Do not commit, push, reset, discard changes, rewrite history, or overwrite
