@@ -126,6 +126,43 @@ def test_a_silent_session_is_closed_by_the_next_read_and_the_user_is_told(
     )
 
 
+def test_the_ranking_carries_the_session_of_whoever_is_working_or_paused(app: Flask):
+    ana = make_account(app, "ana")
+    bob = make_account(app, "bob")
+    room = create_room(ana)
+    join_room(bob, room)
+    start_room_session(ana, room["id"], "write tests")
+
+    def sessions() -> dict[str, Any]:
+        ranking = body(call(bob, "GET", f"/api/rooms/{room['id']}"))["ranking"]
+        return {member["username"]: member["session"] for member in ranking}
+
+    working = sessions()
+    call(ana, "POST", "/api/room-session/pause", {"workedSeconds": 8})
+    paused = sessions()
+
+    assert working["ana"]["mission"] == "write tests"
+    assert working["ana"]["target_time_seconds"] == 3600
+    assert paused["ana"]["actual_time_seconds"] == 8  # the progress stays where the pause left it
+    assert paused["bob"] is None
+
+
+def test_the_ranking_hides_a_mission_from_the_others_when_its_owner_does_not_show_missions(app: Flask):
+    ana = make_account(app, "ana")
+    bob = make_account(app, "bob")
+    room = create_room(ana)
+    join_room(bob, room)
+    start_room_session(ana, room["id"], "write tests")
+    call(ana, "PATCH", f"/api/rooms/{room['id']}/membership", {"showMissions": False})
+
+    def mission_seen_by(who: Account) -> str | None:
+        ranking = body(call(who, "GET", f"/api/rooms/{room['id']}"))["ranking"]
+        return next(member["session"]["mission"] for member in ranking if member["username"] == "ana")
+
+    assert mission_seen_by(bob) is None
+    assert mission_seen_by(ana) == "write tests"
+
+
 def start_and_move_the_start_back(ana: Account, room: dict[str, Any], seconds: int) -> str:
     """Start a session and make the server think it started `seconds` ago. Return its submission ID."""
     started = start_room_session(ana, room["id"], "write tests")

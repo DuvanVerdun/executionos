@@ -131,11 +131,3 @@ def member_state(facts: RunningSessionFacts | None) -> MemberState:
         return "not_working"
 
     return "working" if facts.paused_at is None else "paused"
-
-
-def ring_percentage(facts: RunningSessionFacts, now: datetime) -> int:
-    if facts.target_time_seconds <= 0:
-        return 0
-
-    actual = current_worked_seconds(facts, now)
-    return min(100, math.floor(actual / facts.target_time_seconds * 100))

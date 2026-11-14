@@ -6,7 +6,7 @@ from sqlalchemy import and_, func, select
 
 from executionos.extensions import db
 from executionos.models import Room, RoomMembership, Session, User
-from executionos.rooms.rules import current_worked_seconds, member_state, ring_percentage
+from executionos.rooms.rules import current_worked_seconds, member_state
 from executionos.rooms.service import get_active_membership, load_live_facts
 from executionos.sessions.history import PAGE_SIZE, apply_cursor, daily_summaries, next_cursor, serialize_session
 
@@ -52,7 +52,7 @@ def get_room_snapshot_for_user(user_id: int, room_id: int) -> dict[str, Any]:
     ).scalar_one()
 
     member_rows = db.session.execute(
-        select(RoomMembership.user_id, User.username)
+        select(RoomMembership.user_id, User.username, RoomMembership.show_missions)
         .join(User, User.id == RoomMembership.user_id)
         .where(
             RoomMembership.room_id == room_id,
@@ -72,20 +72,27 @@ def get_room_snapshot_for_user(user_id: int, room_id: int) -> dict[str, Any]:
 
     ranking: list[dict[str, Any]] = []
 
-    for position, (member_user_id, username) in enumerate(ranked, start=1):
+    for position, (member_user_id, username, shows_missions) in enumerate(ranked, start=1):
         sessions_count, total_time_seconds = totals.get(member_user_id, (0, 0))
         facts = live.get(member_user_id)
         state = member_state(facts)
+        is_you = member_user_id == user_id
 
         ranking.append({
             "position": position,
             "username": username,
-            "is_you": member_user_id == user_id,
+            "is_you": is_you,
             "is_owner": member_user_id == owner_user_id,
             "state": state,
-            "ring_percentage": (
-                ring_percentage(facts, now)
-                if facts is not None and state == "working"
+            # The client counts the time on from here while the session runs, so it needs no new answer each second.
+            # A mission is only sent when its owner shows missions in this room.
+            "session": (
+                {
+                    "mission": facts.mission if is_you or shows_missions else None,
+                    "target_time_seconds": facts.target_time_seconds,
+                    "actual_time_seconds": current_worked_seconds(facts, now),
+                }
+                if facts is not None
                 else None
             ),
             "total_time_seconds": total_time_seconds,
