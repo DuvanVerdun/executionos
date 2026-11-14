@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 import { useT } from '../i18n/i18n';
 import { formatDuration, formatDurationHoursMinutesSeconds } from '../lib/durations';
+import { PauseIcon, StopIcon } from '../session/FocusIcons';
 import { MissionCard } from '../session/MissionCard';
 import { ProgressRing } from '../shared/ProgressRing';
 
@@ -55,8 +56,8 @@ function FocusDemo() {
                 </div>
                 <p className="landing-focus-time">{formatDuration(FOCUS_ELAPSED_SECONDS)}</p>
                 <div className="landing-focus-buttons">
-                    <button type="button" className="normal-button">{t('focus.pause')}</button>
-                    <button type="button" className="normal-button">{t('focus.stop')}</button>
+                    <button type="button" className="normal-button" aria-label={t('focus.pause')}><PauseIcon /></button>
+                    <button type="button" className="normal-button" aria-label={t('focus.stop')}><StopIcon /></button>
                 </div>
             </ProgressRing>
         </div>
