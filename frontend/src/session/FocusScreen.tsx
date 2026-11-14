@@ -6,6 +6,7 @@ import { roomSessionStore } from '../rooms/room-session-state';
 import { ProgressRing } from '../shared/ProgressRing';
 import { Screen } from '../shared/Screen';
 import { handleFocusTabVisible, handlePauseResume, handleStopWork } from './focus';
+import { PauseIcon, PlayIcon, StopIcon } from './FocusIcons';
 import { sessionStore } from './state';
 import { focusStore } from './ui-state';
 
@@ -42,11 +43,17 @@ export function FocusScreen() {
                 <p id="focus-current-time-display">{formatDuration(session.actualTimeSeconds)}</p>
 
                 <div className="focus-button-container">
-                    <button id="focus-pause-btn" className="normal-button" disabled={room.isBusy} onClick={handlePauseResume}>
-                        {pauseLabel === 'Pause' ? t('focus.pause') : t('focus.resume')}
+                    <button
+                        id="focus-pause-btn"
+                        className="normal-button"
+                        aria-label={pauseLabel === 'Pause' ? t('focus.pause') : t('focus.resume')}
+                        disabled={room.isBusy}
+                        onClick={handlePauseResume}
+                    >
+                        {pauseLabel === 'Pause' ? <PauseIcon /> : <PlayIcon />}
                     </button>
-                    <button id="focus-stop-btn" className="normal-button" disabled={room.isBusy} onClick={handleStopWork}>
-                        {t('focus.stop')}
+                    <button id="focus-stop-btn" className="normal-button" aria-label={t('focus.stop')} disabled={room.isBusy} onClick={handleStopWork}>
+                        <StopIcon />
                     </button>
                 </div>
             </ProgressRing>

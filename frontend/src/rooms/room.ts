@@ -132,7 +132,7 @@ export async function loadRoom(
         }
         if (!result.success) throw new Error(result.error);
         const previousTotal = roomStore.get().snapshot?.summary.total_sessions;
-        const snapshot = { room: result.room, summary: result.summary, ranking: result.ranking };
+        const snapshot = { room: result.room, summary: result.summary, ranking: result.ranking, received_at: Date.now() };
         roomStore.update({ snapshot });
         roomSnapshotCache.set(roomId, snapshot);
         showRoomView('ready');

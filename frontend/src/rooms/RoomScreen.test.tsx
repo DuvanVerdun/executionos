@@ -8,7 +8,7 @@ import { roomStore } from './state';
 function ranking(count: number): RankingEntry[] {
     return Array.from({ length: count }, /** Make one member of the ranking. */ (_, index) => ({
         position: index + 1, username: `member${index + 1}`, is_you: index === 0, is_owner: index === 0,
-        state: 'not_working', ring_percentage: null, total_time_seconds: 600 * (count - index), sessions_count: 1
+        state: 'not_working', session: null, total_time_seconds: 600 * (count - index), sessions_count: 1
     }));
 }
 

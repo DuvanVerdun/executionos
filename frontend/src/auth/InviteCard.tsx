@@ -12,7 +12,7 @@ export function InviteCard() {
                 <div className="auth-invite-rings" aria-hidden="true">
                     <span className="member-ring member-ring-working" style={withCssVariables({}, { '--ring-pct': '70%' })}></span>
                     <span className="member-ring member-ring-working" style={withCssVariables({}, { '--ring-pct': '40%' })}></span>
-                    <span className="member-ring member-ring-paused"></span>
+                    <span className="member-ring member-ring-paused" style={withCssVariables({}, { '--ring-pct': '55%' })}></span>
                 </div>
             </div>
             <p className="auth-invite-text">{t('auth.invite.text')}</p>

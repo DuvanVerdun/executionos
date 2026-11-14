@@ -28,6 +28,18 @@
     initial-value: 0%;
 }
 
+@property --ring-pct {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 0%;
+}
+
+@property --ring-over {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 0%;
+}
+
 html {
     scrollbar-gutter: stable;
 }
@@ -1290,13 +1302,16 @@ button {
 .focus-button-container .normal-button {
     flex: 0 0 auto;
     min-width: 0;
-    padding: 14px 16px;
+    display: flex;
+    padding: 14px;
     border: 1px solid var(--color-border);
-    border-radius: 12px;
-    font-family: inherit;
-    font-size: clamp(18px, 2.3vh, 22px);
-    line-height: 1.3;
+    border-radius: 50%;
     cursor: pointer;
+}
+
+.focus-button-container .normal-button svg {
+    width: clamp(18px, 2.3vh, 22px);
+    height: clamp(18px, 2.3vh, 22px);
 }
 
 .focus-button-container .normal-button:focus-visible {
@@ -3139,7 +3154,7 @@ button {
 .room-ranking-row {
     --ring-mask: var(--color-surface);
     display: grid;
-    grid-template-columns: calc(32 * var(--rooms-size-unit)) calc(37 * var(--rooms-size-unit)) minmax(0, 1fr) auto calc(140 * var(--rooms-size-unit));
+    grid-template-columns: calc(32 * var(--rooms-size-unit)) auto minmax(0, 1fr) auto calc(140 * var(--rooms-size-unit));
     align-items: center;
     gap: calc(16 * var(--rooms-size-unit));
     padding: calc(12 * var(--rooms-size-unit)) calc(24 * var(--rooms-size-unit));
@@ -3188,11 +3203,17 @@ button {
     line-height: 1.25;
 }
 
+/* Whole pixels everywhere, so the hole of the ring is exactly in the middle of it. */
 .member-ring {
+    --ring-size: round(calc(37 * var(--rooms-size-unit)), 2px);
+    --ring-thickness: round(calc(4 * var(--rooms-size-unit)), 1px);
+    --ring-bar-width: round(calc(4 * var(--rooms-size-unit)), 2px);
+    --ring-bar-gap: round(calc(6 * var(--rooms-size-unit)), 2px);
+    --ring-bar-height: round(calc(14 * var(--rooms-size-unit)), 2px);
     position: relative;
     box-sizing: border-box;
-    width: calc(37 * var(--rooms-size-unit));
-    height: calc(37 * var(--rooms-size-unit));
+    width: var(--ring-size);
+    height: var(--ring-size);
     border-radius: 50%;
     background-color: var(--color-border);
 }
@@ -3200,31 +3221,42 @@ button {
 .member-ring::after {
     content: '';
     position: absolute;
-    inset: calc(4 * var(--rooms-size-unit));
+    inset: var(--ring-thickness);
     border-radius: 50%;
     background-color: var(--ring-mask, var(--color-surface));
 }
 
-.member-ring-working {
-    background: conic-gradient(var(--color-reward) var(--ring-pct, 0%), var(--color-border) 0);
-}
-
+/* Teal up to the target. After it, white goes round over the teal. */
+.member-ring-working,
 .member-ring-paused {
-    background-color: var(--color-white);
+    background: conic-gradient(var(--color-white) var(--ring-over, 0%), var(--color-reward) 0 var(--ring-pct, 0%), var(--color-border) 0);
+    transition: --ring-pct 1s linear, --ring-over 1s linear;
 }
 
 .member-ring-paused::before {
     content: '';
     position: absolute;
     z-index: 1;
-    top: 50%;
-    left: calc(50% - 7 * var(--rooms-size-unit));
-    width: calc(4 * var(--rooms-size-unit));
-    height: calc(14 * var(--rooms-size-unit));
-    transform: translateY(-50%);
-    border-radius: 1px;
+    top: calc(50% - var(--ring-bar-height) / 2);
+    left: calc((100% - 2 * var(--ring-bar-width) - var(--ring-bar-gap)) / 2);
+    width: var(--ring-bar-width);
+    height: var(--ring-bar-height);
+    border-radius: 2px;
     background-color: var(--color-white);
-    box-shadow: calc(10 * var(--rooms-size-unit)) 0 0 var(--color-white);
+    box-shadow: calc(var(--ring-bar-width) + var(--ring-bar-gap)) 0 0 var(--color-white);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .member-ring-working,
+    .member-ring-paused {
+        transition: none;
+    }
+}
+
+.room-live-summary {
+    max-width: calc(480 * var(--calendar-size-unit));
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .room-history {

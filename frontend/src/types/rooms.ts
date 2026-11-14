@@ -22,13 +22,23 @@ export interface RoomSummary {
     average_session_time_seconds: number | null;
 }
 
+/** The session a member has running or paused, as the room shows it to the others. */
+export interface LiveSession {
+    /** Null when the member does not show missions in this room. */
+    mission: string | null;
+    target_time_seconds: number;
+    /** The time worked when the server answered. */
+    actual_time_seconds: number;
+}
+
 export interface RankingEntry {
     position: number;
     username: string;
     is_you: boolean;
     is_owner: boolean;
     state: MemberState;
-    ring_percentage: number | null;
+    /** Null when the member is not working. */
+    session: LiveSession | null;
     total_time_seconds: number;
     sessions_count: number;
 }
@@ -42,6 +52,8 @@ export interface RoomSnapshot {
     };
     summary: RoomSummary;
     ranking: RankingEntry[];
+    /** When this client got the snapshot from the server, so the running sessions can be counted on from then. */
+    received_at?: number;
 }
 
 /** A session in a room's history. The mission is null when its owner hides missions. */

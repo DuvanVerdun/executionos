@@ -19,7 +19,7 @@ describe('App', () => {
     ] as const satisfies readonly (readonly [ScreenName, string])[])('draws the %s screen with its English texts', (name, text) => {
         screenStore.set({ screen: name });
         render(<App />);
-        expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+        expect(screen.queryAllByText(text).length + screen.queryAllByLabelText(text).length).toBeGreaterThan(0);
     });
 
     it('shows only the screen that is current', () => {

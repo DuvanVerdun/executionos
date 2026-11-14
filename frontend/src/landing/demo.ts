@@ -38,11 +38,11 @@ export const DEMO_TOTAL_WORKED_DAYS = 34;
 
 /** The people in the demo room, as the room ranking draws them. */
 export const DEMO_RANKING: readonly RankingEntry[] = [
-    { position: 1, username: 'ana', is_you: false, is_owner: true, state: 'working', ring_percentage: 70, total_time_seconds: 30000, sessions_count: 12 },
-    { position: 2, username: 'you', is_you: true, is_owner: false, state: 'working', ring_percentage: 45, total_time_seconds: 21900, sessions_count: 9 },
-    { position: 3, username: 'leo', is_you: false, is_owner: false, state: 'working', ring_percentage: 85, total_time_seconds: 16800, sessions_count: 7 },
-    { position: 4, username: 'mia', is_you: false, is_owner: false, state: 'paused', ring_percentage: null, total_time_seconds: 11700, sessions_count: 5 },
-    { position: 5, username: 'sam', is_you: false, is_owner: false, state: 'not_working', ring_percentage: null, total_time_seconds: 3900, sessions_count: 2 }
+    { position: 1, username: 'ana', is_you: false, is_owner: true, state: 'working', session: { mission: 'Write the pitch', target_time_seconds: 6000, actual_time_seconds: 4200 }, total_time_seconds: 30000, sessions_count: 12 },
+    { position: 2, username: 'you', is_you: true, is_owner: false, state: 'working', session: { mission: 'Fix the login bug', target_time_seconds: 6000, actual_time_seconds: 2700 }, total_time_seconds: 21900, sessions_count: 9 },
+    { position: 3, username: 'leo', is_you: false, is_owner: false, state: 'working', session: { mission: 'Study chapter 4', target_time_seconds: 6000, actual_time_seconds: 5100 }, total_time_seconds: 16800, sessions_count: 7 },
+    { position: 4, username: 'mia', is_you: false, is_owner: false, state: 'paused', session: { mission: 'Edit the video', target_time_seconds: 6000, actual_time_seconds: 3300 }, total_time_seconds: 11700, sessions_count: 5 },
+    { position: 5, username: 'sam', is_you: false, is_owner: false, state: 'not_working', session: null, total_time_seconds: 3900, sessions_count: 2 }
 ];
 
 /** Return the weekday of today, counting Monday as 0. */

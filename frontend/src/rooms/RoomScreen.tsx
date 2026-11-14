@@ -182,7 +182,7 @@ export function RoomScreen() {
                             <p id="room-start-error" className="form-error-message plan-field-error" role="alert"></p>
                         </MissionCard>
 
-                        <RoomRanking ranking={snapshot?.ranking ?? []} />
+                        <RoomRanking ranking={snapshot?.ranking ?? []} receivedAt={snapshot?.received_at} />
                     </div>
 
                     <section className="room-section">
