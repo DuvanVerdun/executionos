@@ -11,6 +11,7 @@ from executionos.extensions import db, jwt
 from executionos.feedback import feedback_bp
 from executionos.rooms.routes import rooms_bp
 from executionos.sessions.routes import sessions_bp
+from executionos.social.routes import social_bp
 
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
@@ -23,7 +24,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     CORS(app, supports_credentials=True, origins=["https://executionos-mvp.netlify.app", "http://localhost:5500"])
     jwt.init_app(app)
 
-    for blueprint in (auth_bp, sessions_bp, dashboard_bp, rooms_bp, feedback_bp):
+    for blueprint in (auth_bp, sessions_bp, dashboard_bp, rooms_bp, feedback_bp, social_bp):
         app.register_blueprint(blueprint)
 
     return app
