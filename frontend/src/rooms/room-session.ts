@@ -12,6 +12,7 @@ import { delay, millisecondsUntilNextSecond, waitForMinimumFeedback } from '../l
 import { reviewStore, focusStore, type FinishLabel } from '../session/ui-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { getCurrentScreenName, navigateTo } from '../shared/navigation';
+import { loadStreakCelebration, showStreakCelebration, type StreakCelebration } from '../streak/celebration';
 import type { RoomSessionEnvelope, RoomSessionNotice, RoomSessionPayload, RoomSessionResult } from '../types/rooms';
 import type { ScreenName } from '../types/screens';
 import {
@@ -432,17 +433,27 @@ function addSavedSessionToCachedSummary(roomId: number, seconds: number): void {
     });
 }
 
-/** Leave Focus or Review after the session ended, and return to its room. */
-async function endRoomSession({ saved = false }: { saved?: boolean } = {}): Promise<void> {
+/**
+ * Leave Focus or Review after the session ended, and return to its room. A session that was the first of the day
+ * shows the streak screen first, and the room opens when the user leaves it.
+ */
+async function endRoomSession(
+    { saved = false, celebration = null }: { saved?: boolean; celebration?: StreakCelebration | null } = {}
+): Promise<void> {
     const roomId = roomSessionStore.get().roomId;
     const savedSeconds = roomSessionStore.get().display.actualTimeSeconds;
     const screen = getCurrentScreenName();
     resetRoomSessionClient();
     reviewStore.update({ finishLabel: 'Finish', saveMessage: '' });
-    if (saved) {
-        setFloatingMessage(t('session.saved'), { saved: true });
-        if (roomId !== null) addSavedSessionToCachedSummary(roomId, savedSeconds);
+    if (saved && roomId !== null) addSavedSessionToCachedSummary(roomId, savedSeconds);
+    if (celebration && roomId !== null) {
+        showStreakCelebration(celebration, screen, () => {
+            setFloatingMessage(t('session.saved'), { saved: true });
+            void openRoom(roomId, 'streak');
+        });
+        return;
     }
+    if (saved) setFloatingMessage(t('session.saved'), { saved: true });
     if (roomId !== null && (screen === 'focus' || screen === 'review')) await openRoom(roomId, screen);
 }
 
@@ -634,24 +645,26 @@ export async function handleRoomFinish(): Promise<void> {
     reviewStore.update({ saveMessage: '' });
     const outcome = await performRoomSessionRequest(
         roomSessionStore.get().finishFailed ? 'Retrying…' : 'Saving…',
-        /** Wait for earlier events, then send the Finish request for this session. */
+        /** Wait for earlier events, send the Finish request for this session, and look for a streak that grew with it. */
         async () => {
             await roomSessionStore.get().queueTail;
             const current = roomSessionStore.get();
             if (!current.active || !current.submissionId) throw new Error('The session ended before it could be saved');
-            return postFinishRoomSession(current.submissionId, current.display.actualTimeSeconds);
+            const result = await postFinishRoomSession(current.submissionId, current.display.actualTimeSeconds);
+            const saved = isRoomSessionEnvelope(result) && result.saved === true;
+            return { result, celebration: saved ? await loadStreakCelebration('review') : null };
         },
         feedbackStartedAt
     );
     if (outcome.skipped || outcome.unauthorized || !roomSessionStore.get().active) return;
-    const result = outcome.result;
-    if (outcome.failed || !isRoomSessionEnvelope(result)) {
+    const finished = outcome.result;
+    if (outcome.failed || !finished || !isRoomSessionEnvelope(finished.result)) {
         roomSessionStore.update({ finishFailed: true });
         reviewStore.update({ finishLabel: 'Try again' });
         showReviewRoomError(t('session.finishFailed'));
         return;
     }
-    if (applyRoomSessionEnvelope(result)) {
+    if (applyRoomSessionEnvelope(finished.result)) {
         roomSessionStore.update({ finishFailed: false });
         if (!roomSessionStore.get().isPaused) {
             navigateTo('focus', 'review');
@@ -659,7 +672,7 @@ export async function handleRoomFinish(): Promise<void> {
         }
         return;
     }
-    await endRoomSession({ saved: result.saved === true });
+    await endRoomSession({ saved: finished.result.saved === true, celebration: finished.celebration });
 }
 
 /** Confirm presence: close the popup at once and send the check-in. */

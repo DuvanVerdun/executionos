@@ -7,20 +7,21 @@ type SwitchHook = (nextScreen: ScreenName, currentScreen: ScreenName) => void;
 /** How each screen is laid out when it shows. */
 export const SCREEN_DISPLAY: Record<ScreenName, string> = {
     loading: 'flex', landing: 'block', register: 'grid', login: 'grid',
-    plan: 'flex', focus: 'flex', review: 'grid', dashboard: 'flex', rooms: 'flex', room: 'flex'
+    plan: 'flex', focus: 'flex', review: 'grid', streak: 'flex', dashboard: 'flex', rooms: 'flex', room: 'flex'
 };
 
 const ALLOWED_SCREEN_TRANSITIONS: Record<ScreenName, readonly ScreenName[]> = {
     loading: ['register', 'login'],
     landing: ['loading', 'login', 'register', 'plan', 'dashboard', 'rooms'],
     register: ['loading', 'landing', 'login'],
-    login: ['landing', 'register', 'plan', 'focus', 'review', 'dashboard', 'rooms', 'room'],
+    login: ['landing', 'register', 'plan', 'focus', 'review', 'streak', 'dashboard', 'rooms', 'room'],
     plan: ['loading', 'register', 'login', 'dashboard', 'rooms'],
     focus: ['loading', 'login', 'register', 'plan', 'review', 'room'],
     review: ['loading', 'login', 'register', 'focus'],
-    dashboard: ['loading', 'register', 'login', 'plan', 'review', 'rooms'],
+    streak: ['review'],
+    dashboard: ['loading', 'register', 'login', 'plan', 'review', 'streak', 'rooms'],
     rooms: ['loading', 'register', 'login', 'plan', 'dashboard', 'room'],
-    room: ['loading', 'register', 'login', 'rooms', 'review', 'focus']
+    room: ['loading', 'register', 'login', 'rooms', 'review', 'focus', 'streak']
 };
 
 /** The screen that shows now. */

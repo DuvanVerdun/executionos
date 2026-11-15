@@ -7,6 +7,8 @@ import { handleRoomContinue, handleRoomFinish } from '../rooms/room-session';
 import { roomSessionStore } from '../rooms/room-session-state';
 import { setFloatingMessage } from '../shared/floating-message';
 import { navigateTo } from '../shared/navigation';
+import { loadStreakCelebration, showStreakCelebration } from '../streak/celebration';
+import type { ScreenName } from '../types/screens';
 import { postSession } from './api';
 import { planDraftStore, sessionStore } from './state';
 import { clearActiveSession, saveActiveSession, sessionQueue } from './storage';
@@ -114,15 +116,22 @@ export async function handleFinishWork(): Promise<void> {
                 console.error('Could not remove synced session:', error);
             }
         }
+        const celebration = saved ? await loadStreakCelebration('review') : null;
         await waitForMinimumFeedback(feedbackStartedAt);
         if (authStore.get().userId !== userId) return;
         resetApp();
         resetDashboardData();
-        navigateTo('dashboard', 'review');
-        setFloatingMessage(saved
-            ? t('session.saved')
-            : t('session.savedOffline'), { saved });
-        await loadDashboard();
+        const loadingDashboard = loadDashboard();
+        /** Show the Dashboard, which is already loading, with the outcome of the save. */
+        const showDashboard = (from: ScreenName): void => {
+            navigateTo('dashboard', from);
+            setFloatingMessage(saved
+                ? t('session.saved')
+                : t('session.savedOffline'), { saved });
+        };
+        if (celebration) showStreakCelebration(celebration, 'review', () => { showDashboard('streak'); });
+        else showDashboard('review');
+        await loadingDashboard;
     } catch (error) {
         console.error('Could not finish session:', error);
         reviewStore.update({ saveMessage: t('session.finishFailed') });

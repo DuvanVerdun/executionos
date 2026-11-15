@@ -51,6 +51,23 @@ describe('navigateTo', () => {
         expect(getCurrentScreenName()).toBe('landing');
     });
 
+    it('shows the streak screen only after Review, and leaves it for the Dashboard or a room', () => {
+        screenStore.set({ screen: 'review' });
+        navigateTo('streak', 'review');
+        expect(getCurrentScreenName()).toBe('streak');
+        navigateTo('dashboard', 'streak');
+        expect(getCurrentScreenName()).toBe('dashboard');
+        screenStore.set({ screen: 'streak' });
+        navigateTo('room', 'streak');
+        expect(getCurrentScreenName()).toBe('room');
+    });
+
+    it.each(['plan', 'focus', 'dashboard', 'rooms', 'room'] as const)('refuses to open the streak screen from %s', (current) => {
+        screenStore.set({ screen: current });
+        navigateTo('streak', current);
+        expect(getCurrentScreenName()).toBe(current);
+    });
+
     it('runs the steps added by features before the screen changes, in order', () => {
         const calls: string[] = [];
         addBeforeSwitchHook(/** Record the first step. */ (next, current) => {

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authStore } from '../auth/state';
 import { floatingMessageStore } from '../shared/floating-message';
 import { screenStore } from '../shared/navigation';
+import { formatLocalDate } from '../lib/dates';
+import { continueFromStreakCelebration, streakCelebrationStore } from '../streak/celebration';
 import { fakeBackendByPath, jsonBodyOf, pathOf, requestedPaths, type FakeAnswer } from '../test/network';
 import { handleContinueWork, handleFinishWork } from './review';
 import { planDraftStore, sessionStore, updateActiveSession } from './state';
@@ -99,6 +101,57 @@ describe('finishing a session', () => {
         await vi.advanceTimersByTimeAsync(5000);
         await Promise.all([first, second]);
         expect(requestedPaths(fake).filter(/** Keep the save requests. */ (path) => path === 'save-session')).toHaveLength(1);
+    });
+});
+
+describe('finishing the first session of the day', () => {
+    /** Answer the save, and the streak route with today as a work day with the given number of sessions. */
+    function backendWithStreak(totalSessions: number) {
+        const today = formatLocalDate(new Date());
+        return fakeBackendByPath(/** Pick the answer for one request. */ (path) => {
+            if (path.startsWith('streak')) {
+                return {
+                    status: 200,
+                    body: {
+                        success: true, current_streak: 4, total_worked_days: 9, rest_days_remaining_this_week: 2,
+                        calendar: { month: today.slice(0, 7), days: [{ date: today, state: 'work', total_sessions: totalSessions, total_time_seconds: 300 }] }
+                    }
+                };
+            }
+            return path === 'save-session' ? { status: 200, body: { success: true } } : { status: 500 };
+        });
+    }
+
+    it('shows the streak screen between Review and the Dashboard, and the Dashboard when the user continues', async () => {
+        backendWithStreak(1);
+        await finish();
+        expect(screenStore.get().screen).toBe('streak');
+        expect(streakCelebrationStore.get().celebration).toMatchObject({ from: 3, to: 4 });
+        expect(floatingMessageStore.get().message).toBe('');
+        continueFromStreakCelebration();
+        expect(screenStore.get().screen).toBe('dashboard');
+        expect(floatingMessageStore.get().message).toBe('Session saved. Nice work.');
+    });
+
+    it('clears the work before the streak screen, so a reload does not bring the session back', async () => {
+        backendWithStreak(1);
+        await finish();
+        expect(sessionStore.get().active.currentMission).toBe('');
+    });
+
+    it('goes straight to the Dashboard when it was not the first session of the day', async () => {
+        backendWithStreak(2);
+        await finish();
+        expect(screenStore.get().screen).toBe('dashboard');
+        expect(streakCelebrationStore.get().celebration).toBeNull();
+    });
+
+    it('goes straight to the Dashboard when the session was only saved on this browser', async () => {
+        const fake = backendWithStreak(1);
+        backendSaving(new Error('offline'));
+        await finish();
+        expect(screenStore.get().screen).toBe('dashboard');
+        expect(requestedPaths(fake).some(/** Find a streak request. */ (path) => path.startsWith('streak'))).toBe(false);
     });
 });
 

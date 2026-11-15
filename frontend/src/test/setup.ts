@@ -13,6 +13,7 @@ import { focusStore, reviewStore } from '../session/ui-state';
 import { floatingMessageStore } from '../shared/floating-message';
 import { screenStore } from '../shared/navigation';
 import { userMenuStore } from '../shared/user-menu';
+import { streakCelebrationStore } from '../streak/celebration';
 import { streakStore } from '../streak/streak';
 import type { Store } from '../lib/store';
 
@@ -42,6 +43,7 @@ remember(floatingMessageStore);
 remember(screenStore);
 remember(userMenuStore);
 remember(streakStore);
+remember(streakCelebrationStore);
 
 beforeEach(() => {
     restorers.forEach((restore) => { restore(); });

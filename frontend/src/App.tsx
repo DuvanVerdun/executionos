@@ -17,6 +17,7 @@ import { ReviewScreen } from './session/ReviewScreen';
 import { ConfirmModal } from './shared/ConfirmModal';
 import { FloatingMessage } from './shared/FloatingMessage';
 import { screenStore } from './shared/navigation';
+import { StreakScreen } from './streak/StreakScreen';
 
 /** Draw the screen that shows now, and the parts that every screen shares. */
 export function App() {
@@ -38,6 +39,7 @@ export function App() {
             {screen === 'plan' && <PlanScreen />}
             {screen === 'focus' && <FocusScreen />}
             {screen === 'review' && <ReviewScreen />}
+            {screen === 'streak' && <StreakScreen />}
             {screen === 'dashboard' && <DashboardScreen />}
             {screen === 'rooms' && <RoomsScreen />}
             {screen === 'room' && <RoomScreen />}

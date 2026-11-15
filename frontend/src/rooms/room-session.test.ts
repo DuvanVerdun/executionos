@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { formatLocalDate } from '../lib/dates';
 import { reviewStore } from '../session/ui-state';
+import { floatingMessageStore } from '../shared/floating-message';
 import { getCurrentScreenName, screenStore } from '../shared/navigation';
+import { continueFromStreakCelebration, streakCelebrationStore } from '../streak/celebration';
 import { fakeBackendByPath, jsonBodyOf, pathOf, type FakeAnswer } from '../test/network';
 import type { RoomSessionEnvelope, RoomSnapshot } from '../types/rooms';
 import {
@@ -30,7 +33,7 @@ function serverTime(ms: number): string {
  * What the fake server believes about the session. Its own moments are far from this device's clock on purpose,
  * to prove that the device ignores them.
  */
-const server = { state: 'running' as 'running' | 'paused', mark: 1, actualSeconds: 0, acceptCheckin: true, roomLoads: true };
+const server = { state: 'running' as 'running' | 'paused', mark: 1, actualSeconds: 0, acceptCheckin: true, roomLoads: true, firstSessionOfDay: false };
 
 /** Make the envelope that every room session route answers with. */
 function envelope(): Omit<RoomSessionEnvelope, 'status'> {
@@ -86,6 +89,11 @@ function startFakeServer() {
         if (path === 'room-session/finish') {
             return { status: 200, body: { ...envelope(), active: false, session: null, saved: true, session_id: 7 } };
         }
+        if (path.startsWith('streak')) {
+            const today = formatLocalDate(new Date());
+            const day = { date: today, state: 'work', total_sessions: server.firstSessionOfDay ? 1 : 2, total_time_seconds: 600 };
+            return { status: 200, body: { success: true, current_streak: 3, total_worked_days: 9, rest_days_remaining_this_week: 2, calendar: { month: today.slice(0, 7), days: [day] } } };
+        }
         if (path === 'rooms/3') return server.roomLoads ? { status: 200, body: roomSnapshot } : { status: 500 };
         return path.startsWith('room-session') ? { status: 200, body: envelope() } : { status: 500 };
     });
@@ -127,7 +135,7 @@ beforeEach(() => {
     vi.setSystemTime(NOW);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     screenStore.set({ screen: 'room' });
-    Object.assign(server, { state: 'running', mark: 1, actualSeconds: 0, acceptCheckin: true, roomLoads: true });
+    Object.assign(server, { state: 'running', mark: 1, actualSeconds: 0, acceptCheckin: true, roomLoads: true, firstSessionOfDay: false });
 });
 
 afterEach(() => {
@@ -348,6 +356,36 @@ describe('stop, continue and finish', () => {
         expect(bodiesOf(fake, 'room-session/finish')).toEqual([{ submissionId: '11111111-1111-4111-8111-111111111111', actualSeconds: 12 }]);
         expect(roomSessionStore.get().active).toBe(false);
         expect(getCurrentScreenName()).toBe('room');
+    });
+
+    it('shows the streak screen after the first session of the day, and opens the room when the user continues', async () => {
+        server.firstSessionOfDay = true;
+        startFakeServer();
+        await startSession();
+        vi.advanceTimersByTime(12_300);
+        await handleRoomStop();
+        const finishing = handleRoomFinish();
+        await vi.advanceTimersByTimeAsync(3000);
+        await finishing;
+        expect(getCurrentScreenName()).toBe('streak');
+        expect(roomSessionStore.get().active).toBe(false);
+        expect(streakCelebrationStore.get().celebration).toMatchObject({ from: 2, to: 3 });
+        expect(floatingMessageStore.get().message).toBe('');
+        continueFromStreakCelebration();
+        expect(getCurrentScreenName()).toBe('room');
+        expect(floatingMessageStore.get().message).toBe('Session saved. Nice work.');
+    });
+
+    it('returns to the room at once when it was not the first session of the day', async () => {
+        startFakeServer();
+        await startSession();
+        vi.advanceTimersByTime(12_300);
+        await handleRoomStop();
+        const finishing = handleRoomFinish();
+        await vi.advanceTimersByTimeAsync(3000);
+        await finishing;
+        expect(getCurrentScreenName()).toBe('room');
+        expect(streakCelebrationStore.get().celebration).toBeNull();
     });
 
     it('follows the exact flow: start, pause, resume, pause, stop, continue, stop, finish', async () => {
