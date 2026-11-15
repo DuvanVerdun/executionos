@@ -2,7 +2,6 @@ import { authFormStore } from '../auth/forms-state';
 import { setLoginRequiredHandler } from '../auth/http';
 import { authStore } from '../auth/state';
 import { leaveDashboardScreen, resetDashboardData } from '../dashboard/dashboard';
-import { closeFeedbackForm } from '../feedback/feedback';
 import { t } from '../i18n/i18n';
 import { leaveProfileScreen, resetProfileData } from '../profile/profile';
 import { leaveRoomScreen } from '../rooms/room';
@@ -30,9 +29,6 @@ export function registerNavigationHooks(): void {
         }
         const roomId = roomStore.get().roomId;
         if (nextScreen === 'room' && roomId !== null) saveLastScreen(userId, { screen: 'room', roomId });
-    });
-    addBeforeSwitchHook(/** Close the feedback form on every screen change. */ () => {
-        closeFeedbackForm();
     });
     addBeforeSwitchHook(/** Stop Dashboard loading when leaving the Dashboard. */ (nextScreen, currentScreen) => {
         if (currentScreen === 'dashboard' && nextScreen !== 'dashboard') leaveDashboardScreen();

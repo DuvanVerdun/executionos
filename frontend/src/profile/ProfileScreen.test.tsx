@@ -57,11 +57,11 @@ describe('the card of a profile', () => {
         expect(within(screen.getByRole('complementary')).getByRole('img', { name: text === 'Paused' ? 'Paused' : 'Working' })).toBeInTheDocument();
     });
 
-    it('has no follow button on the own profile, and no menu either', () => {
+    it('has no follow button and no menu on the own profile, only the button of the settings', () => {
         showProfile(profile({ username: 'duvan', relation: 'self' }));
         render(<ProfileScreen />);
         const card = screen.getByRole('complementary', { name: 'duvan' });
-        expect(within(card).queryByRole('button')).toBeNull();
+        expect(within(card).getAllByRole('button').map(/** Read a button. */ (button) => button.getAttribute('aria-label'))).toEqual(['Settings']);
     });
 
     it.each([

@@ -114,7 +114,7 @@ export function clearSearch(): void {
 /** Show the user's own profile, and load it. */
 export async function openOwnProfile(): Promise<void> {
     clearSearch();
-    profileStore.update({ viewing: null });
+    profileStore.update({ viewing: null, panel: 'profile' });
     await loadProfile();
 }
 
@@ -124,14 +124,14 @@ export async function openProfile(username: string): Promise<void> {
         await openOwnProfile();
         return;
     }
-    profileStore.update({ viewing: username });
+    profileStore.update({ viewing: username, panel: 'profile' });
     await loadProfile();
 }
 
 /** Prepare the Profile screen after it shows: the user's own profile, the people they follow, and the refresh timer. */
 export async function enterProfileScreen(): Promise<void> {
     clearSearch();
-    profileStore.update({ viewing: null });
+    profileStore.update({ viewing: null, panel: 'profile' });
     stopPolling();
     pollTimer = setInterval(() => { void pollProfileScreen(); }, SOCIAL_POLL_INTERVAL_MS);
     void loadStreak('profile');
@@ -151,7 +151,7 @@ export function leaveProfileScreen(): void {
 /** Forget the profiles and the list. Used when the user signs out or reaches Login. */
 export function resetProfileData(): void {
     leaveProfileScreen();
-    profileStore.update({ viewing: null, view: 'loading', profile: null });
+    profileStore.update({ viewing: null, panel: 'profile', view: 'loading', profile: null });
     followingStore.update({ list: { requests: [], following: [] }, surface: 'loading', hasLoaded: false });
 }
 

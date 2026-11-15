@@ -3,7 +3,6 @@ import { LoadingScreen } from './app/LoadingScreen';
 import { LoginScreen } from './auth/LoginScreen';
 import { RegisterScreen } from './auth/RegisterScreen';
 import { DashboardScreen } from './dashboard/DashboardScreen';
-import { FeedbackForm } from './feedback/FeedbackForm';
 import { useDocumentEvent } from './hooks/useDocumentEvent';
 import { useStore } from './lib/store';
 import { LandingScreen } from './landing/LandingScreen';
@@ -45,7 +44,6 @@ export function App() {
             {screen === 'rooms' && <RoomsScreen />}
             {screen === 'room' && <RoomScreen />}
             {screen === 'profile' && <ProfileScreen />}
-            <FeedbackForm />
             <CheckinModal />
             <ConfirmModal />
             <FloatingMessage />

@@ -47,3 +47,16 @@ export function AddPersonIcon() {
         </svg>
     );
 }
+
+/** The gear of the settings. */
+export function GearIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="M19.31 9.91 22.07 10.4V13.6L19.31 14.09 18.65 15.68 20.25 18 18 20.25 15.68 18.65 14.09 19.31 13.6 22.07H10.4L9.91 19.31 8.32 18.65 6 20.25 3.75 18 5.35 15.68 4.69 14.09 1.93 13.6V10.4L4.69 9.91 5.35 8.32 3.75 6 6 3.75 8.32 5.35 9.91 4.69 10.4 1.93H13.6L14.09 4.69 15.68 5.35 18 3.75 20.25 6 18.65 8.32Z"
+                fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"
+            />
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+    );
+}

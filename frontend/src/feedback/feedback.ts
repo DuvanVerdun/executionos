@@ -1,12 +1,10 @@
 import { t } from '../i18n/i18n';
 import { createStore } from '../lib/store';
-import type { HeaderScreenName } from '../types/screens';
 import { postFeedback } from './api';
 
 interface FeedbackState {
-    isOpen: boolean;
-    /** The screen the form was opened from. */
-    currentScreen: HeaderScreenName | null;
+    /** What is written in the text box. It stays while the user visits other options of the settings. */
+    draft: string;
     isSending: boolean;
     /** The message under the text box, and whether it reports success. */
     message: string;
@@ -16,33 +14,30 @@ interface FeedbackState {
 }
 
 export const feedbackStore = createStore<FeedbackState>({
-    isOpen: false,
-    currentScreen: null,
+    draft: '',
     isSending: false,
     message: '',
     messageIsSuccess: false,
     isInvalid: false
 });
 
-/** Open feedback entry and record its originating screen. */
-export function openFeedbackForm(currentScreen: HeaderScreenName): void {
-    if (!feedbackStore.get().isSending) {
-        feedbackStore.update({ message: '', messageIsSuccess: false, isInvalid: false });
-    }
-    feedbackStore.update({ currentScreen, isOpen: true });
+/** Keep what the user writes, and clear the message about the last attempt. */
+export function setFeedbackDraft(draft: string): void {
+    feedbackStore.update({ draft, message: '', messageIsSuccess: false, isInvalid: false });
 }
 
-/** Close feedback entry and clear its originating screen. */
-export function closeFeedbackForm(): void {
-    feedbackStore.update({ currentScreen: null, isOpen: false });
+/** Clear the message about the last attempt, unless a message is still being sent. */
+export function clearFeedbackMessage(): void {
+    if (!feedbackStore.get().isSending) feedbackStore.update({ message: '', messageIsSuccess: false, isInvalid: false });
 }
 
-/** The result of a send attempt: whether the text box should be cleared. */
+/** The result of a send attempt: whether the text box was cleared. */
 export type SendOutcome = 'sent' | 'rejected' | 'empty' | 'busy';
 
-/** Validate and send feedback. Return 'sent' when the text box should be cleared. */
-export async function sendFeedback(text: string): Promise<SendOutcome> {
+/** Validate and send what is written. The text box is cleared when it is sent. */
+export async function sendFeedback(): Promise<SendOutcome> {
     if (feedbackStore.get().isSending) return 'busy';
+    const text = feedbackStore.get().draft;
     feedbackStore.update({ messageIsSuccess: false, isInvalid: false, message: '' });
 
     if (!text.trim() || text.length > 2000) {
@@ -57,7 +52,7 @@ export async function sendFeedback(text: string): Promise<SendOutcome> {
 
     feedbackStore.update({ isSending: true });
     try {
-        const result = await postFeedback(text, feedbackStore.get().currentScreen);
+        const result = await postFeedback(text, 'profile');
         if (!result.success) {
             feedbackStore.update({
                 message: result.status === 400
@@ -66,7 +61,7 @@ export async function sendFeedback(text: string): Promise<SendOutcome> {
             });
             return 'rejected';
         }
-        feedbackStore.update({ message: t('feedback.sent'), messageIsSuccess: true });
+        feedbackStore.update({ draft: '', message: t('feedback.sent'), messageIsSuccess: true });
         return 'sent';
     } catch {
         feedbackStore.update({ message: t('feedback.unreachable') });

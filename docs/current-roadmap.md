@@ -43,8 +43,8 @@ to the doc that owns it.
 
 ### Open
 
-- How the client sends its live state.
-- Copy in Spanish and English.
+- Review the Spanish and English copy.
+- The Landing and Auth screens get updated for this version later.
 
 ### Left over from v0.6.2
 

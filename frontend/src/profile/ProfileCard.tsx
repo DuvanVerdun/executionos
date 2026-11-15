@@ -6,12 +6,15 @@ import { ringFill, workedSeconds } from '../rooms/live-session';
 import type { MemberState } from '../types/rooms';
 import type { Profile } from '../types/social';
 import { Avatar } from './Avatar';
-import { CheckIcon, DotsIcon } from './icons';
+import { CheckIcon, DotsIcon, GearIcon } from './icons';
 import { blockViewedProfile, followViewedProfile, liveSessionOf, unfollowViewedProfile } from './profile';
+import { closeSettings, openSettings } from './settings/settings';
 
 interface ProfileCardProps {
     profile: Profile;
     isBusy: boolean;
+    /** True while the settings show beside the card. */
+    isSettingsOpen: boolean;
     /** The seconds since the profile came from the server. */
     secondsSinceAnswer: number;
     now: number;
@@ -85,8 +88,8 @@ function ProfileMenu({ profile, isBusy }: { profile: Profile; isBusy: boolean })
     );
 }
 
-/** Draw the card of a profile: the avatar, the username, what the user is doing, the counts, and the way to follow. */
-export function ProfileCard({ profile, isBusy, secondsSinceAnswer, now }: ProfileCardProps) {
+/** Draw the card of a profile: the avatar, the username, what the user is doing, the counts, and the way to follow. The user's own card has the button of the settings. */
+export function ProfileCard({ profile, isBusy, isSettingsOpen, secondsSinceAnswer, now }: ProfileCardProps) {
     const t = useT();
     const status = useStatusText(profile, now);
     const live = profile.data?.live ?? null;
@@ -95,7 +98,16 @@ export function ProfileCard({ profile, isBusy, secondsSinceAnswer, now }: Profil
     const ring = session === null ? undefined : ringFill(workedSeconds(session, state, secondsSinceAnswer), session.target_time_seconds);
     return (
         <aside className="profile-card" aria-label={profile.username}>
-            {profile.relation !== 'self' && <div className="profile-card-menu"><ProfileMenu profile={profile} isBusy={isBusy} /></div>}
+            <div className="profile-card-menu">
+                {profile.relation === 'self' ? (
+                    <button
+                        type="button" className="profile-icon-btn" aria-label={t('profile.settings')} aria-pressed={isSettingsOpen}
+                        onClick={isSettingsOpen ? closeSettings : openSettings}
+                    >
+                        <GearIcon />
+                    </button>
+                ) : <ProfileMenu profile={profile} isBusy={isBusy} />}
+            </div>
             <Avatar username={profile.username} size="large" state={state} {...(ring && { ring })} />
             <div className="profile-card-identity">
                 <h1 className="profile-card-name">{profile.username}</h1>

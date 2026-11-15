@@ -8,6 +8,7 @@ import { FollowingList } from './FollowingList';
 import { isPollingProfileScreen, loadProfile, openOwnProfile, pollProfileScreen } from './profile';
 import { ProfileCard } from './ProfileCard';
 import { LockedProfile, ProfileData } from './ProfileData';
+import { SettingsPanel } from './settings/SettingsPanel';
 import { profileStore } from './state';
 
 /** Draw a message that takes the place of the profile, with the button that follows from it. */
@@ -23,8 +24,9 @@ function ProfileMessage({ text, buttonLabel, onClick }: { text: string; buttonLa
 /** Draw the Profile screen: the card and the data of one profile, and the people the user follows. */
 export function ProfileScreen() {
     const t = useT();
-    const { view, profile, receivedAt, isBusy } = useStore(profileStore);
+    const { view, profile, receivedAt, isBusy, panel } = useStore(profileStore);
     const isCounting = profile?.data?.live.state === 'working';
+    const showsSettings = view === 'ready' && panel === 'settings' && profile?.relation === 'self';
     const now = useNow(isCounting);
 
     useDocumentEvent('visibilitychange', /** Refresh the profile and the list as soon as the tab is visible again. */ () => {
@@ -49,15 +51,17 @@ export function ProfileScreen() {
                 )}
                 {view === 'ready' && profile !== null && (
                     <>
-                        <ProfileCard profile={profile} isBusy={isBusy} secondsSinceAnswer={Math.max(0, now - receivedAt) / 1000} now={now} />
-                        {profile.data !== null
-                            ? <ProfileData data={profile.data} />
-                            : <LockedProfile username={profile.username} isPrivate={profile.is_private} isRequested={profile.relation === 'requested'} />}
+                        <ProfileCard profile={profile} isBusy={isBusy} isSettingsOpen={showsSettings} secondsSinceAnswer={Math.max(0, now - receivedAt) / 1000} now={now} />
+                        {showsSettings && <SettingsPanel />}
+                        {!showsSettings && profile.data !== null && <ProfileData data={profile.data} />}
+                        {!showsSettings && profile.data === null && (
+                            <LockedProfile username={profile.username} isPrivate={profile.is_private} isRequested={profile.relation === 'requested'} />
+                        )}
                     </>
                 )}
                 {view === 'error' && <ProfileMessage text={t('profile.error')} buttonLabel={t('common.retry')} onClick={() => { void loadProfile(); }} />}
                 {view === 'notFound' && <ProfileMessage text={t('profile.notFound')} buttonLabel={t('profile.goToMine')} onClick={() => { void openOwnProfile(); }} />}
-                <FollowingList />
+                {!showsSettings && <FollowingList />}
             </main>
 
         </Screen>

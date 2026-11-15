@@ -17,11 +17,13 @@ interface AuthFieldProps {
     inputRef?: RefObject<HTMLInputElement | null>;
     /** A hint shown under the field while there is no error. */
     guidance?: ReactNode;
+    /** True when the field cannot be edited. */
+    disabled?: boolean;
 }
 
 /** Draw a form field with its label and error message. */
 export function AuthField({
-    id, label, type, autoComplete, containerClass, value, onChange, error, errorId, describedBy, inputRef, guidance
+    id, label, type, autoComplete, containerClass, value, onChange, error, errorId, describedBy, inputRef, guidance, disabled = false
 }: AuthFieldProps) {
     const t = useT();
     const [isVisible, setIsVisible] = useState(false);
@@ -37,6 +39,7 @@ export function AuthField({
                     id={id}
                     autoComplete={autoComplete}
                     placeholder=" "
+                    disabled={disabled}
                     aria-describedby={describedBy}
                     aria-invalid={error ? true : undefined}
                     value={value}

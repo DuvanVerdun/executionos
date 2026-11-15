@@ -11,6 +11,7 @@ import { roomSnapshotCache, roomStore, roomsStore } from '../rooms/state';
 import { planDraftStore, sessionStore } from '../session/state';
 import { focusStore, reviewStore } from '../session/ui-state';
 import { followingStore, profileStore, searchStore } from '../profile/state';
+import { settingsStore } from '../profile/settings/state';
 import { floatingMessageStore } from '../shared/floating-message';
 import { screenStore } from '../shared/navigation';
 import { streakCelebrationStore } from '../streak/celebration';
@@ -44,6 +45,7 @@ remember(screenStore);
 remember(profileStore);
 remember(followingStore);
 remember(searchStore);
+remember(settingsStore);
 remember(streakStore);
 remember(streakCelebrationStore);
 

@@ -7,6 +7,8 @@ export type ProfileView = 'loading' | 'ready' | 'error' | 'notFound';
 interface ProfileState {
     /** The username whose profile shows. Null is the user's own. */
     viewing: string | null;
+    /** What the area beside the card shows: the data and the list, or the settings of the account. */
+    panel: 'profile' | 'settings';
     view: ProfileView;
     profile: Profile | null;
     /** When the profile came from the server, so a session that is working counts on from then. */
@@ -18,6 +20,7 @@ interface ProfileState {
 
 export const profileStore = createStore<ProfileState>({
     viewing: null,
+    panel: 'profile',
     view: 'loading',
     profile: null,
     receivedAt: 0,
