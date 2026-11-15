@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeBackendByPath, jsonBodyOf, pathOf, requestedPaths } from '../test/network';
+import { fakeBackendByPath, jsonBodyOf, requestedPaths } from '../test/network';
 import { ConfirmModal } from './ConfirmModal';
 import { SessionMenu } from './SessionCard';
 
@@ -73,7 +73,6 @@ describe('editing the mission of a session', () => {
         await vi.waitFor(() => { expect(onMissionChanged).toHaveBeenCalledWith('write better tests'); });
         expect(requestedPaths(fake)).toEqual(['update-session/5']);
         expect(fake.mock.calls[0]?.[1]?.method).toBe('PATCH');
-        expect(pathOf(fake.mock.calls[0]?.[0] ?? '')).toBe('update-session/5');
         expect(jsonBodyOf(fake.mock.calls[0]?.[1])).toEqual({ mission: 'write better tests' });
         expect(screen.queryByRole('dialog')).toBeNull();
     });

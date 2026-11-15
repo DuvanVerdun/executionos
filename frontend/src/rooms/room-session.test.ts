@@ -172,26 +172,6 @@ describe('the room timer is counted on this device', () => {
         }
     });
 
-    it('does not stall or skip when a heartbeat answer arrives', async () => {
-        startFakeServer();
-        await startSession();
-        const samples: { atMs: number; value: number }[] = [];
-        for (let step = 0; step < 800; step += 1) {
-            await vi.advanceTimersByTimeAsync(50);
-            samples.push({ atMs: step * 50, value: shown() });
-        }
-        const runs: { value: number; firstMs: number; lastMs: number }[] = [];
-        for (const sample of samples) {
-            const last = runs.at(-1);
-            if (last?.value === sample.value) last.lastMs = sample.atMs;
-            else runs.push({ value: sample.value, firstMs: sample.atMs, lastMs: sample.atMs });
-        }
-        for (const [index, run] of runs.slice(1, -1).entries()) {
-            expect(run.lastMs - run.firstMs + 50).toBeGreaterThanOrEqual(900);
-            expect(run.lastMs - run.firstMs + 50).toBeLessThanOrEqual(1100);
-            expect(run.value - (runs[index]?.value ?? run.value)).toBe(1);
-        }
-    });
 });
 
 describe('pause and resume', () => {

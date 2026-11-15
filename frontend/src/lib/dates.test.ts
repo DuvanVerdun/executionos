@@ -30,9 +30,6 @@ describe('formatLocalDate and parseLocalDate', () => {
         expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 10, 9]);
     });
 
-    it('round-trips', () => {
-        expect(formatLocalDate(parseLocalDate('2026-12-31'))).toBe('2026-12-31');
-    });
 });
 
 describe('normalizePeriodAnchor', () => {

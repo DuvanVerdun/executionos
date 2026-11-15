@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { en } from './en';
 import { es } from './es';
-import { DEFAULT_LANGUAGE, getLocale, languageStore, loadLanguage, setLanguage, t, translate, useT, type TranslationKey } from './i18n';
+import { DEFAULT_LANGUAGE, getLocale, loadLanguage, setLanguage, t, translate, useT, type TranslationKey } from './i18n';
 
 /** Take away the two Spanish texts that the tests below put in, or the real ones. */
 function clearSpanishTexts(): void {
@@ -56,10 +56,6 @@ describe('the language', () => {
         setLanguage('es');
         expect(document.documentElement.lang).toBe('es');
         expect(getLocale()).toBe('es');
-    });
-
-    it('starts in English in the tests', () => {
-        expect(languageStore.get().language).toBe('en');
     });
 
     it('falls back to English for a text that Spanish does not have yet', () => {

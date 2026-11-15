@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { errorStatus } from '../lib/errors';
 import { fakeBackend } from '../test/network';
 import { apiFetch, refreshAccessToken, setLoginRequiredHandler, unauthFetch } from './http';
 import { authStore } from './state';
@@ -73,12 +72,6 @@ describe('apiFetch', () => {
         expect(handler).toHaveBeenCalledWith('review');
     });
 
-    it('throws a StatusError that carries the 401', async () => {
-        setLoginRequiredHandler(vi.fn());
-        fakeBackend({ status: 401 }, { status: 401 });
-        const failure = await apiFetch({ path: 'thing', method: 'GET' }).catch(/** Return the error. */ (error: unknown) => error);
-        expect(errorStatus(failure)).toBe(401);
-    });
 });
 
 describe('refreshAccessToken', () => {

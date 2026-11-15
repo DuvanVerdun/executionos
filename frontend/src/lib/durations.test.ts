@@ -68,7 +68,7 @@ describe('formatAverageSessionTime', () => {
         expect(formatAverageSessionTime(45)).toBe('45s');
     });
 
-    it('shows hours and minutes from a minute up', () => {
+    it('shows minutes from a minute up', () => {
         expect(formatAverageSessionTime(90)).toBe('1m');
     });
 });

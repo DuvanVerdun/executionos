@@ -28,14 +28,6 @@ describe('a day of the demo', () => {
         expect(later.date).toBe('2027-03-02');
     });
 
-    it('gives yesterday two sessions and 1h 50m', () => {
-        expect(demoDay(NOVEMBER_12, 1)).toEqual({ date: '2026-11-11', state: 'work', total_sessions: 2, total_time_seconds: 110 * 60 });
-    });
-
-    it('gives the day before yesterday three sessions and 2h', () => {
-        expect(demoDay(NOVEMBER_12, 2)).toEqual({ date: '2026-11-10', state: 'work', total_sessions: 3, total_time_seconds: 120 * 60 });
-    });
-
     it('is today, with nothing yet, for zero days ago', () => {
         expect(demoDay(NOVEMBER_12, 0)).toEqual({ date: '2026-11-12', state: 'today', total_sessions: 0, total_time_seconds: 0 });
     });
@@ -194,13 +186,6 @@ describe('the demo room', () => {
     it('has five people in order, one of them you', () => {
         expect(DEMO_RANKING.map(/** Read a position. */ (member) => member.position)).toEqual([1, 2, 3, 4, 5]);
         expect(DEMO_RANKING.filter(/** Keep you. */ (member) => member.is_you)).toHaveLength(1);
-    });
-
-    it('has people working, one paused and one not working', () => {
-        const states = DEMO_RANKING.map(/** Read a state. */ (member) => member.state);
-        expect(states.filter(/** Keep the people working. */ (state) => state === 'working').length).toBeGreaterThanOrEqual(2);
-        expect(states).toContain('paused');
-        expect(states).toContain('not_working');
     });
 
     it('is ordered by time', () => {

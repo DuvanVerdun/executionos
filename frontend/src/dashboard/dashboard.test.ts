@@ -134,7 +134,7 @@ describe('refreshing the Dashboard after a delete', () => {
         expect(requestedPaths(fake).length).toBeGreaterThan(3);
     });
 
-    it('does not let a pagination request that was running add old sessions afterwards', async () => {
+    it('stops showing that more sessions are loading when the refresh ends', async () => {
         fakeBackendByPath(/** Answer each request. */ (path) => (path.startsWith('dashboard') ? { status: 200, body: summary(2) } : path.startsWith('get-sessions') ? page([1, 3], null) : { status: 500 }));
         showSessions([1, 2, 3], null);
         dashboardStore.update({ isLoadingMore: true });
