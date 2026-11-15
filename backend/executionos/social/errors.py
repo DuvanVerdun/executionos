@@ -17,5 +17,8 @@ def social_error_response(error: Exception) -> tuple[Any, int]:
     if isinstance(error, UserNotAvailableError):
         return error_response("User not available", 404)
 
+    if isinstance(error, ValueError):
+        return error_response("Invalid request", 400)
+
     current_app.logger.error("Social request failed", exc_info=error)
     return error_response("Social request failed", 500)

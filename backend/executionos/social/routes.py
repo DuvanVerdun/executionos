@@ -1,12 +1,13 @@
 from typing import Any
 
-from flask import Blueprint, jsonify  # type: ignore[attr-defined]
+from flask import Blueprint, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 
 from executionos.errors import error_response, server_error
-from executionos.params import read_json_object
+from executionos.params import parse_timezone, read_json_object
 from executionos.social.errors import social_error_response
 from executionos.social.presence import clear_presence_for_user, report_presence_for_user
+from executionos.social.queries import get_following_for_user, get_profile_for_user, search_users_for_user
 from executionos.social.service import (
     accept_follow_request_for_user,
     block_user_for_user,
@@ -118,5 +119,39 @@ def unblock_user(username: str) -> tuple[Any, int]:
     try:
         unblock_user_for_user(int(get_jwt_identity()), username)
         return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/following", methods=["GET"])
+@jwt_required()
+def get_following() -> tuple[Any, int]:
+    """Return the requests waiting for the authenticated user and the people they follow."""
+    try:
+        timezone = parse_timezone(request.args.get("timezone"))
+        return jsonify({"success": True, **get_following_for_user(int(get_jwt_identity()), timezone)}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/user-search", methods=["GET"])
+@jwt_required()
+def search_users() -> tuple[Any, int]:
+    """Return the users whose username starts with the query."""
+    try:
+        users = search_users_for_user(int(get_jwt_identity()), request.args.get("q", ""))
+        return jsonify({"success": True, "users": users}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/users/<username>", methods=["GET"])
+@jwt_required()
+def get_profile(username: str) -> tuple[Any, int]:
+    """Return a profile: the card, and the data when the authenticated user may see it."""
+    try:
+        timezone = parse_timezone(request.args.get("timezone"))
+        profile = get_profile_for_user(int(get_jwt_identity()), username, timezone)
+        return jsonify({"success": True, "profile": profile}), 200  # type: ignore
     except Exception as error:
         return social_error_response(error)

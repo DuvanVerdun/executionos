@@ -35,7 +35,7 @@ def _is_blocked_between(user_id: int, other_id: int) -> bool:
     ).first() is not None
 
 
-def _find_available_user(user_id: int, raw_username: str) -> User:
+def find_available_user(user_id: int, raw_username: str) -> User:
     """Like `_find_other_user`, and also unavailable when either of the two blocked the other."""
     other = _find_other_user(user_id, raw_username)
 
@@ -62,7 +62,7 @@ def _find_pending_request(user_id: int, requester_id: int) -> Follow:
 
 def follow_user_for_user(user_id: int, raw_username: str) -> str:
     """Follow someone. A private account turns it into a request. Following again changes nothing."""
-    other = _find_available_user(user_id, raw_username)
+    other = find_available_user(user_id, raw_username)
     statement = insert(Follow).values(
         follower_id=user_id,
         followee_id=other.id,
@@ -79,19 +79,19 @@ def follow_user_for_user(user_id: int, raw_username: str) -> str:
 
 def unfollow_user_for_user(user_id: int, raw_username: str) -> None:
     """Stop following someone, or take back a request."""
-    other = _find_available_user(user_id, raw_username)
+    other = find_available_user(user_id, raw_username)
     db.session.execute(delete(Follow).where(Follow.follower_id == user_id, Follow.followee_id == other.id))
     db.session.commit()
 
 
 def accept_follow_request_for_user(user_id: int, raw_username: str) -> None:
-    other = _find_available_user(user_id, raw_username)
+    other = find_available_user(user_id, raw_username)
     _find_pending_request(user_id, other.id).status = ACCEPTED
     db.session.commit()
 
 
 def decline_follow_request_for_user(user_id: int, raw_username: str) -> None:
-    other = _find_available_user(user_id, raw_username)
+    other = find_available_user(user_id, raw_username)
     db.session.delete(_find_pending_request(user_id, other.id))
     db.session.commit()
 

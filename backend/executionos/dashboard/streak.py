@@ -9,6 +9,7 @@ from sqlalchemy import select
 from executionos.extensions import db
 from executionos.models import Session
 from executionos.sessions.history import session_local_date
+from executionos.timeutils import as_utc_aware
 
 
 CalendarState = Literal["work", "rest", "missed", "neutral", "today"]
@@ -79,6 +80,40 @@ def calculate_streak_states(
         rest_days_remaining,
         states,
     )
+
+
+def best_streak(states: dict[date, CalendarState]) -> int:
+    """The longest streak that the states ever reached."""
+    best = 0
+    run = 0
+
+    for day in sorted(states):
+        if states[day] == "work":
+            run += 1
+            best = max(best, run)
+        elif states[day] == "missed":
+            run = 0
+
+    return best
+
+
+def get_work_dates_for_users(user_ids: list[int], timezone: ZoneInfo) -> dict[int, set[date]]:
+    """The days with work of each user, read in one query. Work is a session of more than zero seconds."""
+    today = datetime.now(UTC).astimezone(timezone).date()
+    work_dates: dict[int, set[date]] = {user_id: set() for user_id in user_ids}
+    rows = db.session.execute(
+        select(Session.user_id, Session.date).where(
+            Session.user_id.in_(user_ids),
+            Session.actual_time_seconds > 0,
+        )
+    ).all()
+
+    for user_id, when in rows:
+        local_date = as_utc_aware(when).astimezone(timezone).date()
+        if local_date <= today:
+            work_dates[user_id].add(local_date)
+
+    return work_dates
 
 
 def _get_user_sessions(user_id: int) -> list[Session]:
