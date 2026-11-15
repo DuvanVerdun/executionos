@@ -81,3 +81,24 @@ describe('confirmAction', () => {
         expect(confirmStore.get().request?.message).toBe('Second?');
     });
 });
+
+describe('the consequences in the confirm modal', () => {
+    it('shows each consequence on its own line under the question', async () => {
+        render(<ConfirmModal />);
+        void confirmAction({ message: 'Delete this room?', details: ['It is removed for everyone.', 'Members keep their sessions.'], confirmLabel: 'Delete' });
+        const dialog = await screen.findByRole('alertdialog');
+        expect(screen.getAllByRole('listitem').map(/** Read the text of a line. */ (item) => item.textContent)).toEqual([
+            'It is removed for everyone.', 'Members keep their sessions.'
+        ]);
+        const question = screen.getByText('Delete this room?');
+        expect(question.compareDocumentPosition(screen.getAllByRole('listitem')[0] ?? question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(dialog).toHaveAccessibleDescription(/Delete this room\?.*It is removed for everyone\./s);
+    });
+
+    it('has no list when the question has no consequences', async () => {
+        render(<ConfirmModal />);
+        void ask();
+        await screen.findByRole('alertdialog');
+        expect(screen.queryByRole('list')).toBeNull();
+    });
+});

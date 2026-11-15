@@ -28,7 +28,7 @@ export function ModalOverlay({ id, canClose, onClose, initialFocusRef, children 
         if (event.key !== 'Tab') return;
         const overlay = overlayRef.current;
         if (!overlay) return;
-        const focusable = Array.from(overlay.querySelectorAll('button:not(:disabled), input')).filter(
+        const focusable = Array.from(overlay.querySelectorAll('button:not(:disabled), input, textarea')).filter(
             /** Keep the elements that can take focus. */ (element): element is HTMLElement => element instanceof HTMLElement
         );
         if (focusable.length === 0) return;

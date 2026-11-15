@@ -3,6 +3,8 @@ import { createStore } from '../lib/store';
 /** A question that waits for the user's answer. */
 interface ConfirmRequest {
     message: string;
+    /** What the answer causes, one short sentence for each consequence. */
+    details?: string[];
     /** The text of the button that says yes. */
     confirmLabel: string;
     resolve: (confirmed: boolean) => void;
@@ -12,7 +14,7 @@ interface ConfirmRequest {
 export const confirmStore = createStore<{ request: ConfirmRequest | null }>({ request: null });
 
 /** Show the confirm modal and wait. Return true when the user confirms, and false when the user cancels. */
-export function confirmAction(question: { message: string; confirmLabel: string }): Promise<boolean> {
+export function confirmAction(question: { message: string; details?: string[]; confirmLabel: string }): Promise<boolean> {
     answerConfirm(false);
     return new Promise<boolean>(/** Keep the way to answer until the user decides. */ (resolve) => {
         confirmStore.set({ request: { ...question, resolve } });

@@ -10,13 +10,21 @@ import { buildRoomLink } from './links';
 /** Ask the user to confirm an action that is hard to undo. Return true at once for the actions that need no question. */
 function isConfirmed(action: RoomMenuAction): Promise<boolean> {
     if (action === 'refresh-link') {
-        return confirmAction({ message: t('rooms.refreshConfirm'), confirmLabel: t('rooms.refreshLink') });
+        return confirmAction({
+            message: t('rooms.refreshConfirm'), details: [t('rooms.refreshConfirmDetail')], confirmLabel: t('rooms.refreshLink')
+        });
     }
     if (action === 'delete-room') {
-        return confirmAction({ message: t('rooms.deleteConfirm'), confirmLabel: t('rooms.deleteRoom') });
+        return confirmAction({
+            message: t('rooms.deleteConfirm'),
+            details: [t('rooms.deleteConfirmHistory'), t('rooms.deleteConfirmSessions')],
+            confirmLabel: t('rooms.deleteRoom')
+        });
     }
     if (action === 'leave-room') {
-        return confirmAction({ message: t('rooms.leaveConfirm'), confirmLabel: t('rooms.leaveRoom') });
+        return confirmAction({
+            message: t('rooms.leaveConfirm'), details: [t('rooms.leaveConfirmDetail')], confirmLabel: t('rooms.leaveRoom')
+        });
     }
     return Promise.resolve(true);
 }

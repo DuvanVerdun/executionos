@@ -5,7 +5,7 @@ import { errorStatus } from '../lib/errors';
 import { patchSessionMission } from '../session/api';
 import { getMissionError } from '../session/plan';
 import type { ScreenName } from '../types/screens';
-import { CloseIcon } from './CloseIcon';
+import { ModalHeader } from './ModalHeader';
 import { ModalOverlay } from './ModalOverlay';
 
 interface EditMissionModalProps {
@@ -70,10 +70,7 @@ export function EditMissionModal({ sessionId, mission, screen, onSaved, onClose 
                 id="edit-mission-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-mission-title" noValidate
                 onSubmit={(event) => { void handleSubmit(event); }}
             >
-                <button type="button" id="edit-mission-close-btn" className="modal-close-btn" aria-label={t('session.editClose')} onClick={() => { if (!isSaving) onClose(); }}>
-                    <CloseIcon />
-                </button>
-                <h2 id="edit-mission-title" className="modal-title">{t('session.edit')}</h2>
+                <ModalHeader id="edit-mission" title={t('session.edit')} closeLabel={t('session.editClose')} onClose={() => { if (!isSaving) onClose(); }} />
                 <div className="modal-field">
                     <div className="input-container">
                         <input

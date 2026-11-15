@@ -19,8 +19,15 @@ export function ConfirmModal() {
 
     return (
         <ModalOverlay id="confirm-overlay" canClose onClose={() => { answerConfirm(false); }} initialFocusRef={cancelButtonRef}>
-            <div id="confirm-modal" className="modal-card confirm-card" role="alertdialog" aria-modal="true" aria-describedby="confirm-message">
-                <p id="confirm-message" className="modal-message">{request.message}</p>
+            <div id="confirm-modal" className="modal-card confirm-card" role="alertdialog" aria-modal="true" aria-describedby="confirm-text">
+                <div id="confirm-text" className="modal-text">
+                    <p id="confirm-message" className="modal-message">{request.message}</p>
+                    {request.details && (
+                        <ul id="confirm-details" className="modal-details">
+                            {request.details.map(/** Draw one consequence. */ (detail) => <li key={detail}>{detail}</li>)}
+                        </ul>
+                    )}
+                </div>
                 <div className="modal-actions">
                     <button
                         ref={cancelButtonRef}

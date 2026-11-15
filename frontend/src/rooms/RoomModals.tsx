@@ -2,8 +2,8 @@ import { useRef, useState, type SubmitEvent } from 'react';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
 import { useT } from '../i18n/i18n';
 import { errorStatus } from '../lib/errors';
-import { CloseIcon } from '../shared/CloseIcon';
 import { setFloatingMessage } from '../shared/floating-message';
+import { ModalHeader } from '../shared/ModalHeader';
 import { ModalOverlay } from '../shared/ModalOverlay';
 import type { ScreenName } from '../types/screens';
 import { patchRoomName, postJoinRoom, postRoom } from './api';
@@ -65,10 +65,7 @@ export function CreateRoomModal({ onCreated, onClose, isSubmitting, setIsSubmitt
                 id="create-room-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-room-title" noValidate
                 onSubmit={(event) => { void handleSubmit(event); }}
             >
-                <button type="button" id="create-room-close-btn" className="modal-close-btn" aria-label={t('rooms.closeCreate')} onClick={() => { if (!isSubmitting) onClose(); }}>
-                    <CloseIcon />
-                </button>
-                <h2 id="create-room-title" className="modal-title">{t('rooms.createTitle')}</h2>
+                <ModalHeader id="create-room" title={t('rooms.createTitle')} closeLabel={t('rooms.closeCreate')} onClose={() => { if (!isSubmitting) onClose(); }} />
                 <div className="modal-field">
                     <div className="input-container">
                         <input
@@ -134,10 +131,7 @@ export function JoinRoomModal({ onClose, isSubmitting, setIsSubmitting }: Omit<R
                 id="join-room-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="join-room-title" noValidate
                 onSubmit={(event) => { void handleSubmit(event); }}
             >
-                <button type="button" id="join-room-close-btn" className="modal-close-btn" aria-label={t('rooms.closeJoin')} onClick={() => { if (!isSubmitting) onClose(); }}>
-                    <CloseIcon />
-                </button>
-                <h2 id="join-room-title" className="modal-title">{t('rooms.joinTitle')}</h2>
+                <ModalHeader id="join-room" title={t('rooms.joinTitle')} closeLabel={t('rooms.closeJoin')} onClose={() => { if (!isSubmitting) onClose(); }} />
                 <div className="modal-field">
                     <div className="input-container">
                         <input
@@ -210,10 +204,7 @@ export function RenameRoomModal({ room, screen, onClose }: { room: { id: number;
                 id="rename-room-form" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="rename-room-title" noValidate
                 onSubmit={(event) => { void handleSubmit(event); }}
             >
-                <button type="button" id="rename-room-close-btn" className="modal-close-btn" aria-label={t('rooms.closeRename')} onClick={() => { if (!isSubmitting) onClose(); }}>
-                    <CloseIcon />
-                </button>
-                <h2 id="rename-room-title" className="modal-title">{t('rooms.renameTitle')}</h2>
+                <ModalHeader id="rename-room" title={t('rooms.renameTitle')} closeLabel={t('rooms.closeRename')} onClose={() => { if (!isSubmitting) onClose(); }} />
                 <div className="modal-field">
                     <div className="input-container">
                         <input
@@ -255,10 +246,7 @@ export function RoomCreatedModal({ link, onClose, isSubmitting }: { link: { full
     return (
         <ModalOverlay id="room-created-overlay" canClose={!isSubmitting} onClose={onClose} initialFocusRef={copyButtonRef}>
             <div id="room-created-modal" className="modal-card" role="dialog" aria-modal="true" aria-labelledby="room-created-title">
-                <button type="button" id="room-created-close-btn" className="modal-close-btn" aria-label={t('rooms.closeCreated')} onClick={() => { if (!isSubmitting) onClose(); }}>
-                    <CloseIcon />
-                </button>
-                <h2 id="room-created-title" className="modal-title">{t('rooms.createdTitle')}</h2>
+                <ModalHeader id="room-created" title={t('rooms.createdTitle')} closeLabel={t('rooms.closeCreated')} onClose={() => { if (!isSubmitting) onClose(); }} />
                 <input
                     type="text" className="input modal-link-display" id="room-created-link" readOnly aria-label={t('rooms.linkLabel')}
                     value={link.display}

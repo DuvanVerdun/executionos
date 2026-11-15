@@ -123,7 +123,6 @@ export function Header({ screen, className }: HeaderProps) {
                 <button
                     type="button"
                     id={`${screen}-user-menu-feedback-btn`}
-                    data-feedback-screen={screen}
                     onClick={() => { openFeedbackForm(screen); }}
                 >
                     {t('header.sendFeedback')}
