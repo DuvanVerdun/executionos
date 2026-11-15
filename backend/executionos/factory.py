@@ -4,6 +4,7 @@ from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
 
+from executionos.account.routes import account_bp
 from executionos.auth.routes import auth_bp
 from executionos.config import configure
 from executionos.dashboard.routes import dashboard_bp
@@ -24,7 +25,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     CORS(app, supports_credentials=True, origins=["https://executionos-mvp.netlify.app", "http://localhost:5500"])
     jwt.init_app(app)
 
-    for blueprint in (auth_bp, sessions_bp, dashboard_bp, rooms_bp, feedback_bp, social_bp):
+    for blueprint in (account_bp, auth_bp, sessions_bp, dashboard_bp, rooms_bp, feedback_bp, social_bp):
         app.register_blueprint(blueprint)
 
     return app
