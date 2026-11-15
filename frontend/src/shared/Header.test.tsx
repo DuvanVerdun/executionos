@@ -1,13 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { languageStore, setLanguage } from '../i18n/i18n';
+import { setLanguage } from '../i18n/i18n';
 import { initializeStreakState } from '../streak/streak';
 import { fakeBackendByPath, requestedPaths } from '../test/network';
 import type { HeaderScreenName } from '../types/screens';
 import { Header } from './Header';
 import { screenStore } from './navigation';
-import { userMenuStore } from './user-menu';
 
 beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -18,12 +17,13 @@ describe('Header navigation', () => {
     it.each([
         ['plan', 'Plan'],
         ['dashboard', 'Dashboard'],
-        ['rooms', 'Rooms']
+        ['rooms', 'Rooms'],
+        ['profile', '']
     ] as const satisfies readonly (readonly [HeaderScreenName, string])[])('shows the three buttons and marks the current one on %s', (screenName, current) => {
         render(<Header screen={screenName} className="plan-header" />);
         const buttons = screen.getAllByRole('button').filter(/** Keep the navigation buttons. */ (button) => button.classList.contains('header-nav-btn'));
         expect(buttons.map(/** Read a button's text. */ (button) => button.textContent)).toEqual(['Plan', 'Dashboard', 'Rooms']);
-        expect(buttons.filter(/** Keep the marked buttons. */ (button) => button.getAttribute('aria-current') === 'page').map(/** Read a button's text. */ (button) => button.textContent)).toEqual([current]);
+        expect(buttons.filter(/** Keep the marked buttons. */ (button) => button.getAttribute('aria-current') === 'page').map(/** Read a button's text. */ (button) => button.textContent)).toEqual(current === '' ? [] : [current]);
     });
 
     it('does nothing when the current screen button is clicked', async () => {
@@ -63,52 +63,47 @@ describe('Header navigation', () => {
     });
 });
 
-describe('the language menu', () => {
-    /** Open the account menu, and then the language menu. */
-    async function openLanguageMenu(): Promise<void> {
-        await userEvent.click(screen.getByLabelText('Open user menu'));
-        await userEvent.click(screen.getByRole('button', { name: 'Language' }));
-    }
-
-    it('opens beside the account menu, with English and Español, and marks the language that shows', async () => {
+describe('the way to the profile', () => {
+    it('opens the profile of the user from any screen, and loads it', async () => {
+        const fake = fakeBackendByPath(() => ({ status: 500 }));
+        screenStore.set({ screen: 'plan' });
         render(<Header screen="plan" className="plan-header" />);
-        await openLanguageMenu();
-        expect(screen.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
-        expect(screen.getByRole('menuitemradio', { name: 'Español' })).toHaveAttribute('aria-checked', 'false');
+        await userEvent.click(screen.getByRole('button', { name: 'Open profile' }));
+        expect(screenStore.get().screen).toBe('profile');
+        expect(requestedPaths(fake).some(/** Find the profile request. */ (path) => path.startsWith('users/'))).toBe(true);
+        expect(requestedPaths(fake).some(/** Find the list request. */ (path) => path.startsWith('following'))).toBe(true);
     });
 
-    it('is closed until the Language button is clicked, and closes when it is clicked again', async () => {
-        render(<Header screen="plan" className="plan-header" />);
-        await userEvent.click(screen.getByLabelText('Open user menu'));
-        expect(screen.queryByRole('menu', { name: 'Choose a language' })).toBeNull();
-        await userEvent.click(screen.getByRole('button', { name: 'Language' }));
-        expect(screen.getByRole('menu', { name: 'Choose a language' })).toBeInTheDocument();
-        await userEvent.click(screen.getByRole('button', { name: 'Language' }));
-        expect(screen.queryByRole('menu', { name: 'Choose a language' })).toBeNull();
+    it('opens with the keyboard too', async () => {
+        fakeBackendByPath(() => ({ status: 500 }));
+        screenStore.set({ screen: 'rooms' });
+        render(<Header screen="rooms" className="plan-header" />);
+        screen.getByRole('button', { name: 'Open profile' }).focus();
+        await userEvent.keyboard('{Enter}');
+        expect(screenStore.get().screen).toBe('profile');
     });
 
-    it('changes the language of the app when one is chosen, remembers it, and closes both menus', async () => {
+    it('is marked as the current page on the profile, and on no other screen', () => {
+        const { unmount } = render(<Header screen="profile" className="plan-header" />);
+        expect(screen.getByRole('button', { name: 'Open profile' })).toHaveAttribute('aria-current', 'page');
+        unmount();
         render(<Header screen="plan" className="plan-header" />);
-        await openLanguageMenu();
-        await userEvent.click(screen.getByRole('menuitemradio', { name: 'Español' }));
-        expect(languageStore.get().language).toBe('es');
-        expect(localStorage.getItem('executionOS_language')).toBe('es');
-        expect(screen.getByRole('button', { name: 'Panel' })).toBeInTheDocument();
-        expect(userMenuStore.get()).toEqual({ openScreen: null, isLanguageMenuOpen: false });
+        expect(screen.getByRole('button', { name: 'Open profile' })).not.toHaveAttribute('aria-current');
+    });
+
+    it('shows the profile again when it is clicked on the profile', async () => {
+        const fake = fakeBackendByPath(() => ({ status: 500 }));
+        screenStore.set({ screen: 'profile' });
+        render(<Header screen="profile" className="plan-header" />);
+        await userEvent.click(screen.getByRole('button', { name: 'Open profile' }));
+        expect(screenStore.get().screen).toBe('profile');
+        expect(requestedPaths(fake).some(/** Find the profile request. */ (path) => path.startsWith('users/'))).toBe(true);
     });
 
     it('writes the whole header in Spanish when Spanish shows', () => {
         setLanguage('es');
         render(<Header screen="rooms" className="plan-header" />);
         expect(screen.getByRole('button', { name: 'Salas' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Idioma' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
-    });
-
-    it('closes the language menu when the account menu closes', async () => {
-        render(<Header screen="plan" className="plan-header" />);
-        await openLanguageMenu();
-        await userEvent.click(screen.getByLabelText('Open user menu'));
-        expect(userMenuStore.get().isLanguageMenuOpen).toBe(false);
+        expect(screen.getByRole('button', { name: 'Abrir perfil' })).toBeInTheDocument();
     });
 });

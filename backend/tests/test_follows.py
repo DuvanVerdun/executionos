@@ -48,7 +48,7 @@ def test_following_a_public_account_is_accepted_at_once(app: Flask) -> None:
 
     response = call(duvan, "PUT", "/api/users/lucia/follow")
 
-    assert (response.status_code, body(response)["status"]) == (200, "accepted")
+    assert (response.status_code, body(response)["follow_status"]) == (200, "accepted")
     assert follows() == [(duvan.user_id, lucia.user_id, "accepted")]
 
 
@@ -59,7 +59,7 @@ def test_following_a_private_account_sends_a_request(app: Flask) -> None:
 
     response = call(duvan, "PUT", "/api/users/lucia/follow")
 
-    assert body(response)["status"] == "pending"
+    assert body(response)["follow_status"] == "pending"
     assert follows() == [(duvan.user_id, lucia.user_id, "pending")]
 
 
@@ -71,7 +71,7 @@ def test_following_again_changes_nothing(app: Flask) -> None:
 
     response = call(duvan, "PUT", "/api/users/lucia/follow")
 
-    assert body(response)["status"] == "pending"
+    assert body(response)["follow_status"] == "pending"
     assert len(follows()) == 1
 
 

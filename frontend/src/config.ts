@@ -28,3 +28,13 @@ export const CHECKIN_SOUND_REPEAT_MS = 10000;
 export const ROOM_RETRY_WINDOW_MS = 10000;
 
 export const ROOM_RETRY_DELAY_MS = 1500;
+
+/** How often the Profile screen refreshes the profile and the people the user follows. */
+export const SOCIAL_POLL_INTERVAL_MS = 15000;
+
+export const SOCIAL_REQUEST_TIMEOUT_MS = 20000;
+
+/** How long the search waits after the last key before it asks the server. */
+export const SEARCH_DEBOUNCE_MS = 300;
+
+export const SEARCH_MIN_LENGTH = 2;

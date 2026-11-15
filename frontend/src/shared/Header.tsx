@@ -1,27 +1,17 @@
-import { useRef } from 'react';
-import { handleLogout } from '../auth/logout';
-import { authStore } from '../auth/state';
-import { openFeedbackForm } from '../feedback/feedback';
+import { useRef, type KeyboardEvent } from 'react';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
-import { languageStore, setLanguage, useT, type Language, type TranslationKey } from '../i18n/i18n';
+import { useT, type TranslationKey } from '../i18n/i18n';
 import { useStore } from '../lib/store';
 import { StreakPopup } from '../streak/StreakPopup';
 import { closeStreakPopup, streakStore, toggleStreakPopup } from '../streak/streak';
-import { HEADER_SCREENS, type HeaderScreenName } from '../types/screens';
+import { NAVIGATION_SCREENS, type HeaderScreenName, type NavigationScreenName } from '../types/screens';
 import { goToHeaderScreen } from './header-navigation';
-import { closeUserMenu, toggleLanguageMenu, toggleUserMenu, userMenuStore } from './user-menu';
-
-/** The languages of the language menu, each written in its own language. */
-const LANGUAGE_OPTIONS = [
-    { language: 'en', name: 'English' },
-    { language: 'es', name: 'Español' }
-] as const satisfies readonly { language: Language; name: string }[];
 
 const NAVIGATION_LABELS = {
     plan: 'nav.plan',
     dashboard: 'nav.dashboard',
     rooms: 'nav.rooms'
-} as const satisfies Record<HeaderScreenName, TranslationKey>;
+} as const satisfies Record<NavigationScreenName, TranslationKey>;
 
 interface HeaderProps {
     screen: HeaderScreenName;
@@ -29,26 +19,13 @@ interface HeaderProps {
     className: string;
 }
 
-/** Draw the header of a screen: the wordmark, the three navigation buttons, the streak and the account menu. */
+/** Draw the header of a screen: the wordmark, the three navigation buttons, the streak and the way to the Profile. */
 export function Header({ screen, className }: HeaderProps) {
     const t = useT();
-    const { openScreen: openMenuScreen, isLanguageMenuOpen } = useStore(userMenuStore);
-    const { language } = useStore(languageStore);
     const { openScreen: openStreakScreen, currentStreak } = useStore(streakStore);
-    const { username } = useStore(authStore);
-    const iconRef = useRef<SVGSVGElement>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
     const streakButtonRef = useRef<HTMLButtonElement>(null);
     const streakPopupRef = useRef<HTMLDivElement>(null);
-    const isMenuOpen = openMenuScreen === screen;
     const isStreakOpen = openStreakScreen === screen;
-
-    useDocumentEvent('click', /** Close the account menu when a click occurs outside its controls. */ (event) => {
-        if (openMenuScreen === null) return;
-        const target = event.target instanceof Node ? event.target : null;
-        if (menuRef.current?.contains(target) || iconRef.current?.contains(target)) return;
-        closeUserMenu();
-    });
 
     useDocumentEvent('click', /** Close the consistency calendar on outside clicks. */ (event) => {
         if (openStreakScreen === null) return;
@@ -59,10 +36,17 @@ export function Header({ screen, className }: HeaderProps) {
         closeStreakPopup();
     });
 
+    /** Open the user's own profile with Enter or Space, like a button. */
+    function handleIconKeyDown(event: KeyboardEvent<SVGSVGElement>): void {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        void goToHeaderScreen('profile', screen);
+    }
+
     return (
         <header className={className}>
             <h1 className="wordmark">ExecutionOS</h1>
-            {HEADER_SCREENS.map(/** Draw a navigation button. The one of the current screen is marked. */ (target) => (
+            {NAVIGATION_SCREENS.map(/** Draw a navigation button. The one of the current screen is marked. */ (target) => (
                 <button
                     key={target}
                     type="button"
@@ -96,12 +80,15 @@ export function Header({ screen, className }: HeaderProps) {
                 </div>
             </div>
             <svg
-                ref={iconRef}
                 id={`${screen}-user-icon`}
-                className={isMenuOpen ? 'user-icon is-open' : 'user-icon'}
+                className={screen === 'profile' ? 'user-icon is-current' : 'user-icon'}
                 viewBox="0 0 48 48"
-                aria-label={t('header.openUserMenu')}
-                onClick={() => { toggleUserMenu(screen); }}
+                role="button"
+                tabIndex={0}
+                aria-label={t('header.openProfile')}
+                aria-current={screen === 'profile' ? 'page' : undefined}
+                onClick={() => { void goToHeaderScreen('profile', screen); }}
+                onKeyDown={handleIconKeyDown}
             >
                 <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="2.5" />
 
@@ -116,45 +103,6 @@ export function Header({ screen, className }: HeaderProps) {
                     fill="currentColor"
                 />
             </svg>
-            <div ref={menuRef} id={`${screen}-user-menu`} style={isMenuOpen ? { display: 'flex' } : undefined}>
-                <div id={`${screen}-user-menu-information`}>
-                    <p id={`${screen}-user-menu-username`}>{username}</p>
-                </div>
-                <button
-                    type="button"
-                    id={`${screen}-user-menu-feedback-btn`}
-                    onClick={() => { openFeedbackForm(screen); }}
-                >
-                    {t('header.sendFeedback')}
-                </button>
-                <div className="language-menu-wrapper">
-                    <button
-                        type="button"
-                        id={`${screen}-user-menu-language-btn`}
-                        aria-haspopup="menu"
-                        aria-expanded={isLanguageMenuOpen}
-                        onClick={toggleLanguageMenu}
-                    >
-                        {t('header.language')}
-                    </button>
-                    {isLanguageMenuOpen && (
-                        <div className="language-menu" role="menu" aria-label={t('header.chooseLanguage')}>
-                            {LANGUAGE_OPTIONS.map(/** Draw the button of one language. The current one is checked. */ (option) => (
-                                <button
-                                    key={option.language}
-                                    type="button"
-                                    role="menuitemradio"
-                                    aria-checked={option.language === language}
-                                    onClick={() => { setLanguage(option.language); closeUserMenu(); }}
-                                >
-                                    {option.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                <button id={`${screen}-user-menu-logout-btn`} onClick={() => { void handleLogout(screen); }}>{t('header.logout')}</button>
-            </div>
         </header>
     );
 }

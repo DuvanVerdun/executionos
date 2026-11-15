@@ -7,6 +7,7 @@ import { FeedbackForm } from './feedback/FeedbackForm';
 import { useDocumentEvent } from './hooks/useDocumentEvent';
 import { useStore } from './lib/store';
 import { LandingScreen } from './landing/LandingScreen';
+import { ProfileScreen } from './profile/ProfileScreen';
 import { handleRoomSessionGesture } from './rooms/checkin-sound';
 import { CheckinModal } from './rooms/CheckinModal';
 import { RoomScreen } from './rooms/RoomScreen';
@@ -43,6 +44,7 @@ export function App() {
             {screen === 'dashboard' && <DashboardScreen />}
             {screen === 'rooms' && <RoomsScreen />}
             {screen === 'room' && <RoomScreen />}
+            {screen === 'profile' && <ProfileScreen />}
             <FeedbackForm />
             <CheckinModal />
             <ConfirmModal />

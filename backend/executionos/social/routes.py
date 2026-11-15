@@ -53,7 +53,7 @@ def follow_user(username: str) -> tuple[Any, int]:
     """Follow a user, or send a request when their account is private."""
     try:
         status = follow_user_for_user(int(get_jwt_identity()), username)
-        return jsonify({"success": True, "status": status}), 200  # type: ignore
+        return jsonify({"success": True, "follow_status": status}), 200  # type: ignore
     except Exception as error:
         return social_error_response(error)
 

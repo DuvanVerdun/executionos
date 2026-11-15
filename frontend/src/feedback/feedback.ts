@@ -1,6 +1,5 @@
 import { t } from '../i18n/i18n';
 import { createStore } from '../lib/store';
-import { closeUserMenu, userMenuStore } from '../shared/user-menu';
 import type { HeaderScreenName } from '../types/screens';
 import { postFeedback } from './api';
 
@@ -31,7 +30,6 @@ export function openFeedbackForm(currentScreen: HeaderScreenName): void {
         feedbackStore.update({ message: '', messageIsSuccess: false, isInvalid: false });
     }
     feedbackStore.update({ currentScreen, isOpen: true });
-    if (userMenuStore.get().openScreen !== null) closeUserMenu();
 }
 
 /** Close feedback entry and clear its originating screen. */
