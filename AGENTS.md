@@ -76,6 +76,23 @@ Do not:
 
 If you notice an unrelated issue, mention it instead of silently fixing it.
 
+## Code Comments
+
+The code must be extremely clean. The only comments allowed are doc comments:
+`/** ... */` above functions, components, types, and constants in TypeScript, and
+docstrings in Python. They say what the thing is or does, and why when it is not obvious.
+
+Do not leave the comments that AI tends to leave when making changes:
+
+- Narration of the change ("added", "now we", "fixed", "updated", "new").
+- Step-by-step comments that repeat what the next line does.
+- Section dividers and decorative comments.
+- Commented-out code.
+- `TODO` or `NOTE` comments for work I did not ask to track.
+
+If code needs a comment to be understood, first make the code clearer (names, structure).
+Keep the doc comment of a function true when you change what the function does.
+
 ## Non-Negotiable Technical Patterns
 
 Preserve established ExecutionOS patterns:
