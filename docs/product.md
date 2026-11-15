@@ -173,7 +173,7 @@ Languages: Spanish (the default) and English, chosen in the account menu.
 - **Member:** a user who has joined a room and has not left it.
 - **Former member:** a user who left. Their sessions stay in the room history and totals, marked "(not a member anymore)".
 - **Room session:** a session started inside a room. It is held by the server while it runs, and it is saved to the user's personal history and to the room.
-- **Check-in:** once per hour of actual time, a popup asks "Are you still there?" The user has 5 minutes to click **Still here**.
+- **Check-in:** once per hour of actual time, a popup asks "Are you still there?" The user has 5 minutes to click **Still here**. Its sound repeats every 10 seconds until then.
 - **Working, Paused, Not working:** the state each member shows in the ranking.
 - **Streak:** the days worked in a row. Rest days do not break it.
 - **Rest day:** a day without work that the week allows. A week has two.
@@ -200,13 +200,16 @@ Rules a user can observe:
 - A week (Monday to Sunday) has two rest days that do not accumulate. The third day without work is a missed day and restarts the streak.
 - Today without work is gray: it is still open.
 - The calendar also shows the total days worked, the rest days left this week, and the sessions and time of a day when hovering it.
+- The Dashboard stats for a period are time focused, sessions, days worked (days with at least one session), and average session time.
+- The first session of the day opens a streak screen before the Dashboard, or before the room after a room session. The streak number rolls up beside a flame, and the button gives a pledge to come back tomorrow. A session saved only on this browser skips it.
 
 ## Editing and Navigation
 
 - The mission of a saved session can be edited, from the Dashboard and the Room history. Times never change.
 - One header on Plan, Dashboard, and Rooms holds the navigation, the streak, and the account menu.
 - A reload returns to the last Plan, Dashboard, Rooms, or room screen, until the tab closes.
-- Confirmations use one modal, not the browser's popup.
+- Confirmations use one modal, not the browser's popup. Forms (create, join and rename room, edit mission, Send Feedback) open as centered modals, and clicking outside closes them.
+- The tab icon is a ring: whole teal when no session runs, and the progress of the session while one does, with a pause mark when it is paused.
 
 ## Landing and Entry
 

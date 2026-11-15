@@ -3,6 +3,15 @@
 Each version is a meaningful product step. Small fixes and polish get their
 own commits, not their own entry.
 
+## v0.6.2 — Polish Details (Nov 15, 2026)
+
+- A streak screen after the first session of the day, with the number rolling up beside the flame and a pledge for tomorrow (also after a room session).
+- The tab icon is a progress ring that follows your session.
+- Room Review has the layout of the Room screen, with the room stats and ranking in place at once.
+- The Dashboard shows Days Worked instead of Avg. Completion, and short averages in seconds.
+- Redesigned confirm and form modals, and Send Feedback opens as a modal.
+- The check-in sound repeats every 10 seconds while it waits for an answer.
+
 ## v0.6.1 — Rebuild, Spanish & Landing (Nov 13, 2026)
 
 - Landing page for visitors, and a picture beside Login and Register (with an invite card for room links).

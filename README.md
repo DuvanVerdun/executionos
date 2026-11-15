@@ -25,6 +25,7 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 - Offline session queue and retry
 - Session deletion
 - Dashboard with trends, streaks, and a consistency calendar
+- A streak screen on the first session of the day, and a tab icon that shows your progress
 - Edit session missions and rename rooms
 - Co-DeepWork Rooms: work together through a link, with a ranking and hourly check-ins
 - Landing page, and Spanish (default) and English
@@ -73,6 +74,9 @@ Shared rooms where small groups do deep work together, with server-held sessions
 
 **v0.6.1 — Rebuild, Spanish & Landing**  
 A React and TypeScript rewrite with tests, a landing page, and Spanish.
+
+**v0.6.2 — Polish Details**  
+A streak screen, a progress ring in the tab icon, redesigned modals, and Days Worked on the Dashboard.
 
 ## About the project
 

@@ -78,19 +78,19 @@ src/
   main.tsx       connects the screen-change steps, sets the page language, starts React, then starts the app
   App.tsx        shows the screen that is active, and the parts above every screen
   config.ts      backend address and timing constants
-  app/           startup.ts (restore sign-in, first screen), hooks.ts (steps around screen changes), LoadingScreen
-  lib/           pure helpers (durations, dates, validation, timing, errors, arrays, css), store.ts, dom.ts
+  app/           startup.ts (restore sign-in, first screen), hooks.ts (steps around screen changes), favicon.ts, LoadingScreen
+  lib/           pure helpers (durations, dates, validation, timing, errors, arrays, css, favicon), store.ts, dom.ts
   hooks/         shared React hooks: useDocumentEvent, useInView, useToday
   i18n/          en.ts, es.ts, i18n.ts (see Frontend Texts)
   types/         backend response shapes and shared types
-  shared/        navigation (which screen shows), last-screen, floating message, confirm and edit-mission modals,
-                 account menu (with the language menu), Header, Screen, ProgressRing, SessionCard
+  shared/        navigation (which screen shows), last-screen, floating message, modals (ModalOverlay, ModalHeader,
+                 confirm and edit-mission), account menu (with the language menu), Header, Screen, ProgressRing, SessionCard
   auth/          state, http (token refresh), api, identity, logout, AuthShell (the layout of Login and Register,
                  with AuthVisual and InviteCard), Register and Login screens
   session/       state, ui-state, api, timer, storage (active session + offline queue), sync, plan, focus, review,
-                 MissionCard, Plan, Focus and Review screens
+                 MissionCard, Plan, Focus and Review screens (Review draws a personal and a room layout)
   dashboard/     api, dashboard (state and loading flows), chart-math, TrendChart, SessionHistory, DashboardScreen
-  streak/        api, streak (state and loading flows), StreakPopup
+  streak/        api, streak (state and loading flows), StreakPopup, celebration, pledges, StreakScreen
   feedback/      api, feedback (state and send flow), FeedbackForm
   landing/       the Landing: screen, header, one file per section, demo data, scroll effects (see Landing)
   rooms/         api, state, room-session-state, rooms, room, room-session, rename, menu, copy, links,
@@ -117,7 +117,7 @@ src/
 
 ## Screens and Navigation
 
-- Screens: `loading`, `landing`, `register`, `login`, `plan`, `focus`, `review`, `dashboard`, `rooms`, `room`.
+- Screens: `loading`, `landing`, `register`, `login`, `plan`, `focus`, `review`, `streak`, `dashboard`, `rooms`, `room`.
   There is no URL router. `screenStore` holds the screen, and `navigateTo` only follows the transitions
   that `shared/navigation.ts` allows.
 - **Startup** (`app/startup.ts`): not signed in goes to `landing`, or to `register` with a `#join=` link. Signed in
@@ -127,6 +127,23 @@ src/
 - The last screen is saved in `sessionStorage` (`shared/last-screen.ts`) and forgotten at logout.
 - Leaving `landing` scrolls to the top. Reaching `landing`, `login`, `register`, or `loading` clears the room
   data (`app/hooks.ts`).
+
+## Streak Screen
+
+- After a session is saved on the server, `loadStreakCelebration` asks `GET /api/streak` for the calendar of today. It is
+  the first session of the day when today is a `work` day with exactly one session, and the streak grew from
+  `current_streak - 1` to `current_streak`. A session queued offline skips the check.
+- `review` → `streak` → `dashboard`, or `review` → `streak` → `room`. The Dashboard loads while the screen plays, and
+  the saved message shows when the user leaves it.
+- `pickPledge` picks the button text at random when the screen opens. Each pledge may have `fromStreak`, the first
+  streak day it fits.
+- The number rolls place by place from the right (`placesOf`). The timeline is CSS delays, and reduced motion skips it.
+
+## Tab Icon
+
+`lib/favicon.ts` draws the progress ring as an SVG data address, and `app/favicon.ts` follows the session stores and
+changes the SVG link. The percentage comes from the session's timestamps, so a throttled tab shows the real progress at
+its next tick. `public/favicon.svg` is the idle ring, and `favicon.png` is the fallback for browsers that cannot draw SVG.
 
 ## Frontend Tests
 
@@ -380,7 +397,8 @@ The backend remains authoritative.
 from the first day worked to today. A day with work is `work`. After work, a day without work is `rest` while
 the week (Monday to Sunday) has used fewer than two rest days, then `missed`, which resets the streak. Today
 without work is `today`. The answer has `current_streak`, `total_worked_days`, `rest_days_remaining_this_week`,
-and a month `calendar` with each day's state, sessions, and time. `PATCH /api/update-session/<id>` changes a
+and a month `calendar` with each day's state, sessions, and time. The Dashboard summary has `days_worked`, the
+distinct local days with a session in the period. `PATCH /api/update-session/<id>` changes a
 mission, never the times.
 
 ## Rooms
@@ -424,6 +442,7 @@ Three ideas run through everything:
 | `LINK_TOKEN_BYTES` | 16 | backend |
 | `PAGE_SIZE` | 20, personal list and room history | backend |
 | `HEARTBEAT_INTERVAL_MS`, `ROOM_POLL_INTERVAL_MS` | 15000 | client |
+| `CHECKIN_SOUND_REPEAT_MS` | 10000, the check-in sound repeats while it waits | client |
 
 ### Data model
 
@@ -558,8 +577,12 @@ one query, so a request costs about three statements.
   refresh silently. The skeleton appears only on a first visit. A failed load when
   opening a screen shows its error state, and a failed background poll stays silent.
 - **Check-in.** The popup opens when the client's worked time reaches the next whole hour, and
-  plays a sound scheduled on the audio clock, so tab throttling does not delay it. Audio needs a
+  plays a sound scheduled on the audio clock, so tab throttling does not delay it. The sound repeats every
+  `CHECKIN_SOUND_REPEAT_MS` until the time to answer ends. Audio needs a
   user gesture to unlock. A tab that becomes visible again brings the timer and the check-in up to date.
+- **Review in a room** has the layout of the Room screen. Its summary cards and ranking start as the last
+  snapshot of the room (`roomSnapshotCache`, the ranking without `received_at`, so running sessions are not counted
+  on), and the server's summary and ranking replace them. The ranking loads after the pause reaches the server.
 - **Ordering at load.** Authenticate, join from `#join=` if present, restore the
   server's running session, then restore a personal session, then go to Plan.
 
