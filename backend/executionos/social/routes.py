@@ -5,7 +5,17 @@ from flask_jwt_extended import get_jwt_identity, jwt_required  # type: ignore[re
 
 from executionos.errors import error_response, server_error
 from executionos.params import read_json_object
+from executionos.social.errors import social_error_response
 from executionos.social.presence import clear_presence_for_user, report_presence_for_user
+from executionos.social.service import (
+    accept_follow_request_for_user,
+    block_user_for_user,
+    decline_follow_request_for_user,
+    follow_user_for_user,
+    list_blocked_for_user,
+    unblock_user_for_user,
+    unfollow_user_for_user,
+)
 
 social_bp = Blueprint("social", __name__)
 
@@ -34,3 +44,79 @@ def clear_presence() -> tuple[Any, int]:
         return jsonify({"success": True}), 200  # type: ignore
     except Exception:
         return server_error("Presence request failed")
+
+
+@social_bp.route("/api/users/<username>/follow", methods=["PUT"])
+@jwt_required()
+def follow_user(username: str) -> tuple[Any, int]:
+    """Follow a user, or send a request when their account is private."""
+    try:
+        status = follow_user_for_user(int(get_jwt_identity()), username)
+        return jsonify({"success": True, "status": status}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/users/<username>/follow", methods=["DELETE"])
+@jwt_required()
+def unfollow_user(username: str) -> tuple[Any, int]:
+    """Stop following a user, or take back a request."""
+    try:
+        unfollow_user_for_user(int(get_jwt_identity()), username)
+        return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/follow-requests/<username>/accept", methods=["POST"])
+@jwt_required()
+def accept_follow_request(username: str) -> tuple[Any, int]:
+    """Accept the request that a user sent to the authenticated user."""
+    try:
+        accept_follow_request_for_user(int(get_jwt_identity()), username)
+        return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/follow-requests/<username>", methods=["DELETE"])
+@jwt_required()
+def decline_follow_request(username: str) -> tuple[Any, int]:
+    """Decline the request that a user sent to the authenticated user."""
+    try:
+        decline_follow_request_for_user(int(get_jwt_identity()), username)
+        return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/blocks", methods=["GET"])
+@jwt_required()
+def get_blocks() -> tuple[Any, int]:
+    """Return the users the authenticated user blocked."""
+    try:
+        return jsonify({"success": True, "blocked": list_blocked_for_user(int(get_jwt_identity()))}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/blocks/<username>", methods=["PUT"])
+@jwt_required()
+def block_user(username: str) -> tuple[Any, int]:
+    """Block a user."""
+    try:
+        block_user_for_user(int(get_jwt_identity()), username)
+        return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
+
+
+@social_bp.route("/api/blocks/<username>", methods=["DELETE"])
+@jwt_required()
+def unblock_user(username: str) -> tuple[Any, int]:
+    """Unblock a user."""
+    try:
+        unblock_user_for_user(int(get_jwt_identity()), username)
+        return jsonify({"success": True}), 200  # type: ignore
+    except Exception as error:
+        return social_error_response(error)
