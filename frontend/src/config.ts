@@ -22,6 +22,9 @@ export const CHECKIN_INTERVAL_MS = 3600000;
 
 export const CHECKIN_RESPONSE_MS = 300000;
 
+/** How often the check-in sound repeats while the check-in waits for an answer. */
+export const CHECKIN_SOUND_REPEAT_MS = 10000;
+
 export const ROOM_RETRY_WINDOW_MS = 10000;
 
 export const ROOM_RETRY_DELAY_MS = 1500;

@@ -72,7 +72,8 @@ interface CheckinAudio {
     context: AudioContext | null;
     buffer: AudioBuffer | null;
     loading: Promise<void> | null;
-    source: AudioBufferSourceNode | null;
+    /** The sounds scheduled for the check-in that is due or waiting. */
+    sources: AudioBufferSourceNode[];
     failed: boolean;
 }
 
@@ -81,6 +82,6 @@ export const checkinAudio: CheckinAudio = {
     context: null,
     buffer: null,
     loading: null,
-    source: null,
+    sources: [],
     failed: false
 };

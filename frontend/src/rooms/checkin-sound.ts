@@ -1,4 +1,4 @@
-import { CHECKIN_SOUND_URL } from '../config';
+import { CHECKIN_RESPONSE_MS, CHECKIN_SOUND_REPEAT_MS, CHECKIN_SOUND_URL } from '../config';
 import { roomSessionStore } from './room-session-state';
 import { checkinAudio } from './state';
 
@@ -31,17 +31,22 @@ export async function unlockCheckinAudio(): Promise<void> {
     }
 }
 
-/** Stop a scheduled check-in sound. */
+/** Stop the scheduled check-in sounds. */
 export function cancelCheckinSound(): void {
-    try {
-        checkinAudio.source?.stop();
-    } catch (error) {
-        console.error('Could not stop the check-in sound:', error);
+    for (const source of checkinAudio.sources) {
+        try {
+            source.stop();
+        } catch (error) {
+            console.error('Could not stop the check-in sound:', error);
+        }
     }
-    checkinAudio.source = null;
+    checkinAudio.sources = [];
 }
 
-/** Schedule the check-in sound on the audio clock, which tab throttling does not delay. */
+/**
+ * Schedule the check-in sound on the audio clock, which tab throttling does not delay. It plays when the check-in
+ * is due and again every few seconds until the time to answer is over. The repeats that are already past are skipped.
+ */
 export function armCheckinSound(): void {
     cancelCheckinSound();
     const { context, buffer } = checkinAudio;
@@ -49,13 +54,16 @@ export function armCheckinSound(): void {
     const { dueAtMs } = checkin;
     if (!context || !buffer || context.state !== 'running') return;
     if (!active || isPaused || dueAtMs === null) return;
-    const delayMs = dueAtMs - Date.now();
-    if (delayMs < 0) return;
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    source.start(context.currentTime + delayMs / 1000);
-    checkinAudio.source = source;
+    const repeats = Math.ceil(CHECKIN_RESPONSE_MS / CHECKIN_SOUND_REPEAT_MS);
+    for (let repeat = 0; repeat < repeats; repeat += 1) {
+        const delayMs = dueAtMs + repeat * CHECKIN_SOUND_REPEAT_MS - Date.now();
+        if (delayMs < 0) continue;
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        source.start(context.currentTime + delayMs / 1000);
+        checkinAudio.sources.push(source);
+    }
 }
 
 /** Try to unlock the sound on any click or key press while a room session runs. */
