@@ -21,7 +21,8 @@ export interface DashboardData {
     summary: {
         total_time_seconds: number;
         total_sessions: number;
-        average_completion_percentage: number | null;
+        /** The days of the period that have at least one session. */
+        days_worked: number;
         average_session_time_seconds: number | null;
     };
     trend: TrendBucket[];

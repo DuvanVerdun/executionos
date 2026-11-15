@@ -1,6 +1,6 @@
 import { TrendChart } from '../dashboard/TrendChart';
 import { useT, type TranslationKey } from '../i18n/i18n';
-import { formatDurationHoursMinutes } from '../lib/durations';
+import { formatAverageSessionTime, formatDurationHoursMinutes } from '../lib/durations';
 import { demoStats, demoTrend } from './demo';
 
 const METRICS = [
@@ -28,11 +28,11 @@ export function ProofSection({ today }: { today: Date }) {
                         <p className="dashboard-summary-label">{t('review.sessions')}</p>
                     </div>
                     <div className="dashboard-summary-card">
-                        <p className="dashboard-summary-value">{`${stats.averageCompletionPercentage}%`}</p>
-                        <p className="dashboard-summary-label">{t('dashboard.averageCompletion')}</p>
+                        <p className="dashboard-summary-value">{String(stats.daysWorked)}</p>
+                        <p className="dashboard-summary-label">{t('dashboard.daysWorked')}</p>
                     </div>
                     <div className="dashboard-summary-card">
-                        <p className="dashboard-summary-value">{formatDurationHoursMinutes(stats.averageSessionSeconds)}</p>
+                        <p className="dashboard-summary-value">{formatAverageSessionTime(stats.averageSessionSeconds)}</p>
                         <p className="dashboard-summary-label">{t('review.averageSessionTime')}</p>
                     </div>
                 </div>

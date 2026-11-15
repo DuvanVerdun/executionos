@@ -203,7 +203,7 @@ export const en = {
     'dashboard.loading': 'Loading dashboard',
     'dashboard.stats': 'Stats',
     'dashboard.sessionHistory': 'Session History',
-    'dashboard.averageCompletion': 'Avg. Completion',
+    'dashboard.daysWorked': 'Days Worked',
     'dashboard.trendChart': 'Execution trend',
     'dashboard.completionSummary': '{percent}% completion',
     'dashboard.unreachable': "Couldn't reach the server.",

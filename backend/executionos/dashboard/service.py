@@ -203,19 +203,14 @@ def get_dashboard_data(
         for session in sessions
     )
 
-    average_completion_percentage: float | None = None
+    days_worked = len({
+        session_local_date(session, timezone)
+        for session in sessions
+    })
+
     average_session_time_seconds: int | None = None
 
     if total_sessions > 0:
-        average_completion_percentage = round(
-            sum(
-                session_completion_percentage(session)
-                for session in sessions
-            )
-            / total_sessions,
-            1,
-        )
-
         average_session_time_seconds = round(
             total_time_seconds / total_sessions
         )
@@ -234,9 +229,7 @@ def get_dashboard_data(
         "summary": {
             "total_time_seconds": total_time_seconds,
             "total_sessions": total_sessions,
-            "average_completion_percentage": (
-                average_completion_percentage
-            ),
+            "days_worked": days_worked,
             "average_session_time_seconds": (
                 average_session_time_seconds
             ),

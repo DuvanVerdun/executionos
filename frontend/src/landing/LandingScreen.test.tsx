@@ -94,7 +94,7 @@ describe('the sections', () => {
     it('draws the stats and the chart of the dashboard', () => {
         render(<LandingScreen />);
         const proof = section('Feeling productive is not proof.');
-        for (const label of ['Focused', 'Sessions', 'Avg. Completion', 'Avg. Session Time']) {
+        for (const label of ['Focused', 'Sessions', 'Days Worked', 'Avg. Session Time']) {
             expect(within(proof).getAllByText(label).length).toBeGreaterThan(0);
         }
         expect(within(proof).getByRole('img', { name: 'Execution trend' })).toBeInTheDocument();

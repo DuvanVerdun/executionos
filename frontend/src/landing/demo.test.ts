@@ -178,6 +178,7 @@ describe('the chart and the stats', () => {
         const totalSessions = trend.reduce((sum, bucket) => sum + bucket.total_sessions, 0);
         expect(stats.totalTimeSeconds).toBe(totalTime);
         expect(stats.totalSessions).toBe(totalSessions);
+        expect(stats.daysWorked).toBe(trend.filter(/** Keep the days with sessions. */ (bucket) => bucket.total_sessions > 0).length);
         expect(stats.averageSessionSeconds).toBe(Math.round(totalTime / totalSessions));
     });
 });

@@ -18,7 +18,7 @@ function summary(totalSessions: number): DashboardData & { success: true } {
     return {
         success: true,
         period: { type: 'week', anchor_date: '2026-11-09', start_date: '2026-11-09', end_date: '2026-11-15' },
-        summary: { total_time_seconds: totalSessions * 600, total_sessions: totalSessions, average_completion_percentage: 100, average_session_time_seconds: 600 },
+        summary: { total_time_seconds: totalSessions * 600, total_sessions: totalSessions, days_worked: totalSessions > 0 ? 1 : 0, average_session_time_seconds: 600 },
         trend: []
     };
 }

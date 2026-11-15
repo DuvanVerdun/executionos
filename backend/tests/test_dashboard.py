@@ -120,16 +120,34 @@ def test_dashboard_numbers_and_days_follow_the_users_timezone(app: Flask):
     in_buenos_aires = dashboard(ana, "week", "2026-10-28", "America/Argentina/Buenos_Aires")
 
     for result in (in_utc, in_buenos_aires):
-        assert result["summary"] == {
-            "total_time_seconds": 5400,
-            "total_sessions": 2,
-            "average_completion_percentage": 75.0,
-            "average_session_time_seconds": 2700,
-        }
+        assert result["summary"]["total_time_seconds"] == 5400
+        assert result["summary"]["total_sessions"] == 2
+        assert result["summary"]["average_session_time_seconds"] == 2700
 
     # 02:00 UTC on Wednesday is still 23:00 on Tuesday in Buenos Aires.
     assert sessions_per_day(in_utc) == {"2026-10-27": 1, "2026-10-28": 1}
     assert sessions_per_day(in_buenos_aires) == {"2026-10-27": 2}
+    assert in_utc["summary"]["days_worked"] == 2
+    assert in_buenos_aires["summary"]["days_worked"] == 1
+
+
+def test_days_worked_counts_each_day_with_a_session_once(app: Flask):
+    ana = make_account(app, "ana")
+    save_session(ana, date="2026-10-26T09:00:00Z", actualTimeSeconds=600)
+    save_session(ana, date="2026-10-26T15:00:00Z", actualTimeSeconds=600)
+    save_session(ana, date="2026-10-29T12:00:00Z", actualTimeSeconds=600)
+    save_session(ana, date="2026-09-15T12:00:00Z", actualTimeSeconds=600)
+
+    assert dashboard(ana, "week", "2026-10-26", "UTC")["summary"]["days_worked"] == 2
+    assert dashboard(ana, "month", "2026-10-01", "UTC")["summary"]["days_worked"] == 2
+    assert dashboard(ana, "year", "2026-10-01", "UTC")["summary"]["days_worked"] == 3
+    assert dashboard(ana, "all_time", "2026-10-31", "UTC")["summary"]["days_worked"] == 3
+
+
+def test_days_worked_is_zero_when_the_period_has_no_sessions(app: Flask):
+    ana = make_account(app, "ana")
+
+    assert dashboard(ana, "week", "2026-10-26", "UTC")["summary"]["days_worked"] == 0
 
 
 def test_daily_trend_days_say_whether_they_were_rest_days(app: Flask):

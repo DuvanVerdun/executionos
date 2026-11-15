@@ -17,7 +17,7 @@ export interface MonthDay {
 export interface DemoStats {
     totalTimeSeconds: number;
     totalSessions: number;
-    averageCompletionPercentage: number;
+    daysWorked: number;
     averageSessionSeconds: number;
 }
 
@@ -147,14 +147,17 @@ export function demoTrend(today: Date): TrendBucket[] {
 export function demoStats(): DemoStats {
     let totalTimeSeconds = 0;
     let totalSessions = 0;
+    let daysWorked = 0;
     for (let daysAgo = 0; daysAgo < TREND_DAYS; daysAgo++) {
+        const sessions = demoSessions(daysAgo);
         totalTimeSeconds += demoFocusMinutes(daysAgo) * 60;
-        totalSessions += demoSessions(daysAgo);
+        totalSessions += sessions;
+        if (sessions > 0) daysWorked += 1;
     }
     return {
         totalTimeSeconds,
         totalSessions,
-        averageCompletionPercentage: AVERAGE_COMPLETION_PERCENTAGE,
+        daysWorked,
         averageSessionSeconds: Math.round(totalTimeSeconds / totalSessions)
     };
 }

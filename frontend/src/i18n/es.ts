@@ -202,7 +202,7 @@ export const es: Partial<Record<TranslationKey, string>> = {
     'dashboard.loading': 'Cargando el panel',
     'dashboard.stats': 'Estadísticas',
     'dashboard.sessionHistory': 'Historial de sesiones',
-    'dashboard.averageCompletion': 'Completado promedio',
+    'dashboard.daysWorked': 'Días trabajados',
     'dashboard.trendChart': 'Tendencia de ejecución',
     'dashboard.completionSummary': '{percent}% de completado',
     'dashboard.unreachable': 'No se pudo conectar con el servidor.',

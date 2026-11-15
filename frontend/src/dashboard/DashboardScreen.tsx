@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { useT, type TranslationKey } from '../i18n/i18n';
 import { getElement } from '../lib/dom';
-import { formatDurationHoursMinutes } from '../lib/durations';
+import { formatAverageSessionTime, formatDurationHoursMinutes } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { waitForMinimumFeedback } from '../lib/timing';
 import { syncOfflineWork } from '../session/sync';
@@ -123,14 +123,14 @@ export function DashboardScreen() {
                                             <p className="dashboard-summary-label">{t('review.sessions')}</p>
                                         </div>
                                         <div className="dashboard-summary-card">
-                                            <p id="dashboard-average-percentage-display" className="dashboard-summary-value">
-                                                {data.summary.average_completion_percentage === null ? '—' : `${Math.round(data.summary.average_completion_percentage)}%`}
+                                            <p id="dashboard-days-worked-display" className="dashboard-summary-value">
+                                                {String(data.summary.days_worked)}
                                             </p>
-                                            <p className="dashboard-summary-label">{t('dashboard.averageCompletion')}</p>
+                                            <p className="dashboard-summary-label">{t('dashboard.daysWorked')}</p>
                                         </div>
                                         <div className="dashboard-summary-card">
                                             <p id="dashboard-average-session-time-display" className="dashboard-summary-value">
-                                                {data.summary.average_session_time_seconds === null ? '—' : formatDurationHoursMinutes(data.summary.average_session_time_seconds)}
+                                                {data.summary.average_session_time_seconds === null ? '—' : formatAverageSessionTime(data.summary.average_session_time_seconds)}
                                             </p>
                                             <p className="dashboard-summary-label">{t('review.averageSessionTime')}</p>
                                         </div>
