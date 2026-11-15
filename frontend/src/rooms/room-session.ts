@@ -16,6 +16,7 @@ import type { RoomSessionEnvelope, RoomSessionNotice, RoomSessionPayload, RoomSe
 import type { ScreenName } from '../types/screens';
 import {
     fetchRoomSession,
+    fetchRoomSnapshot,
     fetchRoomSummary,
     postFinishRoomSession,
     postRoomSessionEvent,
@@ -535,11 +536,18 @@ export async function handleRoomPauseResume(): Promise<void> {
     await settleRoomSessionOutcome(outcome, pausing ? t('rooms.errorPause') : t('rooms.errorResume'));
 }
 
-/** Fill the Review summary cards at once from the last known room summary plus this session. Return whether it could. */
-function renderReviewRoomSummaryFromCache(): boolean {
+/**
+ * Fill the Review cards and ranking at once with what the room last looked like, and count this session in the totals.
+ * The ranking has no `receivedAt`, so its running sessions stay as they were seen instead of counting on from an old answer.
+ * Without a last look, both stay empty until the room loads.
+ */
+function renderReviewRoomFromCache(): void {
     const roomId = roomSessionStore.get().roomId;
     const cached = roomId === null ? undefined : roomSnapshotCache.get(roomId);
-    if (!cached) return false;
+    if (!cached) {
+        reviewStore.update({ roomSummary: null, roomRanking: null });
+        return;
+    }
     const totalSessions = cached.summary.total_sessions + 1;
     const totalTime = cached.summary.total_time_seconds + roomSessionStore.get().display.actualTimeSeconds;
     reviewStore.update({
@@ -548,12 +556,12 @@ function renderReviewRoomSummaryFromCache(): boolean {
             total_sessions: totalSessions,
             total_time_seconds: totalTime,
             average_session_time_seconds: Math.round(totalTime / totalSessions)
-        }
+        },
+        roomRanking: { entries: cached.ranking, receivedAt: undefined }
     });
-    return true;
 }
 
-/** Load the room's summary once, counting the paused session, to correct the Review cards. */
+/** Load the room's summary once, counting the paused session, to replace the Review cards of the last look. */
 async function loadReviewRoomSummary(): Promise<void> {
     const roomId = roomSessionStore.get().roomId;
     if (roomId === null) return;
@@ -568,6 +576,22 @@ async function loadReviewRoomSummary(): Promise<void> {
     }
 }
 
+/** Load the room's ranking once for Review, after the queued events reached the server so the user's own row shows as paused, to replace the ranking of the last look. */
+async function loadReviewRoomRanking(): Promise<void> {
+    const roomId = roomSessionStore.get().roomId;
+    if (roomId === null) return;
+    await roomSessionStore.get().queueTail;
+    try {
+        const result = await fetchRoomSnapshot(roomId, 'review');
+        const state = roomSessionStore.get();
+        if (!state.active || state.roomId !== roomId) return;
+        if (!result.success) throw new Error(result.error);
+        reviewStore.update({ roomRanking: { entries: result.ranking, receivedAt: Date.now() } });
+    } catch (error) {
+        if (errorStatus(error) !== 401) console.error('Could not load the room ranking:', error);
+    }
+}
+
 /** Stop the room session: open Review at once and pause it on the server. */
 export async function handleRoomStop(): Promise<void> {
     if (!roomSessionStore.get().active) return;
@@ -575,15 +599,18 @@ export async function handleRoomStop(): Promise<void> {
     if (needsPause) applyLocalPause();
     refreshRoomDisplay();
     navigateTo('review', 'focus');
-    if (!renderReviewRoomSummaryFromCache()) reviewStore.update({ roomSummary: null });
+    renderReviewRoomFromCache();
     void loadReviewRoomSummary();
-    if (!needsPause) return;
     const workedSeconds = roomSessionStore.get().display.actualTimeSeconds;
-    const outcome = await enqueueRoomSessionRequest(
-        /** Send the pause event that Stop uses, with the seconds counted at the click. */
-        () => postRoomSessionEvent('pause', getCurrentScreenName(), workedSeconds)
-    );
-    await settleRoomSessionOutcome(outcome, t('rooms.errorStop'));
+    const pause = needsPause
+        ? enqueueRoomSessionRequest(
+            /** Send the pause event that Stop uses, with the seconds counted at the click. */
+            () => postRoomSessionEvent('pause', getCurrentScreenName(), workedSeconds)
+        )
+        : null;
+    void loadReviewRoomRanking();
+    if (pause === null) return;
+    await settleRoomSessionOutcome(await pause, t('rooms.errorStop'));
 }
 
 /** Resume reviewed work: return to Focus at once and resume on the server. */

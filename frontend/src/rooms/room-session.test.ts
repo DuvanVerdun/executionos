@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { reviewStore } from '../session/ui-state';
 import { getCurrentScreenName, screenStore } from '../shared/navigation';
 import { fakeBackendByPath, jsonBodyOf, pathOf, type FakeAnswer } from '../test/network';
-import type { RoomSessionEnvelope } from '../types/rooms';
+import type { RoomSessionEnvelope, RoomSnapshot } from '../types/rooms';
 import {
     applyRoomSessionEnvelope,
     enterRoomSessionFocus,
@@ -15,7 +16,7 @@ import {
     startRoomWork
 } from './room-session';
 import { roomSessionStore } from './room-session-state';
-import { roomStore } from './state';
+import { roomSnapshotCache, roomStore } from './state';
 
 const NOW = new Date('2026-11-09T12:00:00Z').getTime();
 const HOUR_MS = 3_600_000;
@@ -29,7 +30,7 @@ function serverTime(ms: number): string {
  * What the fake server believes about the session. Its own moments are far from this device's clock on purpose,
  * to prove that the device ignores them.
  */
-const server = { state: 'running' as 'running' | 'paused', mark: 1, actualSeconds: 0, acceptCheckin: true };
+const server = { state: 'running' as 'running' | 'paused', mark: 1, actualSeconds: 0, acceptCheckin: true, roomLoads: true };
 
 /** Make the envelope that every room session route answers with. */
 function envelope(): Omit<RoomSessionEnvelope, 'status'> {
@@ -54,7 +55,29 @@ function envelope(): Omit<RoomSessionEnvelope, 'status'> {
     };
 }
 
-/** Make the fake server answer the room session routes, and keep the requests it gets. */
+/** The room as the server answers it: the user is the only member, and has a session paused. */
+const roomSnapshot: RoomSnapshot & { success: true } = {
+    success: true,
+    room: { id: 3, name: 'Team', is_owner: true, show_missions: true },
+    summary: { total_time_seconds: 0, total_sessions: 0, members_count: 1, average_session_time_seconds: null },
+    ranking: [{
+        position: 1, username: 'ana', is_you: true, is_owner: true, state: 'paused',
+        session: { mission: 'Write', target_time_seconds: 7200, actual_time_seconds: 10 },
+        total_time_seconds: 0, sessions_count: 0
+    }]
+};
+
+/** What the Room screen last saw of the room, before the session started. */
+const lastSeenRoom: RoomSnapshot = {
+    room: roomSnapshot.room,
+    summary: { total_time_seconds: 600, total_sessions: 4, members_count: 1, average_session_time_seconds: 150 },
+    ranking: [{
+        position: 1, username: 'seen', is_you: true, is_owner: true, state: 'not_working', session: null,
+        total_time_seconds: 600, sessions_count: 4
+    }]
+};
+
+/** Make the fake server answer the room session routes and the room, and keep the requests it gets. */
 function startFakeServer() {
     return fakeBackendByPath(/** Pick the answer for one request. */ (path): FakeAnswer => {
         if (path === 'room-session/pause') server.state = 'paused';
@@ -63,6 +86,7 @@ function startFakeServer() {
         if (path === 'room-session/finish') {
             return { status: 200, body: { ...envelope(), active: false, session: null, saved: true, session_id: 7 } };
         }
+        if (path === 'rooms/3') return server.roomLoads ? { status: 200, body: roomSnapshot } : { status: 500 };
         return path.startsWith('room-session') ? { status: 200, body: envelope() } : { status: 500 };
     });
 }
@@ -103,7 +127,7 @@ beforeEach(() => {
     vi.setSystemTime(NOW);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     screenStore.set({ screen: 'room' });
-    Object.assign(server, { state: 'running', mark: 1, actualSeconds: 0, acceptCheckin: true });
+    Object.assign(server, { state: 'running', mark: 1, actualSeconds: 0, acceptCheckin: true, roomLoads: true });
 });
 
 afterEach(() => {
@@ -259,6 +283,63 @@ describe('stop, continue and finish', () => {
         await handleRoomStop();
         expect(getCurrentScreenName()).toBe('review');
         expect(countOf(fake, 'room-session/pause')).toBe(1);
+    });
+
+    it('loads the ranking for Review after the pause reached the server, so the own row is paused', async () => {
+        const fake = startFakeServer();
+        await startSession();
+        vi.advanceTimersByTime(10_000);
+        await handleRoomStop();
+        await vi.waitFor(() => { expect(reviewStore.get().roomRanking).not.toBeNull(); });
+        const paths = fake.mock.calls.map(/** Read the path of one request. */ ([url]) => pathOf(url));
+        expect(paths.indexOf('rooms/3')).toBeGreaterThan(paths.indexOf('room-session/pause'));
+        expect(reviewStore.get().roomRanking?.entries).toEqual(roomSnapshot.ranking);
+        expect(reviewStore.get().roomRanking?.receivedAt).toBeGreaterThanOrEqual(NOW);
+    });
+
+    it('loads the ranking for Review when Stop is pressed while paused, without a new pause', async () => {
+        const fake = startFakeServer();
+        await startSession();
+        vi.advanceTimersByTime(10_000);
+        await handleRoomPauseResume();
+        await handleRoomStop();
+        await vi.waitFor(() => { expect(reviewStore.get().roomRanking).not.toBeNull(); });
+        expect(countOf(fake, 'room-session/pause')).toBe(1);
+        expect(countOf(fake, 'rooms/3')).toBe(1);
+    });
+
+    it('shows no ranking on Review when the room was never seen, not the one of the last Review', async () => {
+        startFakeServer();
+        await startSession();
+        reviewStore.update({ roomRanking: { entries: roomSnapshot.ranking, receivedAt: 1 } });
+        vi.advanceTimersByTime(10_000);
+        const stopping = handleRoomStop();
+        expect(reviewStore.get().roomRanking).toBeNull();
+        await stopping;
+    });
+
+    it('shows the last seen room on Review at once, and replaces it with the real room when it arrives', async () => {
+        roomSnapshotCache.set(3, lastSeenRoom);
+        startFakeServer();
+        await startSession();
+        vi.advanceTimersByTime(10_000);
+        const stopping = handleRoomStop();
+        expect(reviewStore.get().roomRanking).toEqual({ entries: lastSeenRoom.ranking, receivedAt: undefined });
+        expect(reviewStore.get().roomSummary).toMatchObject({ total_sessions: 5, total_time_seconds: 610 });
+        await stopping;
+        await vi.waitFor(() => { expect(reviewStore.get().roomRanking?.entries).toEqual(roomSnapshot.ranking); });
+        expect(reviewStore.get().roomRanking?.receivedAt).toBeGreaterThanOrEqual(NOW);
+    });
+
+    it('keeps the last seen ranking on Review when the real one cannot load', async () => {
+        roomSnapshotCache.set(3, lastSeenRoom);
+        server.roomLoads = false;
+        const fake = startFakeServer();
+        await startSession();
+        await handleRoomStop();
+        await vi.waitFor(() => { expect(countOf(fake, 'rooms/3')).toBe(1); });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(reviewStore.get().roomRanking?.entries).toEqual(lastSeenRoom.ranking);
     });
 
     it('counts the time on Review as paused when the user continues', async () => {

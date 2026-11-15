@@ -3,7 +3,7 @@ import { BEAT_AVERAGE_INCREMENT_SECONDS } from '../config';
 import { useDocumentEvent } from '../hooks/useDocumentEvent';
 import { useT } from '../i18n/i18n';
 import { closestElement } from '../lib/dom';
-import { formatAverageSessionTime, formatDurationHoursMinutes, formatSecondsAsHHMM } from '../lib/durations';
+import { formatSecondsAsHHMM } from '../lib/durations';
 import { useStore } from '../lib/store';
 import { MissionCard } from '../session/MissionCard';
 import { validateMissionFields, type MissionValidationError } from '../session/plan';
@@ -12,6 +12,7 @@ import { RenameRoomModal } from './RoomModals';
 import { RoomHistory } from './RoomHistory';
 import { RoomMenuItems } from './RoomMenuItems';
 import { RoomRanking } from './RoomRanking';
+import { RoomSummaryCards } from './RoomSummaryCards';
 import { runRoomMenuAction } from './menu';
 import { handleRoomBack, isPollingRoom, pollRoom, retryRoom, roomMenuHooks, setRoomMenuState } from './room';
 import { roomSessionStore } from './room-session-state';
@@ -129,35 +130,10 @@ export function RoomScreen() {
 
                 <div id="room-data" className="room-data" style={{ display: view === 'ready' ? 'flex' : 'none' }}>
 
-                    <div className="room-summary-container">
-                        <div className="dashboard-summary-grid">
-                            <div className="dashboard-summary-card">
-                                <p id="room-total-time" className="dashboard-summary-value">
-                                    {snapshot ? formatDurationHoursMinutes(snapshot.summary.total_time_seconds) : ''}
-                                </p>
-                                <p className="dashboard-summary-label">{t('review.focused')}</p>
-                            </div>
-                            <div className="dashboard-summary-card">
-                                <p id="room-session-count" className="dashboard-summary-value">
-                                    {snapshot ? String(snapshot.summary.total_sessions) : ''}
-                                </p>
-                                <p className="dashboard-summary-label">{t('review.sessions')}</p>
-                            </div>
-                            <div className="dashboard-summary-card">
-                                <p id="room-people-count" className="dashboard-summary-value">
-                                    {snapshot ? String(snapshot.summary.members_count) : ''}
-                                </p>
-                                <p className="dashboard-summary-label">{t('review.people')}</p>
-                            </div>
-                            <div className="dashboard-summary-card">
-                                <p id="room-average-time" className="dashboard-summary-value">
-                                    {snapshot ? formatAverageSessionTime(snapshot.summary.average_session_time_seconds) : ''}
-                                </p>
-                                <p className="dashboard-summary-label">{t('review.averageSessionTime')}</p>
-                                <button type="button" id="room-beat-btn" className="room-beat-btn" onClick={handleBeatAverage}>{t('rooms.beatIt')}</button>
-                            </div>
-                        </div>
-                    </div>
+                    <RoomSummaryCards
+                        summary={snapshot?.summary ?? null}
+                        averageFooter={<button type="button" id="room-beat-btn" className="room-beat-btn" onClick={handleBeatAverage}>{t('rooms.beatIt')}</button>}
+                    />
 
                     <div className="room-main-row">
                         <MissionCard

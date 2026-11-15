@@ -2971,6 +2971,8 @@ button {
     display: flex;
     align-items: center;
     gap: calc(24 * var(--rooms-size-unit));
+    /* The height of its round buttons, so a bar that has none (Review) keeps the cards below in the same place. */
+    min-height: calc(64 * var(--rooms-size-unit));
 }
 
 .room-topbar .room-menu-wrapper {
@@ -3014,6 +3016,10 @@ button {
     line-height: 1.25;
     color: var(--color-white);
     overflow-wrap: anywhere;
+}
+
+.room-title.is-centered {
+    text-align: center;
 }
 
 .room-title-skeleton {
@@ -3063,7 +3069,16 @@ button {
     outline-offset: 4px;
 }
 
+/* The slot under the average time. The Beat button fills it on Room, and it stays empty on Review, so both have the same cards. */
+.room-summary-footer {
+    display: flex;
+    min-height: 1lh;
+    font-size: calc(19 * var(--rooms-size-unit));
+    line-height: 1.25;
+}
+
 .room-main-row {
+    --room-main-card-height: calc(534 * var(--rooms-size-unit));
     display: flex;
     align-items: flex-start;
     gap: calc(40 * var(--rooms-size-unit));
@@ -3071,6 +3086,7 @@ button {
 
 .room-mission-card {
     --plan-size-unit: var(--rooms-size-unit);
+    min-height: var(--room-main-card-height);
     flex-shrink: 0;
 }
 
@@ -3084,25 +3100,21 @@ button {
     width: 100%;
 }
 
-.room-summary-container .dashboard-summary-grid,
-.review-room-summary .dashboard-summary-grid {
+.room-summary-container .dashboard-summary-grid {
     gap: calc(16 * var(--rooms-size-unit));
 }
 
-.room-summary-container .dashboard-summary-card,
-.review-room-summary .dashboard-summary-card {
+.room-summary-container .dashboard-summary-card {
     gap: calc(11 * var(--rooms-size-unit));
     padding: calc(27 * var(--rooms-size-unit));
     border-radius: calc(21 * var(--rooms-size-unit));
 }
 
-.room-summary-container .dashboard-summary-value,
-.review-room-summary .dashboard-summary-value {
+.room-summary-container .dashboard-summary-value {
     font-size: calc(48 * var(--rooms-size-unit));
 }
 
-.room-summary-container .dashboard-summary-label,
-.review-room-summary .dashboard-summary-label {
+.room-summary-container .dashboard-summary-label {
     font-size: calc(24 * var(--rooms-size-unit));
 }
 
@@ -3336,14 +3348,60 @@ body[data-screen="room"] .floating-message {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 48px;
     width: 100%;
 }
 
-.review-room-summary {
-    --rooms-size-unit: min(clamp(0.625px, 0.052083333vw, 1.25px), calc(100dvh / 1300));
-    container-type: inline-size;
-    width: 75vw;
+/* Review in a room has the layout of the Room screen, but it never scrolls: nothing sits below the row of cards. */
+.room-review-screen {
+    padding-bottom: calc(40 * var(--rooms-size-unit));
+}
+
+/* The ranking is as tall as the review card at most, and its members scroll inside it. */
+.room-review-row .room-ranking {
+    max-height: var(--room-main-card-height);
+}
+
+.room-review-row .room-ranking-rows {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* The review card is the Plan card of the Room screen. These are the sizes of the review, written in the unit of that card. */
+.room-review-card #review-mission-display {
+    font-size: calc(30 * var(--rooms-size-unit));
+}
+
+.room-review-card #review-target-time-display {
+    font-size: calc(26 * var(--rooms-size-unit));
+}
+
+.room-review-card .review-summary {
+    gap: calc(12 * var(--rooms-size-unit));
+}
+
+.room-review-card .review-summary > div {
+    padding: calc(36 * var(--rooms-size-unit)) calc(20 * var(--rooms-size-unit));
+    border-radius: calc(16 * var(--rooms-size-unit));
+}
+
+.room-review-card #review-completion-status-display,
+.room-review-card .review-time-label {
+    font-size: calc(22 * var(--rooms-size-unit));
+}
+
+.room-review-card #review-completion-percentage-display {
+    width: calc(64 * var(--rooms-size-unit));
+    font-size: calc(18 * var(--rooms-size-unit));
+}
+
+.room-review-card #review-actual-time-display {
+    font-size: calc(56 * var(--rooms-size-unit));
+}
+
+.room-review-card .review-button-container button {
+    padding: calc(20 * var(--rooms-size-unit)) calc(32 * var(--rooms-size-unit));
+    border-radius: calc(12 * var(--rooms-size-unit));
+    font-size: calc(26 * var(--rooms-size-unit));
 }
 
 .checkin-overlay {

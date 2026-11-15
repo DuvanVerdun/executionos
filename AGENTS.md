@@ -138,6 +138,8 @@ unrelated work unless I explicitly ask.
 
 Before modifying a dirty working tree, understand which changes already existed.
 
+Commit messages are short and title only: one line, no body.
+
 ## Documentation Map
 
 Use repository documentation as persistent context.
