@@ -3,7 +3,7 @@ import { setLoginRequiredHandler } from '../auth/http';
 import { authStore } from '../auth/state';
 import { leaveDashboardScreen, resetDashboardData } from '../dashboard/dashboard';
 import { t } from '../i18n/i18n';
-import { closeFeedbackForm } from '../feedback/feedback';
+import { leaveProfileScreen, resetProfileData } from '../profile/profile';
 import { leaveRoomScreen } from '../rooms/room';
 import { resetRoomSessionClient, setReviewRoomMode } from '../rooms/room-session';
 import { roomSessionStore } from '../rooms/room-session-state';
@@ -12,7 +12,6 @@ import { roomSnapshotCache, roomStore } from '../rooms/state';
 import { focusStore } from '../session/ui-state';
 import { saveLastScreen } from '../shared/last-screen';
 import { addBeforeSwitchHook, navigateTo } from '../shared/navigation';
-import { closeUserMenu, userMenuStore } from '../shared/user-menu';
 import { isHeaderScreenName } from '../types/screens';
 
 /** Add every step that must run around a screen change, in the order the steps must run. */
@@ -31,9 +30,6 @@ export function registerNavigationHooks(): void {
         const roomId = roomStore.get().roomId;
         if (nextScreen === 'room' && roomId !== null) saveLastScreen(userId, { screen: 'room', roomId });
     });
-    addBeforeSwitchHook(/** Close the feedback form on every screen change. */ () => {
-        closeFeedbackForm();
-    });
     addBeforeSwitchHook(/** Stop Dashboard loading when leaving the Dashboard. */ (nextScreen, currentScreen) => {
         if (currentScreen === 'dashboard' && nextScreen !== 'dashboard') leaveDashboardScreen();
     });
@@ -43,16 +39,15 @@ export function registerNavigationHooks(): void {
     addBeforeSwitchHook(/** Stop Room polling when leaving a Room. */ (nextScreen, currentScreen) => {
         if (currentScreen === 'room' && nextScreen !== 'room') leaveRoomScreen();
     });
-    addBeforeSwitchHook(/** Close the open account menu when leaving a header screen. */ (_nextScreen, currentScreen) => {
-        if (isHeaderScreenName(currentScreen) && userMenuStore.get().openScreen !== null) {
-            closeUserMenu();
-        }
+    addBeforeSwitchHook(/** Stop Profile polling when leaving the Profile. */ (nextScreen, currentScreen) => {
+        if (currentScreen === 'profile' && nextScreen !== 'profile') leaveProfileScreen();
     });
     addBeforeSwitchHook(/** Forget room and Dashboard data when the user reaches the Landing, Login, Register or Loading. */ (nextScreen) => {
         if (nextScreen === 'landing' || nextScreen === 'login' || nextScreen === 'register' || nextScreen === 'loading') {
             resetRoomSessionClient();
             resetRoomsData();
             resetDashboardData();
+            resetProfileData();
             roomSnapshotCache.clear();
         }
     });

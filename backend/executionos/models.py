@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Index, String, ForeignKey, UniqueConstraint
+from sqlalchemy import Index, String, ForeignKey, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from executionos.extensions import db
@@ -15,12 +15,16 @@ class User(db.Model):
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     token_version: Mapped[int] = mapped_column(default=0, nullable=False)
+    is_private: Mapped[bool] = mapped_column(default=False, server_default=false(), nullable=False)
+    username_changed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     def __init__(self, username: str, email: str, password_hash: str) -> None:
         self.username = username
         self.email = email
         self.password_hash = password_hash
         self.token_version = 0
+        self.is_private = False
+        self.username_changed_at = None
 
     def __repr__(self) -> str:
         return f"<User {self.username}>"
@@ -175,6 +179,84 @@ class SessionEndNotice(db.Model):
 
     def __repr__(self) -> str:
         return f"<SessionEndNotice {self.id} user={self.user_id} reason={self.reason}>"
+
+
+class Follow(db.Model):
+    """A follow of one user by another. It is pending until a private account accepts it."""
+    __tablename__ = "follows"
+    __table_args__ = (UniqueConstraint("follower_id", "followee_id", name="uq_follows_follower_followee"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    follower_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    followee_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    def __init__(self, follower_id: int, followee_id: int, status: str, created_at: datetime) -> None:
+        self.follower_id = follower_id
+        self.followee_id = followee_id
+        self.status = status
+        self.created_at = created_at
+
+    def __repr__(self) -> str:
+        return f"<Follow {self.id} {self.follower_id}->{self.followee_id} status={self.status}>"
+
+
+class Block(db.Model):
+    """A user blocking another. The blocked user cannot find or follow the blocker."""
+    __tablename__ = "blocks"
+    __table_args__ = (UniqueConstraint("blocker_id", "blocked_id", name="uq_blocks_blocker_blocked"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    blocker_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    blocked_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    def __init__(self, blocker_id: int, blocked_id: int, created_at: datetime) -> None:
+        self.blocker_id = blocker_id
+        self.blocked_id = blocked_id
+        self.created_at = created_at
+
+    def __repr__(self) -> str:
+        return f"<Block {self.id} {self.blocker_id}->{self.blocked_id}>"
+
+
+class Presence(db.Model):
+    """The last live state a client reported for a user. One per user, replaced on every report."""
+    __tablename__ = "presences"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, unique=True
+    )
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    mission: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    worked_seconds: Mapped[int] = mapped_column(nullable=False)
+    target_seconds: Mapped[int] = mapped_column(nullable=False)
+    reported_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    def __init__(
+        self,
+        user_id: int,
+        state: str,
+        mission: str | None,
+        worked_seconds: int,
+        target_seconds: int,
+        reported_at: datetime,
+    ) -> None:
+        self.user_id = user_id
+        self.state = state
+        self.mission = mission
+        self.worked_seconds = worked_seconds
+        self.target_seconds = target_seconds
+        self.reported_at = reported_at
+
+    def __repr__(self) -> str:
+        return f"<Presence {self.id} user={self.user_id} state={self.state}>"
 
 
 class Feedback(db.Model):

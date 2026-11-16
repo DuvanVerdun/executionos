@@ -1,18 +1,12 @@
 import { useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNow } from '../hooks/useNow';
 import { useT } from '../i18n/i18n';
 import { withCssVariables } from '../lib/css';
-import { formatDuration, formatDurationHoursMinutes } from '../lib/durations';
-import type { LiveSession, RankingEntry } from '../types/rooms';
+import { formatDurationHoursMinutes } from '../lib/durations';
+import { LiveSessionCard, type Anchor } from '../shared/LiveSessionCard';
+import type { RankingEntry } from '../types/rooms';
 import { MEMBER_STATE_LABELS } from './copy';
 import { ringFill, workedSeconds } from './live-session';
-
-/** The point above a row where its summary card hangs. */
-interface Anchor {
-    x: number;
-    y: number;
-}
 
 /** Draw a small label pill, such as Owner or You. */
 function RoomPill({ text }: { text: string }) {
@@ -30,23 +24,6 @@ function MemberRing({ member, worked }: { member: RankingEntry; worked: number }
             aria-label={t(MEMBER_STATE_LABELS[member.state])}
             style={member.session ? withCssVariables({}, { '--ring-pct': `${filled}%`, '--ring-over': `${over}%` }) : undefined}
         ></span>
-    );
-}
-
-/**
- * Draw the summary card of a member who is working: the mission when they show it, the time worked, the target, and the percentage.
- * It is drawn in the page body, so no card of the ranking clips it.
- */
-function LiveSessionCard({ session, worked, anchor }: { session: LiveSession; worked: number; anchor: Anchor }) {
-    const percentage = Math.floor(worked / session.target_time_seconds * 100);
-    return createPortal(
-        <div className="streak-day-summary room-live-summary" role="tooltip" style={{ left: anchor.x, top: anchor.y }}>
-            {session.mission !== null && <p>{session.mission}</p>}
-            <p className="streak-day-summary-detail">
-                {`${formatDuration(Math.floor(worked))} / ${formatDuration(session.target_time_seconds)} · ${percentage}%`}
-            </p>
-        </div>,
-        document.body
     );
 }
 

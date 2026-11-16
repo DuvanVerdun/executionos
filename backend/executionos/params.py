@@ -8,6 +8,15 @@ from executionos.timeutils import Period
 
 
 MISSION_MAX_LENGTH = 200
+USERNAME_MAX_LENGTH = 50
+
+
+def parse_username(raw_username: object) -> str:
+    """A valid username, trimmed and in lowercase, the way the register route stores it."""
+    username = raw_username.strip().lower() if isinstance(raw_username, str) else ""
+    if not username or len(username) > USERNAME_MAX_LENGTH:
+        raise ValueError(f"A username of at most {USERNAME_MAX_LENGTH} characters is required")
+    return username
 
 
 def parse_mission(raw_mission: object) -> str:

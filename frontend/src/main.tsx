@@ -6,11 +6,13 @@ import { startFaviconSync } from './app/favicon';
 import { registerNavigationHooks } from './app/hooks';
 import { languageStore } from './i18n/i18n';
 import { initializeApp } from './app/startup';
+import { startPresenceReporting } from './profile/presence';
 import { syncOfflineWork } from './session/sync';
 
 document.documentElement.lang = languageStore.get().language;
 registerNavigationHooks();
 startFaviconSync();
+startPresenceReporting();
 
 /** Retry queued submissions when connectivity returns. */
 window.addEventListener('online', () => { void syncOfflineWork(); });

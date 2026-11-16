@@ -48,9 +48,23 @@ export function formatShortDate(date: Date): string {
     }).format(date);
 }
 
+/** Return how long ago a server timestamp was, in the language the app shows: "2 hr. ago", "hace 2 h". */
+export function formatTimeAgo(serverTime: string, nowMs: number): string {
+    const seconds = Math.max(0, (nowMs - parseServerTime(serverTime)) / 1000);
+    const formatter = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always', style: 'short' });
+    if (seconds < 3600) return formatter.format(-Math.max(1, Math.floor(seconds / 60)), 'minute');
+    if (seconds < 86400) return formatter.format(-Math.floor(seconds / 3600), 'hour');
+    return formatter.format(-Math.floor(seconds / 86400), 'day');
+}
+
 /** Format the month of a date as its name, like "November". */
 export function formatMonthName(date: Date): string {
     return new Intl.DateTimeFormat(getLocale(), { month: 'long' }).format(date);
+}
+
+/** Format the month of a date as a short name, like "Nov". */
+export function formatShortMonthName(date: Date): string {
+    return new Intl.DateTimeFormat(getLocale(), { month: 'short' }).format(date);
 }
 
 /** Format the month of a date with its year, like "November 2026". */

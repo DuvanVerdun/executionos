@@ -10,9 +10,10 @@ import { roomSessionStore } from '../rooms/room-session-state';
 import { roomSnapshotCache, roomStore, roomsStore } from '../rooms/state';
 import { planDraftStore, sessionStore } from '../session/state';
 import { focusStore, reviewStore } from '../session/ui-state';
+import { followingStore, profileCache, profileStore, searchStore } from '../profile/state';
+import { settingsStore } from '../profile/settings/state';
 import { floatingMessageStore } from '../shared/floating-message';
 import { screenStore } from '../shared/navigation';
-import { userMenuStore } from '../shared/user-menu';
 import { streakCelebrationStore } from '../streak/celebration';
 import { streakStore } from '../streak/streak';
 import type { Store } from '../lib/store';
@@ -41,13 +42,17 @@ remember(focusStore);
 remember(reviewStore);
 remember(floatingMessageStore);
 remember(screenStore);
-remember(userMenuStore);
+remember(profileStore);
+remember(followingStore);
+remember(searchStore);
+remember(settingsStore);
 remember(streakStore);
 remember(streakCelebrationStore);
 
 beforeEach(() => {
     restorers.forEach((restore) => { restore(); });
     roomSnapshotCache.clear();
+    profileCache.clear();
     localStorage.clear();
 });
 

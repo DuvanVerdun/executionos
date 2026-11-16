@@ -42,3 +42,10 @@ export function jsonBodyOf(init: RequestInit | undefined): Record<string, unknow
 export function requestedPaths(fake: ReturnType<typeof fakeBackend>): string[] {
     return fake.mock.calls.map(/** Read the path of one request. */ ([url]) => pathOf(url));
 }
+
+/** Make a promise that the test settles when it wants, to hold a request in flight. */
+export function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+    let resolve: (value: T) => void = () => undefined;
+    const promise = new Promise<T>(/** Keep the way to settle the promise. */ (settle) => { resolve = settle; });
+    return { promise, resolve };
+}
