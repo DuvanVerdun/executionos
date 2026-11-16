@@ -101,7 +101,7 @@ export function ProfileCard({ profile, isBusy, isSettingsOpen, secondsSinceAnswe
             <div className="profile-card-menu">
                 {profile.relation === 'self' ? (
                     <button
-                        type="button" className="profile-icon-btn" aria-label={t('profile.settings')} aria-pressed={isSettingsOpen}
+                        type="button" className="profile-icon-btn profile-settings-btn" aria-label={t('profile.settings')} aria-pressed={isSettingsOpen}
                         onClick={isSettingsOpen ? closeSettings : openSettings}
                     >
                         <GearIcon />

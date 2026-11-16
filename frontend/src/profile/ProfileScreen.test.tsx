@@ -186,6 +186,13 @@ describe('a profile that the user may not see', () => {
         expect(screen.getByRole('complementary', { name: 'lucia' })).toBeInTheDocument();
     });
 
+    it('shows placeholders where the data will be, and not the lock, for someone the user already follows', () => {
+        showProfile(profile({ data: null, relation: 'following' }));
+        const { container } = render(<ProfileScreen />);
+        expect(container.querySelector('.profile-skeleton-data')).not.toBeNull();
+        expect(container.querySelector('.profile-locked')).toBeNull();
+    });
+
     it('says what a request is waiting for', () => {
         showProfile(profile({ data: null, is_private: true, relation: 'requested' }));
         render(<ProfileScreen />);

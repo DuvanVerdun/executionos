@@ -5,13 +5,13 @@ import { confirmAction } from '../shared/confirm';
 import { setFloatingMessage } from '../shared/floating-message';
 import { loadStreak } from '../streak/streak';
 import type { ApiResult } from '../types/api';
-import type { LiveState, Relation } from '../types/social';
+import type { LiveState, Profile, Relation } from '../types/social';
 import type { LiveSession } from '../types/rooms';
 import {
     deleteFollow, deleteFollowRequest, fetchFollowing, fetchProfile, fetchUserSearch,
     postAcceptFollowRequest, putBlock, putFollow, type FollowStatus
 } from './api';
-import { followingStore, profileStore, searchStore } from './state';
+import { followingStore, profileCache, profileStore, searchStore } from './state';
 
 /** Grow with every load and every screen exit, so older results can be ignored. */
 let profileGeneration = 0;
@@ -46,7 +46,9 @@ export async function loadProfile({ silent = false }: { silent?: boolean } = {})
         const result = await fetchProfile(viewedUsername());
         if (generation !== profileGeneration) return;
         if (result.success) {
-            profileStore.update({ view: 'ready', profile: result.profile, receivedAt: Date.now() });
+            const receivedAt = Date.now();
+            profileCache.set(result.profile.username, { profile: result.profile, receivedAt });
+            profileStore.update({ view: 'ready', profile: result.profile, receivedAt });
         } else if (result.status === 404) {
             profileStore.update({ view: 'notFound', profile: null });
         } else {
@@ -111,21 +113,32 @@ export function clearSearch(): void {
     searchStore.set({ query: '', status: 'idle', results: [], pendingUsername: null });
 }
 
-/** Show the user's own profile, and load it. */
+/** Show the profile that is chosen. One that was loaded before shows at once while it refreshes, and otherwise placeholders show while it loads. */
+async function showChosenProfile(): Promise<void> {
+    const cached = profileCache.get(viewedUsername());
+    if (cached === undefined) {
+        await loadProfile();
+        return;
+    }
+    profileStore.update({ view: 'ready', profile: cached.profile, receivedAt: cached.receivedAt });
+    await loadProfile({ silent: true });
+}
+
+/** Show the user's own profile. */
 export async function openOwnProfile(): Promise<void> {
     clearSearch();
     profileStore.update({ viewing: null, panel: 'profile' });
-    await loadProfile();
+    await showChosenProfile();
 }
 
-/** Show the profile of someone, and load it. */
+/** Show the profile of someone. */
 export async function openProfile(username: string): Promise<void> {
     if (username === authStore.get().username) {
         await openOwnProfile();
         return;
     }
     profileStore.update({ viewing: username, panel: 'profile' });
-    await loadProfile();
+    await showChosenProfile();
 }
 
 /** Prepare the Profile screen after it shows: the user's own profile, the people they follow, and the refresh timer. */
@@ -135,7 +148,7 @@ export async function enterProfileScreen(): Promise<void> {
     stopPolling();
     pollTimer = setInterval(() => { void pollProfileScreen(); }, SOCIAL_POLL_INTERVAL_MS);
     void loadStreak('profile');
-    await Promise.all([loadProfile(), loadFollowing()]);
+    await Promise.all([showChosenProfile(), loadFollowing()]);
 }
 
 /** Stop everything the Profile screen started. */
@@ -151,25 +164,31 @@ export function leaveProfileScreen(): void {
 /** Forget the profiles and the list. Used when the user signs out or reaches Login. */
 export function resetProfileData(): void {
     leaveProfileScreen();
+    profileCache.clear();
     profileStore.update({ viewing: null, panel: 'profile', view: 'loading', profile: null });
     followingStore.update({ list: { requests: [], following: [] }, surface: 'loading', hasLoaded: false });
 }
 
-/** Refresh what a change of the follows changed. */
+/** Refresh what a change of the follows changed: the profile, the list, and the results of the search that shows. */
 async function refreshAfterChange(): Promise<void> {
-    await Promise.all([loadProfile({ silent: true }), loadFollowing({ silent: true })]);
+    await Promise.all([loadProfile({ silent: true }), loadFollowing({ silent: true }), refreshSearch()]);
 }
 
-/** Run a change of the follows for the profile that shows. Tell the user when it fails. Return whether it worked. */
-async function runProfileChange(change: () => Promise<ApiResult<object>>): Promise<boolean> {
+/**
+ * Run a change of the follows for the profile that shows. Tell the user when it fails. Return whether it worked.
+ * The profile that is given shows before the server answers, and the profile that was on screen comes back if the change fails.
+ */
+async function runProfileChange(change: () => Promise<ApiResult<object>>, expected?: Profile): Promise<boolean> {
     if (profileStore.get().isBusy) return false;
-    profileStore.update({ isBusy: true });
+    const before = profileStore.get().profile;
+    profileStore.update({ isBusy: true, ...(expected && { profile: expected }) });
     try {
         const result = await change();
         if (!result.success) throw new Error(result.error);
         return true;
     } catch (error) {
         console.error('Profile change error:', error);
+        if (expected) profileStore.update({ profile: before });
         setFloatingMessage(t('profile.actionFailed'), { error: true });
         return false;
     } finally {
@@ -177,14 +196,20 @@ async function runProfileChange(change: () => Promise<ApiResult<object>>): Promi
     }
 }
 
-/** Follow the person whose profile shows, or ask them when their account is private. */
+/** Follow the person whose profile shows, or ask them when their account is private. The card shows the follow at once. */
 export async function followViewedProfile(): Promise<void> {
-    if (await runProfileChange(() => putFollow(viewedUsername()))) await refreshAfterChange();
+    const shown = profileStore.get().profile;
+    if (shown === null) return;
+    const expected: Profile = { ...shown, relation: shown.is_private ? 'requested' : 'following' };
+    if (await runProfileChange(() => putFollow(viewedUsername()), expected)) await refreshAfterChange();
 }
 
-/** Stop following the person whose profile shows, or take back the request. */
+/** Stop following the person whose profile shows, or take back the request. The card shows it at once. */
 export async function unfollowViewedProfile(): Promise<void> {
-    if (await runProfileChange(() => deleteFollow(viewedUsername()))) await refreshAfterChange();
+    const shown = profileStore.get().profile;
+    if (shown === null) return;
+    const expected: Profile = { ...shown, relation: 'none', data: null };
+    if (await runProfileChange(() => deleteFollow(viewedUsername()), expected)) await refreshAfterChange();
 }
 
 /** After the user confirms, block the person whose profile shows and go back to the user's own profile. */
@@ -221,8 +246,8 @@ export function setSearchQuery(query: string): void {
     searchTimer = setTimeout(() => { void runSearch(text, generation); }, SEARCH_DEBOUNCE_MS);
 }
 
-/** Ask the server for the users that match, unless the user kept writing meanwhile. */
-async function runSearch(text: string, generation: number): Promise<void> {
+/** Ask the server for the users that match, unless the user kept writing meanwhile. A silent search keeps the results on screen if it fails. */
+async function runSearch(text: string, generation: number, { silent = false }: { silent?: boolean } = {}): Promise<void> {
     try {
         const result = await fetchUserSearch(text);
         if (generation !== searchGeneration) return;
@@ -231,8 +256,14 @@ async function runSearch(text: string, generation: number): Promise<void> {
     } catch (error) {
         if (generation !== searchGeneration) return;
         console.error('Search error:', error);
-        searchStore.update({ status: 'error', results: [] });
+        if (!silent) searchStore.update({ status: 'error', results: [] });
     }
+}
+
+/** Ask again for the search that shows, so the follows of its results are up to date. */
+async function refreshSearch(): Promise<void> {
+    if (searchStore.get().status !== 'ready') return;
+    await runSearch(searchStore.get().query.trim(), searchGeneration, { silent: true });
 }
 
 /** Follow a user who the search found, or ask them when their account is private. */

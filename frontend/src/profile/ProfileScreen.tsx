@@ -21,6 +21,17 @@ function ProfileMessage({ text, buttonLabel, onClick }: { text: string; buttonLa
     );
 }
 
+/** Draw placeholders where the data of a profile will be. */
+function DataSkeleton() {
+    return (
+        <div className="profile-skeleton-data" aria-hidden="true">
+            <div className="dashboard-skeleton profile-skeleton-streak"></div>
+            <div className="dashboard-skeleton profile-skeleton-heatmap"></div>
+            <div className="dashboard-skeleton profile-skeleton-stats"></div>
+        </div>
+    );
+}
+
 /** Draw the Profile screen: the card and the data of one profile, and the people the user follows. */
 export function ProfileScreen() {
     const t = useT();
@@ -42,11 +53,7 @@ export function ProfileScreen() {
                 {view === 'loading' && (
                     <>
                         <div className="dashboard-skeleton profile-skeleton-card" role="status" aria-label={t('profile.loading')}></div>
-                        <div className="profile-skeleton-data" aria-hidden="true">
-                            <div className="dashboard-skeleton profile-skeleton-streak"></div>
-                            <div className="dashboard-skeleton profile-skeleton-heatmap"></div>
-                            <div className="dashboard-skeleton profile-skeleton-stats"></div>
-                        </div>
+                        <DataSkeleton />
                     </>
                 )}
                 {view === 'ready' && profile !== null && (
@@ -54,7 +61,8 @@ export function ProfileScreen() {
                         <ProfileCard profile={profile} isBusy={isBusy} isSettingsOpen={showsSettings} secondsSinceAnswer={Math.max(0, now - receivedAt) / 1000} now={now} />
                         {showsSettings && <SettingsPanel />}
                         {!showsSettings && profile.data !== null && <ProfileData data={profile.data} />}
-                        {!showsSettings && profile.data === null && (
+                        {!showsSettings && profile.data === null && profile.relation === 'following' && <DataSkeleton />}
+                        {!showsSettings && profile.data === null && profile.relation !== 'following' && (
                             <LockedProfile username={profile.username} isPrivate={profile.is_private} isRequested={profile.relation === 'requested'} />
                         )}
                     </>

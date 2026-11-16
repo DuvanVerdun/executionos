@@ -10,7 +10,7 @@ import { roomSessionStore } from '../rooms/room-session-state';
 import { roomSnapshotCache, roomStore, roomsStore } from '../rooms/state';
 import { planDraftStore, sessionStore } from '../session/state';
 import { focusStore, reviewStore } from '../session/ui-state';
-import { followingStore, profileStore, searchStore } from '../profile/state';
+import { followingStore, profileCache, profileStore, searchStore } from '../profile/state';
 import { settingsStore } from '../profile/settings/state';
 import { floatingMessageStore } from '../shared/floating-message';
 import { screenStore } from '../shared/navigation';
@@ -52,6 +52,7 @@ remember(streakCelebrationStore);
 beforeEach(() => {
     restorers.forEach((restore) => { restore(); });
     roomSnapshotCache.clear();
+    profileCache.clear();
     localStorage.clear();
 });
 

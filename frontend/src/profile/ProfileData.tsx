@@ -56,7 +56,9 @@ function Heatmap({ heatmap }: { heatmap: ProfileDataFields['heatmap'] }) {
     const columns = heatmap.states.length / 7;
     return (
         <section className="profile-heatmap">
-            <h2 className="profile-section-title">{t('profile.heatmapTitle')}</h2>
+            <div className="profile-heatmap-margin">
+                <h2 className="profile-section-title">{t('profile.heatmapTitle')}</h2>
+            </div>
             <div className="profile-heatmap-body" role="img" aria-label={t('profile.heatmapLabel')}>
                 <div className="profile-heatmap-months" aria-hidden="true">
                     {monthLabels(heatmap.start_date, columns).map(/** Draw the name of one month above its first column. */ (label) => (
@@ -67,10 +69,12 @@ function Heatmap({ heatmap }: { heatmap: ProfileDataFields['heatmap'] }) {
                     {heatmap.states.map(/** Draw one day. */ (state, index) => <span key={index} className={dayClass(state)}></span>)}
                 </div>
             </div>
-            <div className="profile-heatmap-legend">
-                <span><i className="heatmap-marker heatmap-day-work"></i>{t('streak.legendWork')}</span>
-                <span><i className="heatmap-marker heatmap-day-rest"></i>{t('streak.legendRest')}</span>
-                <span><i className="heatmap-marker heatmap-day-today"></i>{t('streak.legendToday')}</span>
+            <div className="profile-heatmap-margin">
+                <div className="profile-heatmap-legend">
+                    <span><i className="heatmap-marker heatmap-day-work"></i>{t('streak.legendWork')}</span>
+                    <span><i className="heatmap-marker heatmap-day-rest"></i>{t('streak.legendRest')}</span>
+                    <span><i className="heatmap-marker heatmap-day-today"></i>{t('streak.legendToday')}</span>
+                </div>
             </div>
         </section>
     );

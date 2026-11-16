@@ -11,7 +11,7 @@ import {
     isPollingProfileScreen, leaveProfileScreen, loadFollowing, loadProfile, openOwnProfile, openProfile,
     pollProfileScreen, relationOfFollow, resetProfileData, setSearchQuery, unfollowViewedProfile
 } from './profile';
-import { followingStore, profileStore, searchStore } from './state';
+import { followingStore, profileCache, profileStore, searchStore } from './state';
 
 /** The answers of a fake backend by "METHOD path", where the path has no query. A request without an answer fails with 500. */
 function backend(routes: Record<string, FakeAnswer>) {
@@ -95,6 +95,56 @@ describe('loading a profile', () => {
     });
 });
 
+describe('opening a profile that was loaded before', () => {
+    it('shows it at once while the server refreshes it, and shows placeholders for one that never loaded', async () => {
+        backend({ 'GET users/lucia': LUCIA, 'GET users/mateo': { status: 200, body: { success: true, profile: profile({ username: 'mateo' }) } } });
+        const first = openProfile('lucia');
+        expect(profileStore.get()).toMatchObject({ view: 'loading', profile: null });
+        await first;
+        await openProfile('mateo');
+        const slow = deferred<Response>();
+        vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockReturnValue(slow.promise));
+        const second = openProfile('lucia');
+        expect(profileStore.get()).toMatchObject({ view: 'ready', viewing: 'lucia' });
+        expect(profileStore.get().profile?.username).toBe('lucia');
+        slow.resolve(new Response(JSON.stringify({ success: true, profile: profile({ followers_count: 9 }) }), { status: 200 }));
+        await second;
+        expect(profileStore.get().profile?.followers_count).toBe(9);
+    });
+
+    it('keeps showing it when the refresh fails, and says the user is not found when the refresh says so', async () => {
+        backend({ 'GET users/lucia': LUCIA });
+        await openProfile('lucia');
+        backend({});
+        await openProfile('lucia');
+        expect(profileStore.get()).toMatchObject({ view: 'ready', profile: { username: 'lucia' } });
+        backend({ 'GET users/lucia': { status: 404, body: { success: false } } });
+        await openProfile('lucia');
+        expect(profileStore.get().view).toBe('notFound');
+    });
+
+    it('keeps the own profile while the user opens other screens and comes back', async () => {
+        backend({ 'GET users/duvan': { status: 200, body: { success: true, profile: profile({ username: 'duvan', relation: 'self' }) } }, 'GET following': LIST, 'GET streak': { status: 500 } });
+        await enterProfileScreen();
+        leaveProfileScreen();
+        const slow = deferred<Response>();
+        vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockReturnValue(slow.promise));
+        const entering = enterProfileScreen();
+        expect(profileStore.get()).toMatchObject({ view: 'ready', profile: { username: 'duvan' } });
+        slow.resolve(new Response('{}', { status: 500 }));
+        await entering;
+        leaveProfileScreen();
+    });
+
+    it('forgets the profiles that were loaded when the user signs out', async () => {
+        backend({ 'GET users/lucia': LUCIA });
+        await openProfile('lucia');
+        expect(profileCache.size).toBe(1);
+        resetProfileData();
+        expect(profileCache.size).toBe(0);
+    });
+});
+
 describe('loading the people the user follows', () => {
     it('shows the requests and the people', async () => {
         backend({ 'GET following': LIST });
@@ -153,7 +203,7 @@ describe('the Profile screen', () => {
 
 describe('changing the follows from a profile', () => {
     beforeEach(() => {
-        profileStore.update({ viewing: 'lucia' });
+        profileStore.update({ viewing: 'lucia', profile: profile({ relation: 'none', data: null }) });
     });
 
     it('follows, and refreshes the profile and the list', async () => {
@@ -169,12 +219,67 @@ describe('changing the follows from a profile', () => {
         expect(requests(fake)).toContain('DELETE users/lucia/follow');
     });
 
-    it('tells the user when the change fails, and refreshes nothing', async () => {
+    it.each([
+        ['a public account', false, 'following'],
+        ['a private account', true, 'requested']
+    ] as const)('shows the follow of %s before the server answers', async (_name, isPrivate, relation) => {
+        profileStore.update({ profile: profile({ relation: 'none', is_private: isPrivate, data: null }) });
+        const slow = deferred<Response>();
+        vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockReturnValue(slow.promise));
+        const done = followViewedProfile();
+        expect(profileStore.get().profile?.relation).toBe(relation);
+        vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue(new Error('offline')));
+        slow.resolve(new Response(JSON.stringify({ success: true, follow_status: 'accepted' }), { status: 200 }));
+        await done;
+    });
+
+    it('shows the unfollow before the server answers, and locks the data', async () => {
+        profileStore.update({ profile: profile({ relation: 'following' }) });
+        const slow = deferred<Response>();
+        vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockReturnValue(slow.promise));
+        const done = unfollowViewedProfile();
+        expect(profileStore.get().profile).toMatchObject({ relation: 'none', data: null });
+        slow.resolve(new Response(JSON.stringify({ success: false }), { status: 500 }));
+        await done;
+    });
+
+    it('brings the profile back, tells the user, and refreshes nothing when the change fails', async () => {
+        const shown = profile({ relation: 'none', data: null });
+        profileStore.update({ profile: shown });
         const fake = backend({ 'PUT users/lucia/follow': { status: 500, body: { success: false } } });
         await followViewedProfile();
         expect(requests(fake)).toEqual(['PUT users/lucia/follow']);
+        expect(profileStore.get().profile).toEqual(shown);
         expect(floatingMessageStore.get()).toMatchObject({ message: "That didn't work. Try again.", error: true });
         expect(profileStore.get().isBusy).toBe(false);
+    });
+
+    it('asks again for the search that shows, so its results show the new follow', async () => {
+        profileStore.update({ profile: profile({ relation: 'none', data: null }) });
+        searchStore.update({ query: 'lu', status: 'ready', results: [{ username: 'lucia', is_private: false, relation: 'none' }] });
+        backend({
+            'PUT users/lucia/follow': { status: 200, body: { success: true, follow_status: 'accepted' } },
+            'GET users/lucia': LUCIA, 'GET following': LIST,
+            'GET user-search': { status: 200, body: { success: true, users: [{ username: 'lucia', is_private: false, relation: 'following' }] } }
+        });
+        await followViewedProfile();
+        expect(searchStore.get().results[0]?.relation).toBe('following');
+    });
+
+    it('keeps the results of the search when asking again fails', async () => {
+        profileStore.update({ profile: profile({ relation: 'none', data: null }) });
+        const results = [{ username: 'lucia', is_private: false, relation: 'none' as const }];
+        searchStore.update({ query: 'lu', status: 'ready', results });
+        backend({ 'PUT users/lucia/follow': { status: 200, body: { success: true, follow_status: 'accepted' } }, 'GET users/lucia': LUCIA, 'GET following': LIST });
+        await followViewedProfile();
+        expect(searchStore.get()).toMatchObject({ status: 'ready', results });
+    });
+
+    it('tells the user when the change fails, and refreshes nothing', async () => {
+        const fake = backend({ 'PUT users/lucia/follow': { status: 500, body: { success: false } } });
+        profileStore.update({ profile: profile({ relation: 'none', data: null }) });
+        await followViewedProfile();
+        expect(requests(fake)).toEqual(['PUT users/lucia/follow']);
     });
 
     it('does not start a second change while one runs', async () => {
@@ -296,7 +401,7 @@ describe('the search', () => {
         await followFromSearch('lucia');
         expect(searchStore.get().results.map(/** Read a relation. */ (user) => user.relation)).toEqual(['requested', 'none']);
         expect(searchStore.get().pendingUsername).toBeNull();
-        expect(requests(fake)).toEqual(['PUT users/lucia/follow', 'GET users/duvan', 'GET following']);
+        expect(requests(fake)).toEqual(['PUT users/lucia/follow', 'GET users/duvan', 'GET following', 'GET user-search']);
     });
 
     it('tells the user when following from the search fails', async () => {

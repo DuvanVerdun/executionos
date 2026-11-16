@@ -28,6 +28,14 @@ export const profileStore = createStore<ProfileState>({
     isBusy: false
 });
 
+/** A profile that was loaded before and when. The user sees it at once when they open it again, while the server refreshes it. */
+interface CachedProfile {
+    profile: Profile;
+    receivedAt: number;
+}
+
+export const profileCache = new Map<string, CachedProfile>();
+
 /** What the list of people the user follows shows: placeholders, the list, or an error. */
 export type FollowingSurface = 'loading' | 'ready' | 'error';
 

@@ -4902,7 +4902,7 @@ body[data-screen="room"] .floating-message {
     grid-template-columns: calc(380 * var(--profile-size-unit)) minmax(0, 1fr) calc(380 * var(--profile-size-unit));
     grid-template-rows: minmax(0, 1fr);
     gap: calc(32 * var(--profile-size-unit));
-    width: calc(1440 * var(--profile-size-unit));
+    width: 75vw;
     height: calc(904 * var(--profile-size-unit));
     margin-top: calc(clamp(16px, 1.666667vw, 40px) + clamp(48px, 4.166667vw, 96px) + 32 * var(--profile-size-unit));
 }
@@ -5218,6 +5218,13 @@ body[data-screen="room"] .floating-message {
     background-color: var(--color-surface);
 }
 
+.profile-streak-current {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(4 * var(--profile-size-unit));
+}
+
 .profile-streak-number {
     display: flex;
     align-items: center;
@@ -5267,25 +5274,39 @@ body[data-screen="room"] .floating-message {
 }
 
 .profile-heatmap {
+    box-sizing: border-box;
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: calc(16 * var(--profile-size-unit));
-    padding: calc(28 * var(--profile-size-unit));
+    container-type: size;
+    padding: 0 calc(28 * var(--profile-size-unit));
     border-radius: calc(24 * var(--profile-size-unit));
     background-color: var(--color-surface);
 }
 
+.profile-heatmap-margin {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-height: calc(40 * var(--profile-size-unit));
+}
+
 .profile-section-title {
     color: var(--color-text);
-    font-size: calc(28 * var(--profile-size-unit));
+    font-size: calc(32 * var(--profile-size-unit));
     font-weight: normal;
     line-height: 1.25;
 }
 
 .profile-heatmap-body {
+    --heatmap-gap: calc(4 * var(--profile-size-unit));
+    /* A circle fits the width of the card and the height that the title and the legend leave, and it is never bigger than in the design. */
+    --heatmap-cell: min(
+        calc((100cqw - 56 * var(--profile-size-unit) - 25 * var(--heatmap-gap)) / 26),
+        calc((100cqh - 2 * 40 * var(--profile-size-unit) - 26 * var(--profile-size-unit) - 6 * var(--heatmap-gap)) / 7),
+        calc(26 * var(--profile-size-unit))
+    );
     display: flex;
     flex-direction: column;
     gap: calc(6 * var(--profile-size-unit));
@@ -5294,8 +5315,8 @@ body[data-screen="room"] .floating-message {
 .profile-heatmap-months,
 .profile-heatmap-days {
     display: grid;
-    grid-template-columns: repeat(26, minmax(0, 1fr));
-    column-gap: calc(4 * var(--profile-size-unit));
+    grid-template-columns: repeat(26, var(--heatmap-cell));
+    justify-content: space-between;
 }
 
 .profile-heatmap-months {
@@ -5309,14 +5330,13 @@ body[data-screen="room"] .floating-message {
 }
 
 .profile-heatmap-days {
-    grid-template-rows: repeat(7, auto);
+    grid-template-rows: repeat(7, var(--heatmap-cell));
     grid-auto-flow: column;
-    row-gap: calc(4 * var(--profile-size-unit));
+    row-gap: var(--heatmap-gap);
 }
 
 .heatmap-day {
     box-sizing: border-box;
-    aspect-ratio: 1;
     border-radius: 50%;
     background-color: var(--color-surface-selected);
 }
@@ -5790,6 +5810,16 @@ button.following-row:hover,
 .following-skeleton-row {
     height: calc(64 * var(--profile-size-unit));
     border-radius: calc(21 * var(--profile-size-unit));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .profile-settings-btn svg {
+        transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+    }
+
+    .profile-settings-btn:hover svg {
+        transform: rotate(90deg);
+    }
 }
 
 .profile-icon-btn[aria-pressed='true'] {
