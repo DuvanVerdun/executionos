@@ -289,6 +289,7 @@ function scheduleCheckin(): void {
     const delayMs = dueAtMs - Date.now();
     if (outstanding || delayMs <= 0) {
         openCheckinModal();
+        armCheckinSound();
         return;
     }
     closeCheckinModal();

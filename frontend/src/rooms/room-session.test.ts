@@ -19,7 +19,7 @@ import {
     startRoomWork
 } from './room-session';
 import { roomSessionStore } from './room-session-state';
-import { roomSnapshotCache, roomStore } from './state';
+import { checkinAudio, roomSnapshotCache, roomStore } from './state';
 
 const NOW = new Date('2026-11-09T12:00:00Z').getTime();
 const HOUR_MS = 3_600_000;
@@ -535,6 +535,30 @@ describe('a tab that was hidden', () => {
         vi.setSystemTime(new Date(NOW + HOUR_MS + 60_000));
         handleRoomTabVisible();
         expect(roomSessionStore.get().checkinOpen).toBe(true);
+    });
+
+    it('keeps the check-in sound repeating when the tab is visible again while the check-in waits', async () => {
+        startFakeServer();
+        await startSession();
+        const starts: number[] = [];
+        const context = {
+            state: 'running',
+            currentTime: 100,
+            destination: {},
+            createBufferSource: () => ({
+                buffer: null,
+                connect: () => undefined,
+                start: (when: number) => { starts.push(when - 100); },
+                stop: () => undefined
+            })
+        };
+        Object.assign(checkinAudio, { context, buffer: {}, sources: [] });
+        vi.setSystemTime(new Date(NOW + HOUR_MS + 25_000));
+        handleRoomTabVisible();
+        expect(roomSessionStore.get().checkinOpen).toBe(true);
+        expect(starts[0]).toBeCloseTo(5, 0);
+        expect(starts).toHaveLength(27);
+        Object.assign(checkinAudio, { context: null, buffer: null, sources: [] });
     });
 
     it('does nothing when there is no room session', () => {
