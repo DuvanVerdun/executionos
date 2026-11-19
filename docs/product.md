@@ -151,7 +151,7 @@ It is not trying to become:
 - A team collaboration suite. Rooms exist so small groups can do deep work together, not to manage a team's work.
 - A calendar replacement.
 - A complete task-management system.
-- A general social network.
+- A general social network. Following exists so friends keep each other consistent: no posts, no messages, no feed.
 - A gamification system detached from real execution.
 
 These boundaries may change if real user evidence creates a reason to change them.
@@ -160,7 +160,7 @@ These boundaries may change if real user evidence creates a reason to change the
 
 Desktop only. Design canvas: 1440×1024, for Figma prototypes. The built app is responsive, see `docs/architecture.md`.
 
-Languages: Spanish (the default) and English, chosen in the account menu.
+Languages: Spanish (the default) and English, chosen in Settings.
 
 ## Glossary
 
@@ -178,6 +178,10 @@ Languages: Spanish (the default) and English, chosen in the account menu.
 - **Streak:** the days worked in a row. Rest days do not break it.
 - **Rest day:** a day without work that the week allows. A week has two.
 - **Missed day:** the third day without work in a week. It restarts the streak.
+- **Profile:** a user's card (avatar, username, counts, state) and, for those who may see it, their streak, heatmap, and stats.
+- **Follow:** to follow a user is to see their profile and live state. It is one-way. Two follows are a mutual follow. There is no "friend".
+- **Public account:** anyone can follow it. **Private account:** a follow is a request that its owner accepts.
+- **Block:** the blocked user cannot find or follow you, and any follow between you ends.
 
 ## Rooms
 
@@ -194,6 +198,24 @@ Rules a user can observe:
 - Personal sessions can be started at any time, even while in rooms. They never appear in a room.
 - Only the owner can rename a room.
 
+## Profile and Following
+
+- The header icon opens your profile. The gear on your card opens Settings.
+- A profile has a card, a streak and the best streak, a heatmap of the last 6 months, and four stats of the last 30 days: time focused, sessions, days worked, and average session time.
+- Only the owner and the people who follow a profile see its data. Everyone else sees the card, and "Private account" or an invitation to follow.
+- Everyone who follows you sees when you work: a ring with your progress, and your mission on hover. There is no setting to hide it yet. This works for personal and room sessions.
+- The list on the right shows who you follow. It has their streak and a ring while they work. Requests wait above it, and nothing else warns you about them.
+- Search finds users by the start of their username. Blocked users never show up, and a user you cannot see looks like a user that does not exist.
+- Switching to a private account keeps your followers. Switching to a public one accepts the requests that were waiting.
+- Streaks of other people are counted in your time zone.
+
+## Settings
+
+- A column of options, and the content of the one you choose: username, password, privacy, blocked users, language, send feedback, and logout.
+- The username can change once every 30 days, and the form says when it can change again.
+- Changing the password signs you out of your other devices.
+- You can unblock a user from the list of blocked users.
+
 ## Streak and Calendar
 
 - A day with a session counts as worked. The streak is the days worked in a row.
@@ -206,9 +228,9 @@ Rules a user can observe:
 ## Editing and Navigation
 
 - The mission of a saved session can be edited, from the Dashboard and the Room history. Times never change.
-- One header on Plan, Dashboard, and Rooms holds the navigation, the streak, and the account menu.
-- A reload returns to the last Plan, Dashboard, Rooms, or room screen, until the tab closes.
-- Confirmations use one modal, not the browser's popup. Forms (create, join and rename room, edit mission, Send Feedback) open as centered modals, and clicking outside closes them.
+- One header on Plan, Dashboard, Rooms, and Profile holds the navigation, the streak, and the way to your profile.
+- A reload returns to the last Plan, Dashboard, Rooms, Profile, or room screen, until the tab closes.
+- Confirmations use one modal, not the browser's popup. Forms (create, join and rename room, edit mission) open as centered modals, and clicking outside closes them. Send Feedback is a form in Settings.
 - The tab icon is a ring: whole teal when no session runs, and the progress of the session while one does, with a pause mark when it is paused.
 
 ## Landing and Entry

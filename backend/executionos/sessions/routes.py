@@ -1,11 +1,8 @@
-from datetime import datetime
-from typing import Any, cast
-from uuid import UUID
+from typing import Any
 
-from flask import Blueprint, current_app, jsonify, request  # type: ignore[attr-defined]
+from flask import Blueprint, jsonify, request  # type: ignore[attr-defined]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required  # type: ignore[reportUnknownVariableType]
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from executionos.errors import error_response, server_error
 from executionos.extensions import db
@@ -19,7 +16,7 @@ from executionos.params import (
     read_json_object,
 )
 from executionos.rooms.session_service import finalize_overdue_for_users, finalize_quietly
-from executionos.sessions.service import get_paginated_sessions
+from executionos.sessions.service import get_paginated_sessions, save_session_for_user
 
 sessions_bp = Blueprint("sessions", __name__)
 
@@ -66,63 +63,18 @@ def get_sessions() -> tuple[Any, int]:
 @jwt_required()
 def save_session() -> tuple[Any, int]:
     """Receive session data and save to the database."""
-    user_id = int(get_jwt_identity())
-    submission_id: str | None = None
     try:
-        raw_data: object = request.get_json(silent=True)  # type: ignore[reportUnknownMemberType]
-        if not isinstance(raw_data, dict):
-            raise ValueError("Session data is required")
-        data = cast(dict[str, Any], raw_data)
-        if data.get("submissionId") is not None:
-            if not isinstance(data["submissionId"], str):
-                raise ValueError("Submission ID must be a UUID string")
-            submission_id = str(UUID(data["submissionId"]))
-            existing = db.session.execute(select(Session).filter_by(
-                user_id=user_id, submission_id=submission_id
-            )).scalar_one_or_none()
-            if existing is not None:
-                return jsonify({"success": True, "session_id": existing.id}), 200  # type: ignore
-        mission = parse_mission(data["mission"])
-        for field in ("targetTimeSeconds", "actualTimeSeconds"):
-            value = data[field]
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-                raise ValueError("Session times must be non-negative integers")
-        if data["targetTimeSeconds"] == 0:
-            raise ValueError("Target time must be greater than zero")
-        if not isinstance(data["date"], str):
-            raise ValueError("Session date must be an ISO string")
-
-        new_session = Session(
-            user_id=user_id,
-            date=datetime.fromisoformat(data["date"].replace("Z", "+00:00")),
-            mission=mission,
-            target_time_seconds=int(data["targetTimeSeconds"]),
-            actual_time_seconds=int(data["actualTimeSeconds"])
-        )
-        new_session.submission_id = submission_id
-
-        db.session.add(new_session)
-        db.session.commit()
-
+        session, created = save_session_for_user(int(get_jwt_identity()), read_json_object())
+        if not created:
+            return jsonify({"success": True, "session_id": session.id}), 200  # type: ignore
         return jsonify({  # type: ignore
             "success": True,
             "message": "Session saved",
-            "session_id": new_session.id
+            "session_id": session.id
         }), 201
     except (ValueError, TypeError, KeyError):
         db.session.rollback()
         return error_response("Invalid session data", 400)
-    except IntegrityError:
-        db.session.rollback()
-
-        if submission_id is not None:
-            existing = db.session.execute(select(Session).filter_by(
-                user_id=user_id, submission_id=submission_id
-            )).scalar_one_or_none()
-            if existing is not None:
-                return jsonify({"success": True, "session_id": existing.id}), 200  # type: ignore
-        current_app.logger.exception("Could not save session")
-        return error_response("Could not save session", 500)
     except Exception:
         return server_error("Could not save session")
 

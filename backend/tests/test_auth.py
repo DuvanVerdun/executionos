@@ -24,6 +24,9 @@ from helpers import (
 # The only routes that may answer without a token. Adding a public route is a deliberate decision.
 PUBLIC_ENDPOINTS = {"auth.register", "auth.login", "static"}
 
+# Routes guarded by the admin key instead of a login. They answer 404 without it (see test_admin.py).
+ADMIN_KEY_ENDPOINTS = {"admin.add_session_for_user"}
+
 
 def test_register_creates_account_and_normalizes_names(client: FlaskClient[Response]):
     result = register(client)
@@ -95,7 +98,7 @@ def test_every_route_requires_login_unless_public(app: Flask):
     answered_without_login: list[str] = []
 
     for rule in app.url_map.iter_rules():
-        if rule.endpoint in PUBLIC_ENDPOINTS:
+        if rule.endpoint in PUBLIC_ENDPOINTS | ADMIN_KEY_ENDPOINTS:
             continue
 
         url = re.sub(r"<[^>]+>", "1", rule.rule)

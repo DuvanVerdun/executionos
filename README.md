@@ -28,6 +28,8 @@ Each screen has one purpose so the user can focus on execution without unnecessa
 - A streak screen on the first session of the day, and a tab icon that shows your progress
 - Edit session missions and rename rooms
 - Co-DeepWork Rooms: work together through a link, with a ranking and hourly check-ins
+- Profile and friends: follow people, and see their streak, heatmap, and live state
+- Settings: username, password, privacy, blocked users, language, and feedback
 - Landing page, and Spanish (default) and English
 
 ## Stack
@@ -48,7 +50,7 @@ The frontend is deployed separately from the backend and database.
 
 The frontend is React and TypeScript in `frontend/src/`, a folder per feature.
 
-The backend is one Python package with a folder per feature (`auth`, `sessions`, `dashboard`, `rooms`).
+The backend is one Python package with a folder per feature (`auth`, `sessions`, `dashboard`, `rooms`, `social`, `account`).
 
 Both structures are explained in `docs/architecture.md`.
 
@@ -77,6 +79,9 @@ A React and TypeScript rewrite with tests, a landing page, and Spanish.
 
 **v0.6.2 — Polish Details**  
 A streak screen, a progress ring in the tab icon, redesigned modals, and Days Worked on the Dashboard.
+
+**v0.7 — Profile & Friends**  
+A profile with your consistency, following people and seeing them work, blocking, and a settings panel.
 
 ## About the project
 
