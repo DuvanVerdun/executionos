@@ -84,17 +84,19 @@ src/
   i18n/          en.ts, es.ts, i18n.ts (see Frontend Texts)
   types/         backend response shapes and shared types
   shared/        navigation (which screen shows), last-screen, floating message, modals (ModalOverlay, ModalHeader,
-                 confirm and edit-mission), account menu (with the language menu), Header, Screen, ProgressRing, SessionCard
+                 confirm and edit-mission), Header, Screen, ProgressRing, LiveSessionCard, SessionCard
   auth/          state, http (token refresh), api, identity, logout, AuthShell (the layout of Login and Register,
                  with AuthVisual and InviteCard), Register and Login screens
   session/       state, ui-state, api, timer, storage (active session + offline queue), sync, plan, focus, review,
                  MissionCard, Plan, Focus and Review screens (Review draws a personal and a room layout)
   dashboard/     api, dashboard (state and loading flows), chart-math, TrendChart, SessionHistory, DashboardScreen
   streak/        api, streak (state and loading flows), StreakPopup, celebration, pledges, StreakScreen
-  feedback/      api, feedback (state and send flow), FeedbackForm
+  feedback/      api, feedback (draft and send flow)
   landing/       the Landing: screen, header, one file per section, demo data, scroll effects (see Landing)
   rooms/         api, state, room-session-state, rooms, room, room-session, rename, menu, copy, links,
                  checkin-sound, and the Rooms and Room screens with their cards, menus and modals
+  profile/       api, state, profile (loading, refresh, follow, block, search), presence (reports the live session),
+                 the Profile screen with its card, data and list, and settings/ (the panel and one file per option)
 ```
 
 - **Arrows go down.** `main` → `app` → features → `shared` → `lib` and `config`.
@@ -117,7 +119,7 @@ src/
 
 ## Screens and Navigation
 
-- Screens: `loading`, `landing`, `register`, `login`, `plan`, `focus`, `review`, `streak`, `dashboard`, `rooms`, `room`.
+- Screens: `loading`, `landing`, `register`, `login`, `plan`, `focus`, `review`, `streak`, `dashboard`, `rooms`, `room`, `profile`.
   There is no URL router. `screenStore` holds the screen, and `navigateTo` only follows the transitions
   that `shared/navigation.ts` allows.
 - **Startup** (`app/startup.ts`): not signed in goes to `landing`, or to `register` with a `#join=` link. Signed in
@@ -125,8 +127,8 @@ src/
 - Logout goes to `landing`. A request that needs a new sign-in goes to `login`. Login and Register never go
   back to `landing`.
 - The last screen is saved in `sessionStorage` (`shared/last-screen.ts`) and forgotten at logout.
-- Leaving `landing` scrolls to the top. Reaching `landing`, `login`, `register`, or `loading` clears the room
-  data (`app/hooks.ts`).
+- Leaving `landing` scrolls to the top. Reaching `landing`, `login`, `register`, or `loading` clears the room,
+  Dashboard, and profile data (`app/hooks.ts`).
 
 ## Streak Screen
 
@@ -173,7 +175,7 @@ its next tick. `public/favicon.svg` is the idle ring, and `favicon.png` is the f
 - Components call `useT()`, so they redraw when the language changes. Plain code (logic
   files) imports `t`.
 - **The language.** Spanish is the default. `setLanguage` saves it in `localStorage` (`executionOS_language`)
-  and sets `<html lang>`. The account menu has the language menu (`shared/Header.tsx`, `shared/user-menu.ts`).
+  and sets `<html lang>`. Settings has the language choice (`profile/settings/LanguageSection.tsx`).
 - Plurals use two keys (`membersOne`, `membersOther`) and the code picks one.
 - **Dates and units.** `lib/dates.ts` formats dates with `Intl` and `getLocale()` (`es` or `en-US`).
   `lib/durations.ts` takes the units `min` and `seg` from keys (`common.minutesShort`, `common.secondsLong`).
@@ -219,6 +221,8 @@ executionos/
   sessions/        routes.py, service.py, history.py
   dashboard/       routes.py, service.py, streak.py
   rooms/           routes.py, service.py, queries.py, session_service.py, rules.py, errors.py
+  social/          routes.py, service.py (follows and blocks), queries.py (profiles, list, search), presence.py, rules.py, errors.py
+  account/         routes.py, service.py (username, password, privacy), errors.py
 ```
 
 - **Arrows only go down.** `routes.py` → `service` / `queries` / `streak` → shared
@@ -274,6 +278,8 @@ Owns authentication information and execution sessions.
 `token_version` is used to invalidate outstanding refresh-token sessions when
 required.
 
+The account also holds `is_private` and `username_changed_at`. The other new tables are in "Profile and Following".
+
 ### Session
 
 A session belongs to exactly one user through a non-nullable `user_id`
@@ -316,6 +322,11 @@ obtain fresh credentials and retry the authenticated operation.
 
 `token_version` provides server-side invalidation of outstanding refresh
 sessions.
+
+### Password Change
+
+Changing the password adds 1 to `token_version`, so other devices lose their refresh session. The answer carries fresh
+credentials, so the current session goes on.
 
 ### Authentication Privacy
 
@@ -592,6 +603,53 @@ The local backend and the production backend use the same Turso database. Anythi
 local code writes lands in production data. Migrations and scripts that write to the
 database are run by the owner only. Back up the database before each migration and
 before any bulk change.
+
+## Profile and Following
+
+Follows are a layer on top of personal execution, like rooms. A personal session stays on the device. The server only knows
+what the client reports about it.
+
+### Data model
+
+- **`users`:** `is_private` and `username_changed_at`.
+- **`follows`:** follower, followee, and `status` (`pending` or `accepted`). One row per pair.
+- **`blocks`:** blocker and blocked. One row per pair.
+- **`presences`:** one row per user, the last report of the client: state, mission, time worked, target, and when.
+- Counts, streaks, live state, and last activity are derived, never stored.
+
+### Rules
+
+- Only the owner and accepted followers get the data of a profile. Everyone else gets the card.
+- A missing user, yourself, and a block in either direction answer the same 404, so nothing leaks.
+- Blocking ends the follows in both directions. A private account that turns public accepts the waiting requests.
+- The username is lowercase, up to 50 characters, and changes once every 30 days. A new password needs 12 or more characters with upper and lower case, a number, and a symbol.
+- Streaks and heatmaps of other people use the time zone of the user who asks (`dashboard/streak.py`).
+
+### Live state
+
+- The client stays the authority. It sends `PUT /api/presence` on every change (working or paused) and every 15 seconds, and `DELETE` when the session ends. Nothing waits for the answer.
+- The server derives the state (`social/rules.py`): a report older than 180 seconds is "not working". A working report counts on from when it came. The ring is capped at 100.
+
+### API
+
+All under `/api/`, with `@jwt_required()`.
+
+- `GET users/<username>?timezone=`: a profile. `GET user-search?q=`: usernames that start with `q` (2 or more characters, 10 results).
+- `PUT` and `DELETE users/<username>/follow`: follow, unfollow, or take back a request. The answer has `follow_status`, not `status`, because the frontend replaces `status` with the HTTP status.
+- `GET following?timezone=`: the requests and the people you follow. `POST follow-requests/<username>/accept` and `DELETE follow-requests/<username>`.
+- `GET blocks`, `PUT` and `DELETE blocks/<username>`.
+- `GET account`, `PATCH account/username`, `PATCH account/privacy`, `PATCH account/password`.
+- `PUT` and `DELETE presence`.
+
+### Frontend
+
+- `profile/profile.ts` holds the flows and `profile/state.ts` the stores. `profile/presence.ts` reports the session. `shared/LiveSessionCard` and the ring helpers are shared with rooms.
+- The screen refreshes every 15 seconds, skips hidden tabs, and ignores stale answers with generation counters.
+- Loaded profiles are kept in `profileCache`. They show at once and refresh in the background. The cache is cleared at logout.
+- A follow or unfollow shows on the card before the server answers, and comes back if it fails.
+- The search waits 300 ms after the last key, needs 2 characters, and asks again after a change so its results stay current.
+- Settings replace the center and the right of the screen. The feedback text is kept in `feedbackStore` while you visit other options.
+- Sizes are `calc(N * var(--profile-size-unit))`. The unit follows the window's width and height, so the screen never scrolls. The content is `75vw` wide, like Rooms and the Dashboard.
 
 ## Dynamic DOM
 

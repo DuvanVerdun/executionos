@@ -3,6 +3,15 @@
 Each version is a meaningful product step. Small fixes and polish get their
 own commits, not their own entry.
 
+## v0.7 — Profile & Friends (Nov 19, 2026)
+
+- A Profile screen with your streak, a 6-month heatmap, and the stats of the last 30 days.
+- Follow people to see their profile. A private account needs your approval.
+- A list of the people you follow, with a ring while they work, and their mission when you hover.
+- Search users by username.
+- Block users, and unblock them.
+- Settings: username (once every 30 days), password, privacy, blocked users, language, feedback, and logout. They replace the account menu.
+
 ## v0.6.2 — Polish Details (Nov 15, 2026)
 
 - A streak screen after the first session of the day, with the number rolling up beside the flame and a pledge for tomorrow (also after a room session).
