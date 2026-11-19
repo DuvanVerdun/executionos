@@ -19,6 +19,7 @@ def configure(app: Flask, test_config: dict[str, Any] | None = None) -> None:
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
         app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
+        app.config["ADMIN_API_KEY"] = os.environ.get("ADMIN_API_KEY", "")
     else:
         app.config.update(test_config)
 
